@@ -17,13 +17,23 @@ export const EndScreen: React.FC<EndScreenProps> = ({ score, maxCombo, missCount
     const [playerName, setPlayerName] = useState("");
     const [nameSaved, setNameSaved] = useState(false);
 
+    // Safe key generation
+    const getStorageKey = (fname: string) => {
+        const safeName = String(fname || "unknown").replace(/\s+/g, '_');
+        return `djbig_hs_${safeName}`;
+    };
+
     useEffect(() => {
-        const storageKey = `djbig_hs_${fileName.replace(/\s+/g, '_')}`;
+        const storageKey = getStorageKey(fileName);
         const stored = localStorage.getItem(storageKey);
         
         let existingRecord: HighScore | null = null;
         if (stored) {
-            existingRecord = JSON.parse(stored);
+            try {
+                existingRecord = JSON.parse(stored);
+            } catch (e) {
+                console.error("Failed to parse high score", e);
+            }
         }
 
         if (!existingRecord || score > existingRecord.score) {
@@ -34,22 +44,32 @@ export const EndScreen: React.FC<EndScreenProps> = ({ score, maxCombo, missCount
     }, [score, fileName]);
 
     const handleSaveName = () => {
-        if (!playerName.trim()) return;
+        if (!playerName || !playerName.trim()) return;
 
+        // STRICTLY SANITIZE DATA TO PREVENT CIRCULAR STRUCTURE ERRORS
+        // We explicitly convert to primitives to ensure no DOM nodes or Events slip in.
         const newRecord: HighScore = {
-            playerName: playerName.trim().toUpperCase(),
-            score: score,
-            maxCombo: maxCombo,
-            missCount: missCount,
+            playerName: String(playerName).trim().toUpperCase(),
+            score: Number(score) || 0, 
+            maxCombo: Number(maxCombo) || 0, 
+            missCount: Number(missCount) || 0,
             timestamp: Date.now()
         };
 
-        const storageKey = `djbig_hs_${fileName.replace(/\s+/g, '_')}`;
-        localStorage.setItem(storageKey, JSON.stringify(newRecord));
+        const storageKey = getStorageKey(fileName);
         
-        setHighScoreData(newRecord);
-        setNameSaved(true);
-        setIsNewRecord(false);
+        try {
+            // Safely attempt to save
+            const jsonString = JSON.stringify(newRecord);
+            localStorage.setItem(storageKey, jsonString);
+            
+            setHighScoreData(newRecord);
+            setNameSaved(true);
+            setIsNewRecord(false);
+        } catch (e) {
+            console.error("Failed to save high score:", e);
+            alert("Could not save score. Storage might be full or data is invalid.");
+        }
     };
 
     return (

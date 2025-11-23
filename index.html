@@ -80,21 +80,47 @@
         100% { transform: translate(var(--tw-translate-x), var(--tw-translate-y)) scale(0); opacity: 0; }
       }
 
-      /* Anime Background Effects */
-      @keyframes spin-slow {
-        from { transform: rotate(0deg); }
-        to { transform: rotate(360deg); }
+      /* Vintage TV Effects */
+      @keyframes noise {
+        0%, 100% { transform: translate(0, 0); }
+        10% { transform: translate(-5%, -5%); }
+        20% { transform: translate(-10%, 5%); }
+        30% { transform: translate(5%, -10%); }
+        40% { transform: translate(-5%, 15%); }
+        50% { transform: translate(-10%, 5%); }
+        60% { transform: translate(15%, 0); }
+        70% { transform: translate(0, 10%); }
+        80% { transform: translate(-15%, 0); }
+        90% { transform: translate(10%, 5%); }
       }
 
-      @keyframes grid-scroll {
-        0% { transform: perspective(500px) rotateX(60deg) translateY(0); }
-        100% { transform: perspective(500px) rotateX(60deg) translateY(40px); }
+      @keyframes crt-flicker {
+        0% { opacity: 0.97; }
+        5% { opacity: 0.95; }
+        10% { opacity: 0.9; }
+        15% { opacity: 0.95; }
+        20% { opacity: 0.99; }
+        25% { opacity: 0.95; }
+        30% { opacity: 0.9; }
+        35% { opacity: 0.96; }
+        40% { opacity: 0.98; }
+        45% { opacity: 0.95; }
+        50% { opacity: 0.99; }
+        55% { opacity: 0.93; }
+        60% { opacity: 0.9; }
+        65% { opacity: 0.96; }
+        70% { opacity: 1; }
+        75% { opacity: 0.97; }
+        80% { opacity: 0.95; }
+        85% { opacity: 0.92; }
+        90% { opacity: 0.98; }
+        95% { opacity: 0.99; }
+        100% { opacity: 0.94; }
       }
 
-      @keyframes float-up {
-        0% { transform: translateY(110vh) scale(0.5); opacity: 0; }
-        20% { opacity: 1; }
-        100% { transform: translateY(-10vh) scale(1.2); opacity: 0; }
+      @keyframes v-scan {
+        0% { transform: translateY(-100%); }
+        100% { transform: translateY(100vh); }
       }
     </style>
   <script type="importmap">
@@ -107,10 +133,8 @@
   }
 }
 </script>
-<link rel="stylesheet" href="/index.css">
 </head>
   <body class="text-slate-200">
     <div id="root"></div>
-  <script type="module" src="/index.tsx"></script>
-</body>
+  </body>
 </html>

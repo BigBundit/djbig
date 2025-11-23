@@ -40,6 +40,7 @@ const App: React.FC = () => {
   // Local Video State
   const [localVideoSrc, setLocalVideoSrc] = useState<string>('');
   const [localFileName, setLocalFileName] = useState<string>('');
+  
   const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
   const [analyzedNotes, setAnalyzedNotes] = useState<NoteType[] | null>(null);
 
@@ -62,11 +63,15 @@ const App: React.FC = () => {
   const pauseTimeRef = useRef<number>(0);
   const totalPauseDurationRef = useRef<number>(0);
   
+  // Ref to track status inside callbacks/closures
+  const statusRef = useRef<GameStatus>(GameStatus.MENU);
+  
   const notesRef = useRef<NoteType[]>([]);
   const activeKeysRef = useRef<boolean[]>(new Array(7).fill(false)); // Max 7
   const videoRef = useRef<HTMLVideoElement>(null); // Ref for local video
   const audioBufferRef = useRef<AudioBuffer | null>(null); // Ref to store raw audio for re-analysis
-  
+  const noiseBufferRef = useRef<AudioBuffer | null>(null); // Ref to cache noise buffer for performance
+
   // Touch Input State
   const laneContainerRef = useRef<HTMLDivElement>(null);
   const touchedLanesRef = useRef<Set<number>>(new Set());
@@ -74,16 +79,10 @@ const App: React.FC = () => {
   // Visual State for React Render
   const [renderNotes, setRenderNotes] = useState<NoteType[]>([]);
 
-  // Memoized Particles for Anime Background
-  const particles = useMemo(() => {
-    return [...Array(20)].map((_, i) => ({
-      id: i,
-      left: `${Math.random() * 100}%`,
-      delay: `${Math.random() * 5}s`,
-      duration: `${3 + Math.random() * 4}s`,
-      size: `${2 + Math.random() * 4}px`
-    }));
-  }, []);
+  // Update status ref
+  useEffect(() => {
+    statusRef.current = status;
+  }, [status]);
 
   const initAudio = () => {
     if (!audioCtxRef.current) {
@@ -95,14 +94,27 @@ const App: React.FC = () => {
     return audioCtxRef.current;
   };
 
+  // Helper to get or create noise buffer (Optimization)
+  const getNoiseBuffer = (ctx: AudioContext) => {
+    if (!noiseBufferRef.current) {
+      const bufferSize = ctx.sampleRate * 2.0; // 2 seconds
+      const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i++) {
+        data[i] = Math.random() * 2 - 1;
+      }
+      noiseBufferRef.current = buffer;
+    }
+    return noiseBufferRef.current;
+  };
+
   const performAnalysis = async (buffer: AudioBuffer) => {
       setIsAnalyzing(true);
       try {
         const notes = await analyzeAudioAndGenerateNotes(buffer, level, keyMode);
         setAnalyzedNotes(notes);
-        console.log(`Analysis complete. Level: ${level}, Keys: ${keyMode}, Notes: ${notes.length}`);
       } catch (error) {
-        console.error("Analysis failed", error);
+        console.error("Analysis failed");
       } finally {
         setIsAnalyzing(false);
       }
@@ -126,7 +138,7 @@ const App: React.FC = () => {
         
         await performAnalysis(audioBuffer);
       } catch (error) {
-        console.error("Audio decode failed", error);
+        console.error("Audio decode failed");
         alert("Could not analyze audio file.");
         setIsAnalyzing(false);
       }
@@ -136,7 +148,6 @@ const App: React.FC = () => {
   // Re-analyze when level or key mode changes
   useEffect(() => {
     if (audioBufferRef.current && !isAnalyzing) {
-       // Debounce slightly to prevent flicker if user clicks fast
        const timeoutId = setTimeout(() => {
            if (audioBufferRef.current) {
                performAnalysis(audioBufferRef.current);
@@ -145,17 +156,6 @@ const App: React.FC = () => {
        return () => clearTimeout(timeoutId);
     }
   }, [level, keyMode]);
-
-  // Generate white noise buffer for snares/hats
-  const createNoiseBuffer = (ctx: AudioContext) => {
-    const bufferSize = ctx.sampleRate * 2.0; // 2 seconds
-    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
-    const data = buffer.getChannelData(0);
-    for (let i = 0; i < bufferSize; i++) {
-      data[i] = Math.random() * 2 - 1;
-    }
-    return buffer;
-  };
 
   const playHitSound = (laneIndex: number) => {
     if (!audioCtxRef.current) return;
@@ -186,7 +186,7 @@ const App: React.FC = () => {
       osc.stop(t + 0.5);
     } else if (isSnare) {
       // SNARE / CLAP
-      const noiseBuffer = createNoiseBuffer(ctx);
+      const noiseBuffer = getNoiseBuffer(ctx);
       const noise = ctx.createBufferSource();
       noise.buffer = noiseBuffer;
       const noiseFilter = ctx.createBiquadFilter();
@@ -216,7 +216,7 @@ const App: React.FC = () => {
       osc.stop(t + 0.2);
     } else {
       // HI-HAT
-      const noiseBuffer = createNoiseBuffer(ctx);
+      const noiseBuffer = getNoiseBuffer(ctx);
       const noise = ctx.createBufferSource();
       noise.buffer = noiseBuffer;
       const noiseFilter = ctx.createBiquadFilter();
@@ -256,7 +256,7 @@ const App: React.FC = () => {
             osc.stop(startTime + 0.5);
         } else if (type === 'snare') {
             const noise = ctx.createBufferSource();
-            noise.buffer = createNoiseBuffer(ctx);
+            noise.buffer = getNoiseBuffer(ctx);
             const noiseFilter = ctx.createBiquadFilter();
             noiseFilter.type = 'highpass';
             noiseFilter.frequency.value = 800;
@@ -290,7 +290,7 @@ const App: React.FC = () => {
              osc.stop(startTime + 0.4);
         } else if (type === 'crash') {
             const noise = ctx.createBufferSource();
-            noise.buffer = createNoiseBuffer(ctx);
+            noise.buffer = getNoiseBuffer(ctx);
             const noiseFilter = ctx.createBiquadFilter();
             noiseFilter.type = 'highpass';
             noiseFilter.frequency.value = 2000;
@@ -386,6 +386,7 @@ const App: React.FC = () => {
                 setFeedback({ text: "MAX 100%", color: "text-cyan-300", id: Date.now() });
             } else if (hitType === ScoreRating.GOOD) {
                 setScore(s => s + 50);
+                setHealth(h => Math.min(100, h + 0.1));
                 setFeedback({ text: "90%", color: "text-green-400", id: Date.now() });
             } else {
                 setScore(s => s + 10);
@@ -513,7 +514,7 @@ const App: React.FC = () => {
     if (status === GameStatus.PLAYING) {
       frameRef.current = requestAnimationFrame(update);
       if (videoRef.current) {
-        videoRef.current.play().catch(e => console.error("Local video play error", e));
+        videoRef.current.play().catch(e => console.error("Local video play error"));
       }
     }
     return () => cancelAnimationFrame(frameRef.current);
@@ -579,11 +580,26 @@ const App: React.FC = () => {
         alert("Please upload an MP4 video file first.");
         return;
     }
+
     if (!analyzedNotes) {
-        alert("Please wait for audio analysis to complete.");
+        alert("Please wait for analysis to complete.");
         return;
     }
-    notesRef.current = JSON.parse(JSON.stringify(analyzedNotes));
+    
+    // Explicitly map properties to avoid circular structure errors
+    if (analyzedNotes) {
+        notesRef.current = analyzedNotes.map(n => ({
+            id: Number(n.id),
+            laneIndex: Number(n.laneIndex),
+            timestamp: Number(n.timestamp),
+            y: Number(n.y),
+            hit: Boolean(n.hit),
+            missed: Boolean(n.missed)
+        }));
+    } else {
+        notesRef.current = [];
+    }
+
     activeKeysRef.current = new Array(keyMode).fill(false); // Reset active keys size
 
     setScore(0);
@@ -609,7 +625,8 @@ const App: React.FC = () => {
       
       {/* BACKGROUND LAYER */}
       <div className="absolute inset-0 z-0 pointer-events-auto bg-slate-950">
-        {(status === GameStatus.PLAYING || status === GameStatus.PAUSED || status === GameStatus.OUTRO) ? (
+        
+        {status === GameStatus.PLAYING || status === GameStatus.PAUSED || status === GameStatus.OUTRO ? (
             <video
                 ref={videoRef}
                 src={localVideoSrc}
@@ -617,112 +634,27 @@ const App: React.FC = () => {
                 onEnded={triggerOutro}
             />
         ) : (
-             // ANIME STYLE BACKGROUND (Same as before)
-             <div className="w-full h-full relative overflow-hidden bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-blue-900 via-slate-900 to-black">
-                <div className="absolute inset-[-50%] opacity-20 animate-[spin-slow_20s_linear_infinite] origin-center">
-                    <svg viewBox="0 0 100 100" className="w-full h-full fill-cyan-400">
-                        {[...Array(24)].map((_,i) => (
-                            <path key={i} d={`M50 50 L${50 + 80*Math.cos(i*15 * Math.PI/180)} ${50 + 80*Math.sin(i*15 * Math.PI/180)} L${50 + 70*Math.cos((i*15+5) * Math.PI/180)} ${50 + 70*Math.sin((i*15+5) * Math.PI/180)} Z`} />
-                        ))}
-                    </svg>
-                </div>
-                <div className="absolute bottom-0 w-full h-2/3 bg-gradient-to-t from-fuchsia-900/40 to-transparent z-0 pointer-events-none"></div>
-                <div className="absolute -bottom-[50%] -left-[50%] -right-[50%] h-full opacity-30 pointer-events-none"
+            // VINTAGE TV BACKGROUND
+            <div className="w-full h-full relative overflow-hidden bg-black">
+                {/* Static Noise Layer */}
+                <div className="absolute inset-[-50%] opacity-[0.15] animate-[noise_0.2s_steps(2)_infinite]"
                      style={{
-                         backgroundImage: 'linear-gradient(transparent 95%, #06b6d4 95%), linear-gradient(90deg, transparent 95%, #06b6d4 95%)',
-                         backgroundSize: '60px 60px',
-                         transform: 'perspective(500px) rotateX(60deg)',
-                         animation: 'grid-scroll 1s linear infinite'
+                         backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='1'/%3E%3C/svg%3E")`,
                      }}
                 ></div>
-                {particles.map((p) => (
-                    <div 
-                        key={p.id}
-                        className="absolute bottom-0 bg-white rounded-full shadow-[0_0_10px_white]"
-                        style={{
-                            left: p.left,
-                            width: p.size,
-                            height: p.size,
-                            animation: `float-up ${p.duration} ease-in infinite`,
-                            animationDelay: p.delay
-                        }}
-                    ></div>
-                ))}
-                {/* Instruments SVGs (Preserved from previous request) */}
-                <div className="absolute inset-0 pointer-events-none overflow-hidden">
-                    {/* Guitar */}
-                    <svg className="absolute top-[15%] left-[10%] w-64 h-64 text-cyan-500/10 animate-[float-up_20s_ease-in-out_infinite]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="0.5" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="m9.06 11.9 8.07-6.7c.88-.73.81-1.92-.1-2.67a1.98 1.98 0 0 0-2.68.1l-8.06 6.7a1.98 1.98 0 0 0-.1 2.68c.88.73 2.07.8 2.87.16" />
-                        <path d="M12.97 4.14 7.6 10.6a5.77 5.77 0 0 0-.32 7.7 5.76 5.76 0 0 0 7.7.32l5.37-6.46" />
-                        <path d="M7 21c-2.21 0-4-1.79-4-4" />
-                    </svg>
-                    {/* Bass Guitar */}
-                    <svg className="absolute top-[60%] left-[15%] w-72 h-72 text-indigo-500/10 animate-[float-up_24s_ease-in-out_infinite_2s]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="0.8" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M9 21c-2.21 0-4-1.79-4-4V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v12c0 2.21-1.79 4-4 4z" />
-                        <line x1="11" y1="3" x2="11" y2="21" />
-                        <line x1="9" y1="17" x2="13" y2="17" />
-                        <line x1="9" y1="12" x2="13" y2="12" />
-                    </svg>
-                    {/* Speaker */}
-                    <svg className="absolute bottom-[20%] right-[5%] w-56 h-56 text-fuchsia-500/10 animate-[float-up_25s_ease-in-out_infinite_reverse]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="0.5" strokeLinecap="round" strokeLinejoin="round">
-                        <rect width="16" height="20" x="4" y="2" rx="2" />
-                        <circle cx="12" cy="14" r="4" />
-                        <line x1="12" x2="12.01" y1="6" y2="6" />
-                    </svg>
-                    {/* Microphone */}
-                    <svg className="absolute top-[40%] right-[20%] w-40 h-40 text-yellow-500/10 animate-[float-up_18s_ease-in-out_infinite]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="0.5" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
-                        <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-                        <line x1="12" x2="12" y1="19" y2="22" />
-                        <line x1="8" x2="16" y1="22" y2="22" />
-                    </svg>
-                    {/* Drum */}
-                    <svg className="absolute bottom-[10%] left-[25%] w-60 h-60 text-white/10 animate-[float-up_22s_ease-in-out_infinite_1s]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="0.5" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M7 13.4v7.9" />
-                        <path d="M17 13.4v7.9" />
-                        <path d="M2 9c0 1.1 4.5 2 10 2s10-.9 10-2" />
-                        <path d="M2 9v8c0 1.1 4.5 2 10 2s10-.9 10-2V9" />
-                        <ellipse cx="4" cy="4" rx="3" ry="1" />
-                        <line x1="4" y1="4" x2="6" y2="13" />
-                        <ellipse cx="20" cy="5" rx="3" ry="1" />
-                        <line x1="20" y1="5" x2="18" y2="13" />
-                    </svg>
-                    {/* Turntable */}
-                    <svg className="absolute bottom-[40%] right-[30%] w-52 h-52 text-cyan-600/10 animate-[float-up_30s_ease-in-out_infinite_4s]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="0.5" strokeLinecap="round" strokeLinejoin="round">
-                         <rect x="2" y="2" width="20" height="20" rx="2" />
-                         <circle cx="12" cy="12" r="8" />
-                         <circle cx="12" cy="12" r="2" />
-                         <path d="M20 4 L16 8" />
-                    </svg>
-                    {/* Piano */}
-                    <svg className="absolute top-[5%] right-[5%] w-64 h-32 text-fuchsia-300/10 animate-[float-up_12s_ease-in-out_infinite_3s]" viewBox="0 0 24 12" fill="none" stroke="currentColor" strokeWidth="0.5">
-                        <rect x="0" y="0" width="24" height="12" />
-                        <line x1="4" y1="0" x2="4" y2="12" />
-                        <line x1="8" y1="0" x2="8" y2="12" />
-                        <line x1="12" y1="0" x2="12" y2="12" />
-                        <line x1="16" y1="0" x2="16" y2="12" />
-                        <line x1="20" y1="0" x2="20" y2="12" />
-                    </svg>
-                    {/* Note */}
-                    <svg className="absolute top-[20%] left-[40%] w-32 h-32 text-cyan-300/10 animate-[float-up_15s_ease-in-out_infinite_3s]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="0.5" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M9 18V5l12-2v13" />
-                        <circle cx="6" cy="18" r="3" />
-                        <circle cx="18" cy="16" r="3" />
-                    </svg>
-                     {/* Headphones */}
-                    <svg className="absolute bottom-[30%] left-[5%] w-40 h-40 text-fuchsia-300/10 animate-[float-up_28s_ease-in-out_infinite_5s]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="0.5" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M3 14v3c0 .6.4 1 1 1h2a1 1 0 0 0 1-1v-3a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1z" />
-                        <path d="M18 13h2a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1z" />
-                        <path d="M21 14v-3a9 9 0 0 0-9-9 9 9 0 0 0-9 9v3" />
-                    </svg>
-                </div>
-                <div className="absolute inset-0 bg-radial-gradient from-transparent to-black/60 pointer-events-none"></div>
+                {/* Flicker Overlay */}
+                <div className="absolute inset-0 bg-white/5 animate-[crt-flicker_0.15s_infinite] pointer-events-none mix-blend-overlay"></div>
+                {/* Vignette */}
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_50%,rgba(0,0,0,1)_100%)] pointer-events-none"></div>
+                {/* Scanline rolling bar */}
+                <div className="absolute inset-x-0 h-32 bg-white/5 animate-[v-scan_8s_linear_infinite] blur-xl pointer-events-none"></div>
             </div>
         )}
         <div className="absolute inset-0 bg-gradient-to-r from-black via-slate-950/40 to-transparent pointer-events-none"></div>
       </div>
 
-      <div className="scanlines z-10 pointer-events-none"></div>
+      {/* SCANLINES - NOW ON TOP Z-50 */}
+      <div className="scanlines z-50 pointer-events-none opacity-40"></div>
 
       {/* OUTRO SEQUENCE OVERLAY */}
       {status === GameStatus.OUTRO && (
@@ -745,7 +677,7 @@ const App: React.FC = () => {
             DJ<span className="text-cyan-400">BIG</span>
           </h1>
           
-          <div className="w-full max-w-xl space-y-6 p-8 bg-black/80 backdrop-blur-xl border border-slate-700 rounded-xl shadow-2xl relative">
+          <div className="w-full max-w-xl space-y-6 p-8 backdrop-blur-xl border border-slate-700 rounded-xl shadow-2xl relative transition-all duration-500 bg-black/80">
             
             {isAnalyzing && (
                 <div className="absolute inset-0 z-50 bg-black/90 flex flex-col items-center justify-center rounded-xl">
@@ -754,7 +686,7 @@ const App: React.FC = () => {
                 </div>
             )}
 
-            {/* Upload Section */}
+            {/* INPUT SECTION */}
             <div className="animate-fade-in space-y-3">
                 <label className="text-sm font-bold tracking-widest text-cyan-400 block">SELECT MUSIC TRACK</label>
                 <label className="flex flex-col items-center justify-center w-full h-16 border-2 border-slate-700 border-dashed rounded cursor-pointer hover:bg-slate-800 hover:border-cyan-500 transition-all bg-slate-900/50 group">
@@ -830,8 +762,8 @@ const App: React.FC = () => {
             <button 
                 onClick={startGame}
                 disabled={isAnalyzing || !analyzedNotes}
-                className={`w-full py-4 bg-gradient-to-r from-cyan-700 to-blue-700 text-white font-display font-bold text-2xl tracking-widest uppercase transition-all transform shadow-[0_0_30px_rgba(6,182,212,0.4)]
-                    ${(isAnalyzing || !analyzedNotes) ? 'opacity-50 cursor-not-allowed grayscale' : 'hover:from-cyan-600 hover:to-blue-600 hover:scale-[1.02]'}
+                className={`w-full py-4 bg-gradient-to-r from-cyan-700 to-blue-700 text-white font-display font-bold text-2xl tracking-widest uppercase transition-all transform shadow-[0_0_30px_rgba(6,182,212,0.4)] border border-cyan-400/50
+                    ${(isAnalyzing || !analyzedNotes) ? 'opacity-50 cursor-not-allowed grayscale' : 'hover:from-cyan-600 hover:to-blue-600 hover:scale-[1.02] animate-pulse'}
                 `}
             >
                 {isAnalyzing ? 'ANALYZING...' : 'Game Start!!'}
