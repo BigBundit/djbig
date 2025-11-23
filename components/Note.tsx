@@ -25,8 +25,8 @@ export const Note: React.FC<NoteProps> = ({ note, totalLanes, color }) => {
                 height: '2.5%' 
             }}
         >
+            {/* Note Head */}
             <div className={`w-full h-full rounded-[2px] ${colorClass} relative`}>
-                {/* Note highlight */}
                 <div className="absolute inset-x-0 top-0 h-[40%] bg-white/60"></div>
             </div>
         </div>

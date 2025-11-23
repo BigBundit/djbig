@@ -30,10 +30,19 @@ const App: React.FC = () => {
   const [combo, setCombo] = useState<number>(0);
   const [maxCombo, setMaxCombo] = useState<number>(0);
   const [health, setHealth] = useState<number>(100);
+  
+  // Stats for Ranking
+  const [perfectCount, setPerfectCount] = useState<number>(0);
+  const [goodCount, setGoodCount] = useState<number>(0);
   const [missCount, setMissCount] = useState<number>(0);
+
   const [feedback, setFeedback] = useState<{ text: string; color: string; id: number } | null>(null);
   const [isAutoPlay, setIsAutoPlay] = useState<boolean>(false);
   
+  // Countdown State
+  const [startCountdown, setStartCountdown] = useState<number | null>(null);
+  const [isShaking, setIsShaking] = useState<boolean>(false);
+
   // Visual Effects State
   const [hitEffects, setHitEffects] = useState<HitEffectData[]>([]);
 
@@ -69,9 +78,10 @@ const App: React.FC = () => {
   const notesRef = useRef<NoteType[]>([]);
   const activeKeysRef = useRef<boolean[]>(new Array(7).fill(false)); // Max 7
   const videoRef = useRef<HTMLVideoElement>(null); // Ref for local video
+  const bgRef = useRef<HTMLDivElement>(null); // Ref for background pulse
   const audioBufferRef = useRef<AudioBuffer | null>(null); // Ref to store raw audio for re-analysis
   const noiseBufferRef = useRef<AudioBuffer | null>(null); // Ref to cache noise buffer for performance
-
+  
   // Touch Input State
   const laneContainerRef = useRef<HTMLDivElement>(null);
   const touchedLanesRef = useRef<Set<number>>(new Set());
@@ -108,6 +118,32 @@ const App: React.FC = () => {
     return noiseBufferRef.current;
   };
 
+  const playUiSound = (type: 'hover' | 'select') => {
+      if (!audioCtxRef.current) return; // Only play if context is already initialized
+      const ctx = audioCtxRef.current;
+      const t = ctx.currentTime;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      
+      if (type === 'hover') {
+          osc.frequency.setValueAtTime(400, t);
+          osc.frequency.exponentialRampToValueAtTime(200, t + 0.05);
+          gain.gain.setValueAtTime(0.05, t);
+          osc.type = 'sine';
+      } else {
+          osc.frequency.setValueAtTime(800, t);
+          osc.frequency.exponentialRampToValueAtTime(400, t + 0.1);
+          gain.gain.setValueAtTime(0.1, t);
+          osc.type = 'square';
+      }
+      
+      gain.gain.exponentialRampToValueAtTime(0.01, t + 0.1);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(t);
+      osc.stop(t + 0.1);
+  };
+
   const performAnalysis = async (buffer: AudioBuffer) => {
       setIsAnalyzing(true);
       try {
@@ -123,6 +159,9 @@ const App: React.FC = () => {
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      // Init audio context on user interaction
+      initAudio();
+      
       if (localVideoSrc) URL.revokeObjectURL(localVideoSrc);
       const url = URL.createObjectURL(file);
       setLocalVideoSrc(url);
@@ -161,9 +200,8 @@ const App: React.FC = () => {
     if (!audioCtxRef.current) return;
     const ctx = audioCtxRef.current;
     const t = ctx.currentTime;
-
+    
     // Adapt sound to key mode. 
-    // Logic: Center key or space is kick. Outer is hi-hat. Middle is snare.
     let isKick = false;
     let isSnare = false;
 
@@ -206,10 +244,8 @@ const App: React.FC = () => {
       noise.connect(noiseFilter);
       noiseFilter.connect(noiseGain);
       noiseGain.connect(ctx.destination);
-      
       osc.connect(oscGain);
       oscGain.connect(ctx.destination);
-      
       noise.start(t);
       osc.start(t);
       noise.stop(t + 0.2);
@@ -229,7 +265,6 @@ const App: React.FC = () => {
       noise.connect(noiseFilter);
       noiseFilter.connect(noiseGain);
       noiseGain.connect(ctx.destination);
-      
       noise.start(t);
       noise.stop(t + 0.05);
     }
@@ -348,15 +383,17 @@ const App: React.FC = () => {
   // CORE GAME LOGIC
   const triggerLane = useCallback((laneIndex: number) => {
     if (status !== GameStatus.PLAYING || isAutoPlay) return; 
-
+    
     if (activeKeysRef.current[laneIndex]) return;
     activeKeysRef.current[laneIndex] = true;
 
     const now = performance.now();
+    // Find nearest note
     const elapsed = now - startTimeRef.current - totalPauseDurationRef.current;
     
+    // Filter for unhit notes
     const notesInLane = notesRef.current.filter(n => n.laneIndex === laneIndex && !n.hit && !n.missed);
-    notesInLane.sort((a, b) => b.y - a.y);
+    notesInLane.sort((a, b) => b.y - a.y); // Closest to bottom first (highest Y)
     const targetNote = notesInLane[0];
 
     // HIT LOGIC
@@ -364,14 +401,16 @@ const App: React.FC = () => {
         const dist = Math.abs(targetNote.y - 90);
         let hitType: ScoreRating | null = null;
 
-        if (dist < 4) hitType = ScoreRating.PERFECT;
-        else if (dist < 10) hitType = ScoreRating.GOOD;
-        else if (dist < 18) hitType = ScoreRating.BAD;
+        if (dist < 6) hitType = ScoreRating.PERFECT; // slightly wider window for feel
+        else if (dist < 12) hitType = ScoreRating.GOOD;
+        else if (dist < 20) hitType = ScoreRating.BAD;
 
         if (hitType !== null) {
-            targetNote.hit = true;
             playHitSound(laneIndex);
 
+            // NORMAL NOTE HIT
+            targetNote.hit = true;
+            
             const newEffect: HitEffectData = {
                 id: Date.now() + Math.random(),
                 laneIndex: laneIndex,
@@ -382,10 +421,12 @@ const App: React.FC = () => {
             
             if (hitType === ScoreRating.PERFECT) {
                 setScore(s => s + 100 + (combo > 10 ? 10 : 0));
+                setPerfectCount(c => c + 1);
                 setHealth(h => Math.min(100, h + 0.5));
                 setFeedback({ text: "MAX 100%", color: "text-cyan-300", id: Date.now() });
             } else if (hitType === ScoreRating.GOOD) {
                 setScore(s => s + 50);
+                setGoodCount(c => c + 1);
                 setHealth(h => Math.min(100, h + 0.1));
                 setFeedback({ text: "90%", color: "text-green-400", id: Date.now() });
             } else {
@@ -449,6 +490,14 @@ const App: React.FC = () => {
   const update = useCallback(() => {
     if (status !== GameStatus.PLAYING) return;
 
+    // Background pulse logic
+    if (bgRef.current) {
+         // Subtle breathing effect
+         const time = Date.now() / 1000;
+         const scale = 1 + Math.sin(time * 2) * 0.01;
+         bgRef.current.style.transform = `scale(${scale})`;
+    }
+
     const now = performance.now();
     const elapsed = now - startTimeRef.current - totalPauseDurationRef.current;
     
@@ -456,44 +505,43 @@ const App: React.FC = () => {
     const currentFallSpeed = BASE_FALL_SPEED_MS / speedMod;
 
     notesRef.current.forEach(note => {
+      // Calculate Y
       const timeSinceSpawn = elapsed - note.timestamp;
       const position = (timeSinceSpawn / currentFallSpeed) * 90;
       note.y = position;
 
-      // AUTO PLAY
-      if (isAutoPlay && !note.hit && !note.missed && position >= 90) {
-          note.hit = true;
-          activeKeysRef.current[note.laneIndex] = true;
-          setTimeout(() => {
-               activeKeysRef.current[note.laneIndex] = false;
-          }, 50);
+      // AUTO PLAY LOGIC
+      if (isAutoPlay && !note.hit && !note.missed) {
+          // Normal Auto Hit
+          if (position >= 90) {
+            note.hit = true;
+            activeKeysRef.current[note.laneIndex] = true;
+            setTimeout(() => { activeKeysRef.current[note.laneIndex] = false; }, 50);
 
-          playHitSound(note.laneIndex);
-          
-          const newEffect: HitEffectData = {
-                id: Date.now() + Math.random(),
-                laneIndex: note.laneIndex,
-                rating: ScoreRating.PERFECT,
-                timestamp: now
-            };
-          setHitEffects(prev => [...prev, newEffect]);
-          setScore(s => s + 100 + (combo > 10 ? 10 : 0));
-          setHealth(h => Math.min(100, h + 0.5));
-          setFeedback({ text: "AUTO", color: "text-cyan-300", id: Date.now() });
-          setCombo(c => {
-                const newC = c + 1;
-                if (newC > maxCombo) setMaxCombo(newC);
-                setMaxCombo(prev => Math.max(prev, newC));
-                return newC;
-          });
+            playHitSound(note.laneIndex);
+            
+            setHitEffects(prev => [...prev, { id: Date.now() + Math.random(), laneIndex: note.laneIndex, rating: ScoreRating.PERFECT, timestamp: now }]);
+            setScore(s => s + 100);
+            setPerfectCount(c => c + 1);
+            setHealth(h => Math.min(100, h + 0.5));
+            setFeedback({ text: "AUTO", color: "text-cyan-300", id: Date.now() });
+            setCombo(c => {
+                    const newC = c + 1;
+                    setMaxCombo(prev => Math.max(prev, newC));
+                    return newC;
+            });
+          }
       }
 
+      // MISS LOGIC (Head passed threshold without being hit)
       if (!note.hit && !note.missed && position > missThreshold) {
         note.missed = true;
         setMissCount(c => c + 1);
         setCombo(0);
         setHealth(h => Math.max(0, h - 4));
         setFeedback({ text: "MISS", color: "text-red-500", id: Date.now() });
+        setIsShaking(true);
+        setTimeout(() => setIsShaking(false), 200);
       }
     });
 
@@ -522,7 +570,13 @@ const App: React.FC = () => {
 
   // Input Handling
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
-    if (status === GameStatus.MENU) return;
+    if (status === GameStatus.MENU) {
+        const laneIndex = activeLaneConfig.findIndex(l => l.key === e.key.toLowerCase());
+        if (laneIndex !== -1 && audioCtxRef.current) {
+            playHitSound(laneIndex);
+        }
+        return;
+    }
     
     if (e.key === 'F1') {
         e.preventDefault();
@@ -550,7 +604,6 @@ const App: React.FC = () => {
         return;
     }
 
-    // Look up key in active config
     const laneIndex = activeLaneConfig.findIndex(l => l.key === e.key.toLowerCase());
     if (laneIndex !== -1) {
         triggerLane(laneIndex);
@@ -573,8 +626,9 @@ const App: React.FC = () => {
     };
   }, [handleKeyDown, handleKeyUp]);
 
-  const startGame = () => {
+  const startCountdownSequence = () => {
     initAudio();
+    playUiSound('select');
 
     if (!localVideoSrc) {
         alert("Please upload an MP4 video file first.");
@@ -585,8 +639,23 @@ const App: React.FC = () => {
         alert("Please wait for analysis to complete.");
         return;
     }
-    
-    // Explicitly map properties to avoid circular structure errors
+
+    setStartCountdown(3);
+    let count = 3;
+    const timer = setInterval(() => {
+        count--;
+        if (count > 0) {
+            setStartCountdown(count);
+        } else {
+            clearInterval(timer);
+            setStartCountdown(null);
+            startGame();
+        }
+    }, 1000);
+  }
+
+  const startGame = () => {
+    // Explicitly map properties
     if (analyzedNotes) {
         notesRef.current = analyzedNotes.map(n => ({
             id: Number(n.id),
@@ -600,13 +669,15 @@ const App: React.FC = () => {
         notesRef.current = [];
     }
 
-    activeKeysRef.current = new Array(keyMode).fill(false); // Reset active keys size
+    activeKeysRef.current = new Array(keyMode).fill(false);
 
     setScore(0);
     setCombo(0);
     setMaxCombo(0);
     setHealth(100);
     setMissCount(0);
+    setPerfectCount(0);
+    setGoodCount(0);
     setHitEffects([]);
     setIsAutoPlay(false);
     totalPauseDurationRef.current = 0;
@@ -616,15 +687,23 @@ const App: React.FC = () => {
   };
 
   const quitGame = () => {
+      playUiSound('select');
       setStatus(GameStatus.MENU);
       setHitEffects([]);
   };
 
+  const getLevelColor = (l: number) => {
+      if (l <= 3) return 'border-green-500 text-green-400 shadow-green-500/20';
+      if (l <= 6) return 'border-yellow-500 text-yellow-400 shadow-yellow-500/20';
+      if (l <= 8) return 'border-orange-500 text-orange-400 shadow-orange-500/20';
+      return 'border-red-500 text-red-400 shadow-red-500/20';
+  };
+
   return (
-    <div className="relative w-full h-screen bg-black overflow-hidden text-slate-100 select-none">
+    <div className={`relative w-full h-screen bg-black overflow-hidden text-slate-100 select-none ${isShaking ? 'animate-[shake_0.2s_ease-in-out]' : ''}`}>
       
       {/* BACKGROUND LAYER */}
-      <div className="absolute inset-0 z-0 pointer-events-auto bg-slate-950">
+      <div className="absolute inset-0 z-0 pointer-events-auto bg-slate-950 overflow-hidden" ref={bgRef} style={{ transition: 'transform 0.05s, filter 0.05s' }}>
         
         {status === GameStatus.PLAYING || status === GameStatus.PAUSED || status === GameStatus.OUTRO ? (
             <video
@@ -636,27 +715,36 @@ const App: React.FC = () => {
         ) : (
             // VINTAGE TV BACKGROUND
             <div className="w-full h-full relative overflow-hidden bg-black">
-                {/* Static Noise Layer */}
+                {/* Static Noise */}
                 <div className="absolute inset-[-50%] opacity-[0.15] animate-[noise_0.2s_steps(2)_infinite]"
                      style={{
                          backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='1'/%3E%3C/svg%3E")`,
                      }}
                 ></div>
-                {/* Flicker Overlay */}
+                {/* Flicker */}
                 <div className="absolute inset-0 bg-white/5 animate-[crt-flicker_0.15s_infinite] pointer-events-none mix-blend-overlay"></div>
                 {/* Vignette */}
                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_50%,rgba(0,0,0,1)_100%)] pointer-events-none"></div>
-                {/* Scanline rolling bar */}
+                {/* Scanline rolling */}
                 <div className="absolute inset-x-0 h-32 bg-white/5 animate-[v-scan_8s_linear_infinite] blur-xl pointer-events-none"></div>
             </div>
         )}
         <div className="absolute inset-0 bg-gradient-to-r from-black via-slate-950/40 to-transparent pointer-events-none"></div>
       </div>
 
-      {/* SCANLINES - NOW ON TOP Z-50 */}
+      {/* SCANLINES */}
       <div className="scanlines z-50 pointer-events-none opacity-40"></div>
 
-      {/* OUTRO SEQUENCE OVERLAY */}
+      {/* COUNTDOWN */}
+      {startCountdown !== null && (
+          <div className="absolute inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+              <div className="text-[15rem] font-black font-display text-cyan-400 animate-ping">
+                  {startCountdown}
+              </div>
+          </div>
+      )}
+
+      {/* OUTRO */}
       {status === GameStatus.OUTRO && (
           <div className="absolute inset-0 z-50 flex items-center justify-center bg-black animate-fade-in duration-1000">
               <div className="flex flex-col items-center animate-bounce-short">
@@ -671,13 +759,13 @@ const App: React.FC = () => {
       )}
 
       {/* MAIN MENU */}
-      {status === GameStatus.MENU && (
+      {status === GameStatus.MENU && !startCountdown && (
         <div className="relative z-30 h-full flex flex-col items-center justify-center animate-fade-in px-4 overflow-y-auto">
           <h1 className="text-6xl md:text-8xl font-display font-bold text-transparent bg-clip-text bg-gradient-to-b from-white to-slate-500 tracking-tighter filter drop-shadow-[0_0_25px_rgba(6,182,212,0.6)] mb-6 text-center transform hover:scale-105 transition-transform duration-500">
             DJ<span className="text-cyan-400">BIG</span>
           </h1>
           
-          <div className="w-full max-w-xl space-y-6 p-8 backdrop-blur-xl border border-slate-700 rounded-xl shadow-2xl relative transition-all duration-500 bg-black/80">
+          <div className="w-full max-w-xl space-y-6 p-8 backdrop-blur-xl border border-slate-700 rounded-xl shadow-2xl relative transition-all duration-50 bg-black/80">
             
             {isAnalyzing && (
                 <div className="absolute inset-0 z-50 bg-black/90 flex flex-col items-center justify-center rounded-xl">
@@ -686,10 +774,14 @@ const App: React.FC = () => {
                 </div>
             )}
 
-            {/* INPUT SECTION */}
+            {/* INPUT */}
             <div className="animate-fade-in space-y-3">
                 <label className="text-sm font-bold tracking-widest text-cyan-400 block">SELECT MUSIC TRACK</label>
-                <label className="flex flex-col items-center justify-center w-full h-16 border-2 border-slate-700 border-dashed rounded cursor-pointer hover:bg-slate-800 hover:border-cyan-500 transition-all bg-slate-900/50 group">
+                <label 
+                    className="flex flex-col items-center justify-center w-full h-16 border-2 border-slate-700 border-dashed rounded cursor-pointer hover:bg-slate-800 hover:border-cyan-500 transition-all bg-slate-900/50 group"
+                    onMouseEnter={() => playUiSound('hover')}
+                    onClick={() => playUiSound('select')}
+                >
                     <div className="flex flex-col items-center justify-center">
                         <p className="text-sm text-slate-400 font-mono group-hover:text-cyan-300 transition-colors">
                             {localFileName ? localFileName : "CLICK TO SELECT MP4 / MP3 FILE"}
@@ -699,14 +791,15 @@ const App: React.FC = () => {
                 </label>
             </div>
 
-            {/* KEY MODE SELECTOR */}
+            {/* KEY MODE */}
             <div>
                 <label className="text-xs font-bold tracking-widest text-cyan-400 mb-2 block">KEY CONFIGURATION</label>
                 <div className="flex space-x-2">
                     {[4, 5, 7].map((k) => (
                         <button
                             key={k}
-                            onClick={() => setKeyMode(k as 4|5|7)}
+                            onClick={() => { setKeyMode(k as 4|5|7); playUiSound('select'); }}
+                            onMouseEnter={() => playUiSound('hover')}
                             className={`flex-1 py-2 font-display font-bold border rounded transition-all ${
                                 keyMode === k
                                 ? 'bg-cyan-600 border-cyan-400 text-white shadow-[0_0_10px_rgba(34,211,238,0.4)]' 
@@ -719,7 +812,7 @@ const App: React.FC = () => {
                 </div>
             </div>
 
-            {/* LEVEL SELECTOR 1-10 */}
+            {/* LEVEL SELECTOR */}
             <div>
                 <label className="text-xs font-bold tracking-widest text-cyan-400 mb-2 block flex justify-between">
                     <span>LEVEL SELECTION</span>
@@ -729,11 +822,12 @@ const App: React.FC = () => {
                     {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((l) => (
                         <button
                             key={l}
-                            onClick={() => setLevel(l)}
+                            onClick={() => { setLevel(l); playUiSound('select'); }}
+                            onMouseEnter={() => playUiSound('hover')}
                             className={`aspect-square font-display font-bold text-sm flex items-center justify-center border transition-all rounded ${
                                 level === l
-                                ? 'bg-cyan-600 border-cyan-400 text-white shadow-[0_0_15px_rgba(34,211,238,0.4)] scale-110 z-10' 
-                                : 'bg-slate-800 border-slate-600 text-slate-400 hover:bg-slate-700'
+                                ? `bg-slate-700 text-white scale-110 z-10 shadow-[0_0_15px_rgba(255,255,255,0.2)] ${getLevelColor(l)}` 
+                                : `bg-slate-800 border-slate-600 text-slate-400 hover:bg-slate-700`
                             }`}
                         >
                             {l}
@@ -742,7 +836,7 @@ const App: React.FC = () => {
                 </div>
             </div>
 
-            {/* Speed */}
+            {/* SPEED */}
             <div>
                 <div className="flex justify-between mb-2">
                     <label className="text-xs font-bold tracking-widest text-cyan-400">SCROLL SPEED</label>
@@ -760,7 +854,8 @@ const App: React.FC = () => {
             </div>
             
             <button 
-                onClick={startGame}
+                onClick={startCountdownSequence}
+                onMouseEnter={() => playUiSound('hover')}
                 disabled={isAnalyzing || !analyzedNotes}
                 className={`w-full py-4 bg-gradient-to-r from-cyan-700 to-blue-700 text-white font-display font-bold text-2xl tracking-widest uppercase transition-all transform shadow-[0_0_30px_rgba(6,182,212,0.4)] border border-cyan-400/50
                     ${(isAnalyzing || !analyzedNotes) ? 'opacity-50 cursor-not-allowed grayscale' : 'hover:from-cyan-600 hover:to-blue-600 hover:scale-[1.02] animate-pulse'}
@@ -820,7 +915,6 @@ const App: React.FC = () => {
                     <div className="absolute w-full h-1 bg-cyan-400 top-[90%] z-10 pointer-events-none"></div>
 
                     {renderNotes.map((note) => {
-                        // Pass current lane config to Note for styling
                         const config = activeLaneConfig[note.laneIndex];
                         if (!config) return null;
                         return (
@@ -865,17 +959,21 @@ const App: React.FC = () => {
       )}
       
       {status === GameStatus.PAUSED && (
-        <PauseMenu onResume={togglePause} onQuit={quitGame} />
+        <PauseMenu onResume={() => { togglePause(); playUiSound('select'); }} onQuit={quitGame} />
       )}
 
       {status === GameStatus.FINISHED && (
         <EndScreen 
-            score={score} 
-            maxCombo={maxCombo} 
-            missCount={missCount}
+            stats={{
+                score,
+                maxCombo,
+                miss: missCount,
+                perfect: perfectCount,
+                good: goodCount
+            }}
             fileName={localFileName}
-            onRestart={() => setStatus(GameStatus.MENU)}
-            onMenu={() => setStatus(GameStatus.MENU)}
+            onRestart={() => { setStatus(GameStatus.MENU); playUiSound('select'); }}
+            onMenu={() => { setStatus(GameStatus.MENU); playUiSound('select'); }}
         />
       )}
     </div>

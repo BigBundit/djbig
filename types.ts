@@ -61,3 +61,11 @@ export interface HighScore {
     missCount: number;
     timestamp: number;
 }
+
+export interface GameStats {
+    perfect: number;
+    good: number;
+    miss: number;
+    maxCombo: number;
+    score: number;
+}
