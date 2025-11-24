@@ -1,5 +1,5 @@
 
-import { LaneConfig } from './types';
+import { LaneConfig, KeyMapping } from './types';
 
 export const BASE_FALL_SPEED_MS = 1500; 
 export const HIT_WINDOW_PERFECT = 45;
@@ -33,6 +33,12 @@ const COLOR_YELLOW = {
     text: 'text-yellow-400',
     bg: 'bg-yellow-400',
     noteShadow: 'shadow-[0_0_15px_rgba(250,204,21,0.8)]'
+};
+
+export const DEFAULT_KEY_MAPPINGS: KeyMapping = {
+    4: ['d', 'f', 'j', 'k'],
+    5: ['d', 'f', ' ', 'j', 'k'],
+    7: ['s', 'd', 'f', ' ', 'j', 'k', 'l']
 };
 
 // 4 KEYS: D, F, J, K

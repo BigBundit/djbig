@@ -1,3 +1,4 @@
+
 import React from 'react';
 
 interface ScoreBoardProps {
@@ -30,7 +31,7 @@ export const ScoreBoard: React.FC<ScoreBoardProps> = ({ score, combo, health, ma
                     {combo}
                 </div>
                 {combo > 0 && (
-                    <div className="text-sm font-bold text-white tracking-widest bg-slate-800 px-2 rounded">
+                    <div className="text-sm font-bold text-white tracking-widest bg-slate-800 px-2 rounded whitespace-nowrap">
                         COMBO LINK
                     </div>
                 )}

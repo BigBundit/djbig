@@ -5,13 +5,16 @@ import {
   ScoreRating, 
   GameStatus,
   HitEffectData,
-  LaneConfig
+  LaneConfig,
+  SongMetadata,
+  KeyMapping
 } from './types';
 import { 
   LANE_CONFIGS_4,
   LANE_CONFIGS_5,
   LANE_CONFIGS_7,
-  BASE_FALL_SPEED_MS
+  BASE_FALL_SPEED_MS,
+  DEFAULT_KEY_MAPPINGS
 } from './constants';
 import { ScoreBoard } from './components/ScoreBoard';
 import { Lane } from './components/Lane';
@@ -19,7 +22,9 @@ import { EndScreen } from './components/EndScreen';
 import { Note } from './components/Note';
 import { PauseMenu } from './components/PauseMenu';
 import { HitEffect } from './components/HitEffect';
+import { KeyConfigMenu } from './components/KeyConfigMenu';
 import { analyzeAudioAndGenerateNotes } from './utils/audioAnalyzer';
+import { generateVideoThumbnail } from './utils/mediaUtils';
 
 const audioCtxRef = { current: null as AudioContext | null };
 
@@ -50,6 +55,10 @@ const App: React.FC = () => {
   const [localVideoSrc, setLocalVideoSrc] = useState<string>('');
   const [localFileName, setLocalFileName] = useState<string>('');
   
+  // Folder / Song Selection State
+  const [songList, setSongList] = useState<SongMetadata[]>([]);
+  const [isLoadingFolder, setIsLoadingFolder] = useState<boolean>(false);
+  
   const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
   const [analyzedNotes, setAnalyzedNotes] = useState<NoteType[] | null>(null);
 
@@ -58,13 +67,41 @@ const App: React.FC = () => {
   
   // Key Mode State
   const [keyMode, setKeyMode] = useState<4 | 5 | 7>(7);
+  const [keyMappings, setKeyMappings] = useState<KeyMapping>(DEFAULT_KEY_MAPPINGS);
+  const [showKeyConfig, setShowKeyConfig] = useState<boolean>(false);
 
-  // Derived Config
+  // Load Key Mappings from LocalStorage
+  useEffect(() => {
+      const stored = localStorage.getItem('djbig_key_config');
+      if (stored) {
+          try {
+              setKeyMappings(JSON.parse(stored));
+          } catch (e) {
+              console.error("Failed to load key config", e);
+          }
+      }
+  }, []);
+
+  const saveKeyMappings = (newMappings: KeyMapping) => {
+      setKeyMappings(newMappings);
+      localStorage.setItem('djbig_key_config', JSON.stringify(newMappings));
+  };
+
+  // Derived Config with Dynamic Keys
   const activeLaneConfig: LaneConfig[] = useMemo(() => {
-      if (keyMode === 4) return LANE_CONFIGS_4;
-      if (keyMode === 5) return LANE_CONFIGS_5;
-      return LANE_CONFIGS_7;
-  }, [keyMode]);
+      let baseConfig: LaneConfig[] = [];
+      if (keyMode === 4) baseConfig = LANE_CONFIGS_4;
+      else if (keyMode === 5) baseConfig = LANE_CONFIGS_5;
+      else baseConfig = LANE_CONFIGS_7;
+
+      // Override keys from mapping
+      const currentKeys = keyMappings[keyMode];
+      return baseConfig.map((lane, idx) => ({
+          ...lane,
+          key: currentKeys[idx] || lane.key, // Fallback if something is wrong
+          label: currentKeys[idx] === ' ' ? 'SPC' : currentKeys[idx].toUpperCase()
+      }));
+  }, [keyMode, keyMappings]);
 
   // Engine State (Refs for performance)
   const frameRef = useRef<number>(0);
@@ -79,7 +116,11 @@ const App: React.FC = () => {
   const activeKeysRef = useRef<boolean[]>(new Array(7).fill(false)); // Max 7
   const videoRef = useRef<HTMLVideoElement>(null); // Ref for local video
   const bgRef = useRef<HTMLDivElement>(null); // Ref for background pulse
+  const progressBarRef = useRef<HTMLDivElement>(null); // Ref for progress bar
+  
   const audioBufferRef = useRef<AudioBuffer | null>(null); // Ref to store raw audio for re-analysis
+  const audioDurationRef = useRef<number>(0); // Duration in seconds
+
   const noiseBufferRef = useRef<AudioBuffer | null>(null); // Ref to cache noise buffer for performance
   
   // Touch Input State
@@ -156,8 +197,7 @@ const App: React.FC = () => {
       }
   };
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+  const handleFileSelect = async (file: File) => {
     if (file) {
       // Init audio context on user interaction
       initAudio();
@@ -174,6 +214,7 @@ const App: React.FC = () => {
         const ctx = initAudio();
         const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
         audioBufferRef.current = audioBuffer; // Store for later re-use
+        audioDurationRef.current = audioBuffer.duration;
         
         await performAnalysis(audioBuffer);
       } catch (error) {
@@ -182,6 +223,53 @@ const App: React.FC = () => {
         setIsAnalyzing(false);
       }
     }
+  };
+
+  const handleSingleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (file) handleFileSelect(file);
+  };
+
+  const handleFolderSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const files = e.target.files;
+      if (!files || files.length === 0) return;
+
+      setIsLoadingFolder(true);
+      setSongList([]);
+
+      const validExtensions = ['.mp4', '.mp3', '.m4a', '.wav', '.ogg'];
+      const loadedSongs: SongMetadata[] = [];
+
+      // Process files
+      for (let i = 0; i < files.length; i++) {
+          const file = files[i];
+          const lowerName = file.name.toLowerCase();
+          const isValid = validExtensions.some(ext => lowerName.endsWith(ext));
+          
+          if (isValid) {
+              const isVideo = lowerName.endsWith('.mp4') || lowerName.endsWith('.m4v') || lowerName.endsWith('.webm');
+              let thumb: string | null = null;
+              
+              if (isVideo) {
+                 try {
+                     thumb = await generateVideoThumbnail(file);
+                 } catch (err) {
+                     console.warn("Failed to gen thumb", err);
+                 }
+              }
+
+              loadedSongs.push({
+                  id: `${i}-${file.name}`,
+                  file: file,
+                  name: file.name,
+                  thumbnailUrl: thumb,
+                  type: isVideo ? 'video' : 'audio'
+              });
+          }
+      }
+
+      setSongList(loadedSongs);
+      setIsLoadingFolder(false);
   };
 
   // Re-analyze when level or key mode changes
@@ -501,6 +589,13 @@ const App: React.FC = () => {
     const now = performance.now();
     const elapsed = now - startTimeRef.current - totalPauseDurationRef.current;
     
+    // Progress Bar Logic
+    if (progressBarRef.current && audioDurationRef.current > 0) {
+        const durationMs = audioDurationRef.current * 1000;
+        const progress = Math.min(100, (elapsed / durationMs) * 100);
+        progressBarRef.current.style.width = `${progress}%`;
+    }
+    
     const missThreshold = 115; 
     const currentFallSpeed = BASE_FALL_SPEED_MS / speedMod;
 
@@ -521,10 +616,10 @@ const App: React.FC = () => {
             playHitSound(note.laneIndex);
             
             setHitEffects(prev => [...prev, { id: Date.now() + Math.random(), laneIndex: note.laneIndex, rating: ScoreRating.PERFECT, timestamp: now }]);
-            setScore(s => s + 100);
-            setPerfectCount(c => c + 1);
-            setHealth(h => Math.min(100, h + 0.5));
-            setFeedback({ text: "AUTO", color: "text-cyan-300", id: Date.now() });
+            
+            // AUTO PLAY DOES NOT ADD SCORE OR RANK STATS
+            setFeedback({ text: "AUTO", color: "text-fuchsia-500", id: Date.now() });
+            
             setCombo(c => {
                     const newC = c + 1;
                     setMaxCombo(prev => Math.max(prev, newC));
@@ -631,7 +726,7 @@ const App: React.FC = () => {
     playUiSound('select');
 
     if (!localVideoSrc) {
-        alert("Please upload an MP4 video file first.");
+        alert("Please select a track first.");
         return;
     }
 
@@ -735,6 +830,16 @@ const App: React.FC = () => {
       {/* SCANLINES */}
       <div className="scanlines z-50 pointer-events-none opacity-40"></div>
 
+      {/* SETTINGS MENU */}
+      {showKeyConfig && (
+          <KeyConfigMenu 
+            currentKeyMode={keyMode}
+            mappings={keyMappings}
+            onSave={saveKeyMappings}
+            onClose={() => setShowKeyConfig(false)}
+          />
+      )}
+
       {/* COUNTDOWN */}
       {startCountdown !== null && (
           <div className="absolute inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm">
@@ -760,12 +865,21 @@ const App: React.FC = () => {
 
       {/* MAIN MENU */}
       {status === GameStatus.MENU && !startCountdown && (
-        <div className="relative z-30 h-full flex flex-col items-center justify-center animate-fade-in px-4 overflow-y-auto">
-          <h1 className="text-6xl md:text-8xl font-display font-bold text-transparent bg-clip-text bg-gradient-to-b from-white to-slate-500 tracking-tighter filter drop-shadow-[0_0_25px_rgba(6,182,212,0.6)] mb-6 text-center transform hover:scale-105 transition-transform duration-500">
+        <div className="relative z-30 h-full flex flex-col items-center justify-center animate-fade-in px-4 overflow-y-auto py-8">
+            
+          {/* SETTINGS BUTTON */}
+          <button 
+             onClick={() => setShowKeyConfig(true)}
+             className="absolute top-4 right-4 p-2 text-slate-400 hover:text-cyan-400 hover:rotate-90 transition-all duration-500"
+          >
+             <svg className="w-8 h-8" viewBox="0 0 24 24" fill="currentColor"><path d="M19.14,12.94c0.04-0.3,0.06-0.61,0.06-0.94c0-0.32-0.02-0.64-0.07-0.94l2.03-1.58c0.18-0.14,0.23-0.41,0.12-0.61 l-1.92-3.32c-0.12-0.22-0.37-0.29-0.59-0.22l-2.39,0.96c-0.5-0.38-1.03-0.7-1.62-0.94L14.4,2.81c-0.04-0.24-0.24-0.41-0.48-0.41 h-3.84c-0.24,0-0.43,0.17-0.47,0.41L9.25,5.35C8.66,5.59,8.12,5.92,7.63,6.29L5.24,5.33c-0.22-0.08-0.47,0-0.59,0.22L2.74,8.87 C2.62,9.08,2.66,9.34,2.86,9.48l2.03,1.58C4.84,11.36,4.8,11.69,4.8,12s0.02,0.64,0.07,0.94l-2.03,1.58 c-0.18,0.14-0.23,0.41-0.12,0.61l1.92,3.32c0.12,0.22,0.37,0.29,0.59,0.22l2.39-0.96c0.5,0.38,1.03,0.7,1.62,0.94l0.36,2.54 c0.05,0.24,0.24,0.41,0.48,0.41h3.84c0.24,0,0.44-0.17,0.47-0.41l0.36-2.54c0.59-0.24,1.13-0.56,1.62-0.94l2.39,0.96 c0.22,0.08,0.47,0,0.59-0.22l1.92-3.32c0.12-0.22,0.07-0.47-0.12-0.61L19.14,12.94z M12,15.6c-1.98,0-3.6-1.62-3.6-3.6 s1.62-3.6,3.6-3.6s3.6,1.62,3.6,3.6S13.98,15.6,12,15.6z"/></svg>
+          </button>
+
+          <h1 className="text-5xl md:text-7xl font-display font-bold text-transparent bg-clip-text bg-gradient-to-b from-white to-slate-500 tracking-tighter filter drop-shadow-[0_0_25px_rgba(6,182,212,0.6)] mb-4 text-center transform hover:scale-105 transition-transform duration-500">
             DJ<span className="text-cyan-400">BIG</span>
           </h1>
           
-          <div className="w-full max-w-xl space-y-6 p-8 backdrop-blur-xl border border-slate-700 rounded-xl shadow-2xl relative transition-all duration-50 bg-black/80">
+          <div className="w-full max-w-2xl space-y-4 p-5 backdrop-blur-xl border border-slate-700 rounded-xl shadow-2xl relative transition-all duration-50 bg-black/80">
             
             {isAnalyzing && (
                 <div className="absolute inset-0 z-50 bg-black/90 flex flex-col items-center justify-center rounded-xl">
@@ -774,33 +888,106 @@ const App: React.FC = () => {
                 </div>
             )}
 
-            {/* INPUT */}
+            {/* FOLDER / FILE INPUT */}
             <div className="animate-fade-in space-y-3">
-                <label className="text-sm font-bold tracking-widest text-cyan-400 block">SELECT MUSIC TRACK</label>
-                <label 
-                    className="flex flex-col items-center justify-center w-full h-16 border-2 border-slate-700 border-dashed rounded cursor-pointer hover:bg-slate-800 hover:border-cyan-500 transition-all bg-slate-900/50 group"
-                    onMouseEnter={() => playUiSound('hover')}
-                    onClick={() => playUiSound('select')}
-                >
-                    <div className="flex flex-col items-center justify-center">
-                        <p className="text-sm text-slate-400 font-mono group-hover:text-cyan-300 transition-colors">
-                            {localFileName ? localFileName : "CLICK TO SELECT MP4 / MP3 FILE"}
-                        </p>
+                <div className="flex justify-between items-end">
+                    <label className="text-sm font-bold tracking-widest text-cyan-400 block">SELECT MUSIC SOURCE</label>
+                    {songList.length > 0 && (
+                        <button 
+                            onClick={() => { setSongList([]); setLocalFileName(''); setAnalyzedNotes(null); }}
+                            className="text-xs text-red-400 hover:text-red-300 underline font-mono"
+                        >
+                            CLEAR PLAYLIST
+                        </button>
+                    )}
+                </div>
+
+                {songList.length === 0 ? (
+                    <div className="grid grid-cols-2 gap-4">
+                        {/* SINGLE FILE */}
+                        <label 
+                            className="flex flex-col items-center justify-center w-full h-20 border-2 border-slate-700 border-dashed rounded cursor-pointer hover:bg-slate-800 hover:border-cyan-500 transition-all bg-slate-900/50 group"
+                            onMouseEnter={() => playUiSound('hover')}
+                            onClick={() => playUiSound('select')}
+                        >
+                            <div className="flex flex-col items-center justify-center">
+                                <span className="text-2xl mb-1 text-slate-500 group-hover:text-cyan-400">📄</span>
+                                <p className="text-xs text-slate-400 font-mono group-hover:text-cyan-300 transition-colors">
+                                    LOAD SINGLE FILE
+                                </p>
+                            </div>
+                            <input type="file" accept="video/*,audio/*" onChange={handleSingleFileUpload} className="hidden" />
+                        </label>
+
+                        {/* FOLDER */}
+                        <label 
+                            className="flex flex-col items-center justify-center w-full h-20 border-2 border-slate-700 border-dashed rounded cursor-pointer hover:bg-slate-800 hover:border-fuchsia-500 transition-all bg-slate-900/50 group"
+                            onMouseEnter={() => playUiSound('hover')}
+                            onClick={() => playUiSound('select')}
+                        >
+                            <div className="flex flex-col items-center justify-center">
+                                {isLoadingFolder ? (
+                                    <div className="w-6 h-6 border-2 border-fuchsia-500 border-t-transparent rounded-full animate-spin"></div>
+                                ) : (
+                                    <>
+                                        <span className="text-2xl mb-1 text-slate-500 group-hover:text-fuchsia-400">📂</span>
+                                        <p className="text-xs text-slate-400 font-mono group-hover:text-fuchsia-300 transition-colors">
+                                            LOAD FOLDER
+                                        </p>
+                                    </>
+                                )}
+                            </div>
+                            {/* @ts-ignore */}
+                            <input type="file" webkitdirectory="" directory="" multiple onChange={handleFolderSelect} className="hidden" />
+                        </label>
                     </div>
-                    <input type="file" accept="video/*,audio/*" onChange={handleFileUpload} className="hidden" />
-                </label>
+                ) : (
+                    // ALBUM GRID
+                    <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 max-h-[220px] overflow-y-auto pr-2 custom-scrollbar">
+                        {songList.map((song) => (
+                            <div 
+                                key={song.id}
+                                onClick={() => handleFileSelect(song.file)}
+                                onMouseEnter={() => playUiSound('hover')}
+                                className={`
+                                    relative aspect-square group cursor-pointer rounded-lg overflow-hidden border-2 transition-all
+                                    ${localFileName === song.name ? 'border-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.5)]' : 'border-slate-700 hover:border-white'}
+                                `}
+                            >
+                                {song.thumbnailUrl ? (
+                                    <img src={song.thumbnailUrl} alt={song.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+                                ) : (
+                                    <div className="w-full h-full bg-slate-800 flex items-center justify-center group-hover:bg-slate-700">
+                                        <div className={`w-12 h-12 rounded-full border-4 border-slate-600 flex items-center justify-center ${localFileName === song.name ? 'animate-spin-slow' : ''}`}>
+                                            <div className="w-3 h-3 bg-slate-900 rounded-full"></div>
+                                        </div>
+                                    </div>
+                                )}
+                                
+                                <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent opacity-80 group-hover:opacity-60 transition-opacity"></div>
+                                <div className="absolute bottom-0 left-0 right-0 p-1.5">
+                                    <div className="text-[10px] font-bold text-white truncate drop-shadow-md font-display">{song.name}</div>
+                                </div>
+
+                                {localFileName === song.name && (
+                                    <div className="absolute top-1 right-1 w-2 h-2 bg-cyan-400 rounded-full animate-pulse shadow-[0_0_10px_cyan]"></div>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                )}
             </div>
 
             {/* KEY MODE */}
             <div>
-                <label className="text-xs font-bold tracking-widest text-cyan-400 mb-2 block">KEY CONFIGURATION</label>
+                <label className="text-xs font-bold tracking-widest text-cyan-400 mb-1 block">KEY CONFIGURATION</label>
                 <div className="flex space-x-2">
                     {[4, 5, 7].map((k) => (
                         <button
                             key={k}
                             onClick={() => { setKeyMode(k as 4|5|7); playUiSound('select'); }}
                             onMouseEnter={() => playUiSound('hover')}
-                            className={`flex-1 py-2 font-display font-bold border rounded transition-all ${
+                            className={`flex-1 py-1.5 text-xs font-display font-bold border rounded transition-all ${
                                 keyMode === k
                                 ? 'bg-cyan-600 border-cyan-400 text-white shadow-[0_0_10px_rgba(34,211,238,0.4)]' 
                                 : 'bg-slate-800 border-slate-600 text-slate-400 hover:bg-slate-700'
@@ -814,7 +1001,7 @@ const App: React.FC = () => {
 
             {/* LEVEL SELECTOR */}
             <div>
-                <label className="text-xs font-bold tracking-widest text-cyan-400 mb-2 block flex justify-between">
+                <label className="text-xs font-bold tracking-widest text-cyan-400 mb-1 block flex justify-between">
                     <span>LEVEL SELECTION</span>
                     <span className="text-white">{level}</span>
                 </label>
@@ -824,7 +1011,7 @@ const App: React.FC = () => {
                             key={l}
                             onClick={() => { setLevel(l); playUiSound('select'); }}
                             onMouseEnter={() => playUiSound('hover')}
-                            className={`aspect-square font-display font-bold text-sm flex items-center justify-center border transition-all rounded ${
+                            className={`aspect-square font-display font-bold text-xs flex items-center justify-center border transition-all rounded ${
                                 level === l
                                 ? `bg-slate-700 text-white scale-110 z-10 shadow-[0_0_15px_rgba(255,255,255,0.2)] ${getLevelColor(l)}` 
                                 : `bg-slate-800 border-slate-600 text-slate-400 hover:bg-slate-700`
@@ -838,7 +1025,7 @@ const App: React.FC = () => {
 
             {/* SPEED */}
             <div>
-                <div className="flex justify-between mb-2">
+                <div className="flex justify-between mb-1">
                     <label className="text-xs font-bold tracking-widest text-cyan-400">SCROLL SPEED</label>
                     <span className="text-xs font-mono text-white">{speedMod.toFixed(1)}x</span>
                 </div>
@@ -849,7 +1036,7 @@ const App: React.FC = () => {
                     step="0.1"
                     value={speedMod}
                     onChange={(e) => setSpeedMod(parseFloat(e.target.value))}
-                    className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-cyan-400"
+                    className="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-cyan-400"
                 />
             </div>
             
@@ -857,7 +1044,7 @@ const App: React.FC = () => {
                 onClick={startCountdownSequence}
                 onMouseEnter={() => playUiSound('hover')}
                 disabled={isAnalyzing || !analyzedNotes}
-                className={`w-full py-4 bg-gradient-to-r from-cyan-700 to-blue-700 text-white font-display font-bold text-2xl tracking-widest uppercase transition-all transform shadow-[0_0_30px_rgba(6,182,212,0.4)] border border-cyan-400/50
+                className={`w-full py-3 bg-gradient-to-r from-cyan-700 to-blue-700 text-white font-display font-bold text-xl tracking-widest uppercase transition-all transform shadow-[0_0_30px_rgba(6,182,212,0.4)] border border-cyan-400/50
                     ${(isAnalyzing || !analyzedNotes) ? 'opacity-50 cursor-not-allowed grayscale' : 'hover:from-cyan-600 hover:to-blue-600 hover:scale-[1.02] animate-pulse'}
                 `}
             >
@@ -887,6 +1074,11 @@ const App: React.FC = () => {
                     onTouchCancel={handleTouch}
                 >
                     
+                    {/* PROGRESS BAR (GOLD) */}
+                    <div className="absolute top-0 left-0 w-full h-1 bg-slate-800 z-40">
+                         <div ref={progressBarRef} className="h-full bg-yellow-400 shadow-[0_0_10px_rgba(250,204,21,0.8)]" style={{ width: '0%' }}></div>
+                    </div>
+
                     {activeLaneConfig.map((lane, index) => (
                         <Lane 
                             key={index} 

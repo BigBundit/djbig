@@ -69,3 +69,18 @@ export interface GameStats {
     maxCombo: number;
     score: number;
 }
+
+export interface SongMetadata {
+    id: string;
+    file: File;
+    name: string;
+    thumbnailUrl: string | null;
+    type: 'video' | 'audio';
+    duration?: string;
+}
+
+export interface KeyMapping {
+    4: string[];
+    5: string[];
+    7: string[];
+}
