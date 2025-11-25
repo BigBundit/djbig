@@ -1012,13 +1012,13 @@ const App: React.FC = () => {
                 loop
                 muted
                 playsInline
-                className="w-full h-full object-cover opacity-60"
+                className="absolute inset-0 w-full h-full object-cover object-center opacity-60"
               />
             ) : (
               <video
                 ref={mediaRef as React.RefObject<HTMLVideoElement>}
                 src={localVideoSrc}
-                className="w-full h-full object-cover opacity-80"
+                className="absolute inset-0 w-full h-full object-cover object-center opacity-80"
                 onEnded={triggerOutro}
               />
             )}
@@ -1041,7 +1041,7 @@ const App: React.FC = () => {
               loop
               muted
               playsInline
-              className="absolute inset-0 w-full h-full object-cover opacity-100"
+              className="absolute inset-0 w-full h-full object-cover object-center opacity-100"
             />
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,rgba(0,0,0,0.4)_100%)]"></div>
           </div>
@@ -1299,7 +1299,7 @@ const App: React.FC = () => {
                         <img
                           src={song.thumbnailUrl}
                           alt={song.name}
-                          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                          className="absolute inset-0 w-full h-full object-cover object-center group-hover:scale-110 transition-transform duration-500"
                         />
                       ) : (
                         <div className="w-full h-full bg-slate-800 flex items-center.justify-center group-hover:bg-slate-700">
