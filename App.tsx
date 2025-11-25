@@ -1,6 +1,5 @@
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { GoogleGenAI } from "@google/genai";
 import { 
   Note as NoteType, 
   ScoreRating, 
@@ -66,7 +65,6 @@ const App: React.FC = () => {
   const [isLoadingFolder, setIsLoadingFolder] = useState<boolean>(false);
   
   const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
-  const [isGeneratingTheme, setIsGeneratingTheme] = useState<boolean>(false);
   const [analyzedNotes, setAnalyzedNotes] = useState<NoteType[] | null>(null);
 
   const [level, setLevel] = useState<number>(5); // Level 1-10
@@ -101,30 +99,6 @@ const App: React.FC = () => {
           }
       }
   }, []);
-
-  // Attempt to load demo track on menu entry
-  useEffect(() => {
-    if (status === GameStatus.MENU && songList.length === 0) {
-        fetch('demo.mp3')
-            .then(res => {
-                if (res.ok) return res.blob();
-                throw new Error('No demo track');
-            })
-            .then(blob => {
-                const file = new File([blob], 'demo.mp3', { type: 'audio/mpeg' });
-                setSongList([{
-                    id: 'demo',
-                    file: file,
-                    name: 'DEMO TRACK',
-                    thumbnailUrl: null,
-                    type: 'audio'
-                }]);
-            })
-            .catch(() => {
-                // Silent fail if demo.mp3 is not present
-            });
-    }
-  }, [status, songList.length]);
 
   const saveKeyMappings = (newMappings: KeyMapping) => {
       setKeyMappings(newMappings);
@@ -245,76 +219,6 @@ const App: React.FC = () => {
       } finally {
         setIsAnalyzing(false);
       }
-  };
-
-  const generateAiTheme = async () => {
-    try {
-        // Veo requires user-selected API key
-        // @ts-ignore
-        if (window.aistudio && !await window.aistudio.hasSelectedApiKey()) {
-            // @ts-ignore
-            await window.aistudio.openSelectKey();
-        }
-
-        setIsGeneratingTheme(true);
-        initAudio(); // Ensure context is ready
-
-        // We create a fresh instance after key selection
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-
-        const promptText = "Upbeat catchy game intro music, instrumental only, no vocals. Bright electronic synths, rhythmic percussion, energetic but not overwhelming. Designed for a music-themed game. Memorable melody, looping seamlessly, fun and modern arcade vibes. Clear structure, short and repeating hook. No voices, no singing, no chants.";
-        const styles = "Styles: electronic, chiptune, synthwave, arcade, upbeat instrumental";
-        const finalPrompt = `${promptText}\n\n${styles}`;
-        
-        // Video prompt for the visual part of the generation
-        const videoPrompt = "Abstract neon rhythm game background, futuristic cyber city equalizer, pulsing geometric shapes, 4k, seamless loop, vibrant cyan and magenta colors.";
-
-        let operation = await ai.models.generateVideos({
-            model: 'veo-3.1-fast-generate-preview',
-            prompt: `${videoPrompt}. Audio style: ${finalPrompt}`,
-            config: {
-                numberOfVideos: 1,
-                resolution: '1080p',
-                aspectRatio: '16:9'
-            }
-        });
-
-        // Poll for completion
-        while (!operation.done) {
-            await new Promise(resolve => setTimeout(resolve, 5000));
-            operation = await ai.operations.getVideosOperation({ operation: operation });
-        }
-
-        const videoUri = operation.response?.generatedVideos?.[0]?.video?.uri;
-        if (videoUri) {
-            // Fetch video blob
-            const response = await fetch(`${videoUri}&key=${process.env.API_KEY}`);
-            const blob = await response.blob();
-            const file = new File([blob], "AI_THEME_SONG.mp4", { type: "video/mp4" });
-
-            // Automatically load it
-            await handleFileSelect(file);
-            
-            // Add to list visually
-            const thumb = await generateVideoThumbnail(file);
-            setSongList([{
-                id: 'ai-theme',
-                file: file,
-                name: 'AI GENERATED THEME',
-                thumbnailUrl: thumb,
-                type: 'video'
-            }]);
-            
-            // Set sound profile for AI song to electronic/arcade to match the prompt
-            setSoundProfile('chiptune');
-        }
-
-    } catch (error) {
-        console.error("Failed to generate AI Theme:", error);
-        alert("Failed to generate theme. Please ensure you have selected a valid paid project/API key.");
-    } finally {
-        setIsGeneratingTheme(false);
-    }
   };
 
   const handleFileSelect = async (file: File) => {
@@ -1118,9 +1022,18 @@ const App: React.FC = () => {
       {/* TITLE SCREEN */}
       {status === GameStatus.TITLE && (
           <div className="relative z-30 h-full flex flex-col items-center justify-center animate-fade-in px-4">
-              <h1 className="text-7xl md:text-9xl font-display font-black text-transparent bg-clip-text bg-gradient-to-b from-white to-slate-500 tracking-tighter filter drop-shadow-[0_0_25px_rgba(6,182,212,0.6)] mb-12 text-center transform hover:scale-105 transition-transform duration-500 animate-pulse">
+              <h1 className="text-7xl md:text-9xl font-display font-black text-transparent bg-clip-text bg-gradient-to-b from-white to-slate-500 tracking-tighter filter drop-shadow-[0_0_25px_rgba(6,182,212,0.6)] mb-2 text-center transform hover:scale-105 transition-transform duration-500 animate-pulse">
                 DJ<span className="text-cyan-400">BIG</span>
               </h1>
+              
+              <div className="mb-12 text-center bg-black/50 backdrop-blur-sm p-4 rounded-lg border border-white/5">
+                  <p className="text-cyan-400 font-display font-bold tracking-[0.15em] text-sm md:text-base mb-1">
+                      CUSTOM RHYTHM ENGINE
+                  </p>
+                  <p className="text-slate-400 font-mono text-xs md:text-sm tracking-widest">
+                      PLAY WITH YOUR OWN MP4 VIDEO FILES
+                  </p>
+              </div>
               
               <div className="flex flex-col space-y-6 w-full max-w-sm">
                   <button 
@@ -1156,7 +1069,7 @@ const App: React.FC = () => {
                        <span className="text-xl font-display font-bold tracking-[0.2em] text-slate-400 group-hover:text-red-400">EXIT</span>
                   </button>
               </div>
-              <div className="mt-12 text-slate-600 font-mono text-xs">VERSION 2.7 // SYSTEM READY</div>
+              <div className="mt-12 text-slate-600 font-mono text-xs">VERSION 2.8 // SYSTEM READY</div>
           </div>
       )}
 
@@ -1186,17 +1099,12 @@ const App: React.FC = () => {
           
           <div className="w-full max-w-2xl space-y-4 p-5 backdrop-blur-xl border border-slate-700 rounded-xl shadow-2xl relative transition-all duration-50 bg-black/80">
             
-            {(isAnalyzing || isGeneratingTheme) && (
+            {isAnalyzing && (
                 <div className="absolute inset-0 z-50 bg-black/90 flex flex-col items-center justify-center rounded-xl p-8 text-center">
                     <div className="w-12 h-12 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin mb-4"></div>
                     <div className="text-cyan-400 font-mono animate-pulse font-bold text-lg mb-2">
-                        {isGeneratingTheme ? 'SYNTHESIZING NEURAL AUDIO-VISUALS...' : 'ANALYZING AUDIO SPECTRUM...'}
+                        ANALYZING AUDIO SPECTRUM...
                     </div>
-                    {isGeneratingTheme && (
-                        <div className="text-xs text-slate-500 max-w-sm mt-2">
-                            Generating a custom 1080p music video using Gemini Veo. This may take up to 2 minutes. Please stand by...
-                        </div>
-                    )}
                 </div>
             )}
 
@@ -1205,12 +1113,6 @@ const App: React.FC = () => {
                 <div className="flex justify-between items-end">
                     <label className="text-sm font-bold tracking-widest text-cyan-400 block">SELECT MUSIC SOURCE</label>
                     <div className="flex gap-4">
-                        <button 
-                            onClick={generateAiTheme}
-                            className="text-xs text-fuchsia-400 hover:text-fuchsia-300 font-bold font-display animate-pulse flex items-center gap-1"
-                        >
-                            <span>★</span> GENERATE AI THEME
-                        </button>
                         {songList.length > 0 && (
                             <button 
                                 onClick={() => { setSongList([]); setLocalFileName(''); setAnalyzedNotes(null); }}
@@ -1232,8 +1134,9 @@ const App: React.FC = () => {
                         >
                             <div className="flex flex-col items-center justify-center">
                                 <span className="text-2xl mb-1 text-slate-500 group-hover:text-cyan-400">📄</span>
-                                <p className="text-xs text-slate-400 font-mono group-hover:text-cyan-300 transition-colors">
-                                    LOAD SINGLE FILE
+                                <p className="text-xs text-slate-400 font-mono group-hover:text-cyan-300 transition-colors text-center">
+                                    LOAD SINGLE FILE<br/>
+                                    <span className="text-[10px] opacity-60">(MP4, MP3, WAV, OGG)</span>
                                 </p>
                             </div>
                             <input type="file" accept="video/*,audio/*" onChange={handleSingleFileUpload} className="hidden" />
@@ -1363,9 +1266,9 @@ const App: React.FC = () => {
             <button 
                 onClick={startCountdownSequence}
                 onMouseEnter={() => playUiSound('hover')}
-                disabled={isAnalyzing || !analyzedNotes || isGeneratingTheme}
+                disabled={isAnalyzing || !analyzedNotes}
                 className={`w-full py-3 bg-gradient-to-r from-cyan-700 to-blue-700 text-white font-display font-bold text-xl tracking-widest uppercase transition-all transform shadow-[0_0_30px_rgba(6,182,212,0.4)] border border-cyan-400/50
-                    ${(isAnalyzing || !analyzedNotes || isGeneratingTheme) ? 'opacity-50 cursor-not-allowed grayscale' : 'hover:from-cyan-600 hover:to-blue-600 hover:scale-[1.02] animate-pulse'}
+                    ${(isAnalyzing || !analyzedNotes) ? 'opacity-50 cursor-not-allowed grayscale' : 'hover:from-cyan-600 hover:to-blue-600 hover:scale-[1.02] animate-pulse'}
                 `}
             >
                 {isAnalyzing ? 'ANALYZING...' : 'Game Start!!'}
