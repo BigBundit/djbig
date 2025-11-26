@@ -17,10 +17,16 @@ export const TRANSLATIONS = {
         LOAD_SINGLE: "LOAD SINGLE FILE",
         LOAD_FOLDER: "LOAD FOLDER",
         KEY_CONFIG: "KEY CONFIGURATION",
-        LEVEL: "LEVEL SELECTION",
+        LEVEL: "DIFFICULTY",
         SCROLL_SPEED: "SCROLL SPEED",
         GAME_START: "GAME START!!",
         ANALYZING: "ANALYZING...",
+
+        // Difficulties
+        EASY: "EASY",
+        NORMAL: "NORMAL",
+        HARD: "HARD",
+        EXPERT: "EXPERT",
 
         // In-Game
         COMBO: "COMBO",
@@ -98,10 +104,16 @@ export const TRANSLATIONS = {
         LOAD_SINGLE: "โหลดไฟล์เดี่ยว",
         LOAD_FOLDER: "โหลดโฟลเดอร์",
         KEY_CONFIG: "การตั้งค่าปุ่ม",
-        LEVEL: "เลือกระดับความยาก",
+        LEVEL: "ความยาก",
         SCROLL_SPEED: "ความเร็ว",
         GAME_START: "เริ่มภารกิจ!!",
         ANALYZING: "กำลังวิเคราะห์...",
+
+        // Difficulties
+        EASY: "ง่าย",
+        NORMAL: "ปกติ",
+        HARD: "ยาก",
+        EXPERT: "เชี่ยวชาญ",
 
         // In-Game
         COMBO: "คอมโบ",

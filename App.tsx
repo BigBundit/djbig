@@ -88,7 +88,7 @@ const App: React.FC = () => {
   const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
   const [analyzedNotes, setAnalyzedNotes] = useState<NoteType[] | null>(null);
 
-  const [level, setLevel] = useState<number>(5); // Level 1-10
+  const [level, setLevel] = useState<number>(7); // Default to 7 (Easy in new scale)
   const [speedMod, setSpeedMod] = useState<number>(2.0); // Default 2x speed
   
   // Key Mode State
@@ -980,11 +980,16 @@ const App: React.FC = () => {
       setHitEffects([]);
   };
 
-  const getLevelColor = (l: number) => {
-      if (l <= 3) return 'border-green-500 text-green-400 shadow-green-500/20';
-      if (l <= 6) return 'border-yellow-500 text-yellow-400 shadow-yellow-500/20';
-      if (l <= 8) return 'border-orange-500 text-orange-400 shadow-orange-500/20';
-      return 'border-red-500 text-red-400 shadow-red-500/20';
+  const DIFFICULTY_OPTIONS = [
+      { label: t.EASY, value: 7, color: 'border-green-500 text-green-400 shadow-green-500/20' },
+      { label: t.NORMAL, value: 8, color: 'border-yellow-500 text-yellow-400 shadow-yellow-500/20' },
+      { label: t.HARD, value: 9, color: 'border-orange-500 text-orange-400 shadow-orange-500/20' },
+      { label: t.EXPERT, value: 10, color: 'border-red-500 text-red-500 shadow-red-500/20' }
+  ];
+
+  const getCurrentDifficultyLabel = () => {
+      const diff = DIFFICULTY_OPTIONS.find(d => d.value === level);
+      return diff ? diff.label : t.NORMAL;
   };
 
   // Helper render for lanes to avoid duplication
@@ -1497,11 +1502,25 @@ const App: React.FC = () => {
                 </div>
             </div>
 
+            {/* NEW DIFFICULTY SELECTOR */}
             <div>
-                <label className={`text-xs font-bold tracking-widest text-cyan-400 mb-1 block flex justify-between ${fontClass}`}><span>{t.LEVEL}</span><span className="text-white font-mono">{level}</span></label>
-                <div className="grid grid-cols-10 gap-1">
-                    {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((l) => (
-                        <button key={l} onClick={() => { setLevel(l); playUiSound('select'); }} onMouseEnter={() => playUiSound('hover')} className={`aspect-square font-display font-bold text-xs flex items-center justify-center border transition-all rounded ${level === l ? `bg-slate-700 text-white scale-110 z-10 shadow-[0_0_15px_rgba(255,255,255,0.2)] ${getLevelColor(l)}` : `bg-slate-800 border-slate-600 text-slate-400 hover:bg-slate-700`}`}>{l}</button>
+                <label className={`text-xs font-bold tracking-widest text-cyan-400 mb-1 block flex justify-between ${fontClass}`}><span>{t.LEVEL}</span><span className="text-white font-display font-bold">{getCurrentDifficultyLabel()}</span></label>
+                <div className="grid grid-cols-4 gap-2">
+                    {DIFFICULTY_OPTIONS.map((diff) => (
+                        <button 
+                            key={diff.value} 
+                            onClick={() => { setLevel(diff.value); playUiSound('select'); }} 
+                            onMouseEnter={() => playUiSound('hover')} 
+                            className={`
+                                py-3 font-display font-bold text-xs border transition-all rounded flex items-center justify-center
+                                ${level === diff.value 
+                                    ? `bg-slate-800 scale-105 z-10 ${diff.color}` 
+                                    : 'bg-slate-900 border-slate-700 text-slate-500 hover:bg-slate-800 hover:text-slate-300'
+                                }
+                            `}
+                        >
+                            {diff.label}
+                        </button>
                     ))}
                 </div>
             </div>
