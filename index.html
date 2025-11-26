@@ -166,6 +166,19 @@
       .animate-cyber-slam {
         animation: cyber-slam 0.15s cubic-bezier(0.1, 0.7, 1.0, 0.1) forwards;
       }
+
+      /* CONCERT CAMERA DRIFT */
+      @keyframes camera-drift {
+        0% { transform: scale(1.1) translate(0, 0); }
+        25% { transform: scale(1.15) translate(-1%, 0.5%); }
+        50% { transform: scale(1.1) translate(0.5%, 1%); }
+        75% { transform: scale(1.15) translate(1%, -0.5%); }
+        100% { transform: scale(1.1) translate(0, 0); }
+      }
+      
+      .animate-camera-drift {
+        animation: camera-drift 20s ease-in-out infinite;
+      }
     </style>
   <script type="importmap">
 {

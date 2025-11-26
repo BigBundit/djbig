@@ -308,6 +308,61 @@ const App: React.FC = () => {
       }
   };
 
+  const handlePlayDemo = async () => {
+    playUiSound('select');
+    const ctx = initAudio();
+    setIsAnalyzing(true);
+    setSongList([]);
+    setLocalFileName("DEMO_TRACK");
+    setMediaType('video');
+    setSoundProfile('rock');
+    
+    // FORCE EXPERT LEVEL FOR DEMO
+    setLevel(10);
+    
+    try {
+        // Fetch the local video file
+        const response = await fetch('demoplay.mp4');
+        if (!response.ok) throw new Error("Demo file not found");
+        
+        const videoBlob = await response.blob();
+        const videoUrl = URL.createObjectURL(videoBlob);
+        setLocalVideoSrc(videoUrl);
+
+        // Decode audio for analysis
+        const arrayBuffer = await videoBlob.arrayBuffer();
+        const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
+
+        audioBufferRef.current = audioBuffer;
+        audioDurationRef.current = audioBuffer.duration;
+        
+        // ANALYZE AT LEVEL 10 (EXPERT)
+        const notes = await analyzeAudioAndGenerateNotes(audioBuffer, 10, keyMode);
+        setAnalyzedNotes(notes);
+        setIsAnalyzing(false);
+        
+        // Auto start logic
+        setStartCountdown(3);
+        let count = 3;
+        const timer = setInterval(() => {
+            count--;
+            if (count > 0) {
+                setStartCountdown(count);
+            } else {
+                clearInterval(timer);
+                setStartCountdown(null);
+                // PASS NOTES DIRECTLY to avoid closure staleness
+                startGame(false, notes); 
+            }
+        }, 1000);
+        
+    } catch (e) {
+        console.error("Failed to load demo", e);
+        alert("Failed to load demo. Make sure 'demoplay.mp4' is in the public folder.");
+        setIsAnalyzing(false);
+    }
+  };
+
   const handleFileSelect = async (file: File) => {
     if (file) {
       // Init audio context on user interaction
@@ -567,7 +622,6 @@ const App: React.FC = () => {
     if (!audioCtxRef.current) return;
     const ctx = audioCtxRef.current;
     const t = ctx.currentTime;
-    // ... [Same Outro logic] ...
     const playDrum = (type: 'kick' | 'snare' | 'tom' | 'crash', startTime: number, intensity: number = 1.0) => {
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
@@ -625,6 +679,7 @@ const App: React.FC = () => {
         setStatus(GameStatus.PAUSED);
         pauseTimeRef.current = performance.now();
         if (mediaRef.current) mediaRef.current.pause();
+        if (audioCtxRef.current) audioCtxRef.current.suspend();
         if (bgVideoRef.current) bgVideoRef.current.pause(); // Sync BG
     } else if (status === GameStatus.PAUSED) {
         setStatus(GameStatus.PLAYING);
@@ -632,7 +687,7 @@ const App: React.FC = () => {
         totalPauseDurationRef.current += pauseDuration;
         if (mediaRef.current) mediaRef.current.play().catch(() => {});
         if (bgVideoRef.current) bgVideoRef.current.play().catch(() => {}); // Sync BG
-        initAudio(); 
+        if (audioCtxRef.current) audioCtxRef.current.resume();
     }
   }, [status]);
 
@@ -778,6 +833,12 @@ const App: React.FC = () => {
         const durationMs = audioDurationRef.current * 1000;
         const progress = Math.min(100, (elapsed / durationMs) * 100);
         progressBarRef.current.style.width = `${progress}%`;
+    }
+
+    // Auto-End for Buffer Playback (Demo)
+    if (audioDurationRef.current > 0 && elapsed > audioDurationRef.current * 1000 + 1000) {
+        triggerOutro();
+        return;
     }
     
     const missThreshold = 115; 
@@ -938,14 +999,15 @@ const App: React.FC = () => {
         } else {
             clearInterval(timer);
             setStartCountdown(null);
-            startGame();
+            startGame(false);
         }
     }, 1000);
   }
 
-  const startGame = () => {
-    if (analyzedNotes) {
-        notesRef.current = analyzedNotes.map(n => ({
+  const startGame = (useBufferPlayback: boolean, notesOverride?: NoteType[]) => {
+    const notesToUse = notesOverride || analyzedNotes;
+    if (notesToUse) {
+        notesRef.current = notesToUse.map(n => ({
             id: Number(n.id),
             laneIndex: Number(n.laneIndex),
             timestamp: Number(n.timestamp),
@@ -972,6 +1034,18 @@ const App: React.FC = () => {
     
     setStatus(GameStatus.PLAYING);
     startTimeRef.current = performance.now();
+
+    // Start Buffer Audio if demo
+    if (useBufferPlayback && audioBufferRef.current && audioCtxRef.current) {
+        const source = audioCtxRef.current.createBufferSource();
+        source.buffer = audioBufferRef.current;
+        const gain = audioCtxRef.current.createGain();
+        gain.gain.value = audioSettingsRef.current.masterVolume;
+        source.connect(gain);
+        gain.connect(audioCtxRef.current.destination);
+        source.start(0);
+        // We aren't storing source ref to stop it on pause for this simple demo, but in full app we would
+    }
   };
 
   const quitGame = () => {
@@ -1263,15 +1337,14 @@ const App: React.FC = () => {
         {status === GameStatus.PLAYING || status === GameStatus.PAUSED || status === GameStatus.OUTRO ? (
              <>
                 {mediaType === 'audio' ? (
-                     <video
-                        ref={bgVideoRef}
-                        src="background.mp4"
-                        autoPlay
-                        loop
-                        muted
-                        playsInline
-                        className="w-full h-full object-cover opacity-60"
-                    />
+                     <div className="absolute inset-0 w-full h-full bg-slate-900">
+                        <img 
+                            src="bg01.png" 
+                            alt="concert bg"
+                            className="w-full h-full object-cover opacity-50 animate-camera-drift"
+                        />
+                        <div className="absolute inset-0 bg-slate-950/80"></div>
+                     </div>
                 ) : (
                     <video
                         ref={mediaRef as React.RefObject<HTMLVideoElement>}
@@ -1281,7 +1354,8 @@ const App: React.FC = () => {
                     />
                 )}
 
-                {mediaType === 'audio' && (
+                {/* Demo Playback or Audio File Playback */}
+                {mediaType === 'audio' && localFileName !== "DEMO_TRACK" && (
                     <audio
                         ref={mediaRef as React.RefObject<HTMLAudioElement>}
                         src={localVideoSrc}
@@ -1292,14 +1366,13 @@ const App: React.FC = () => {
         ) : (
             <div className="w-full h-full relative overflow-hidden bg-black">
                  {layoutSettings.enableMenuBackground && (
-                    <video
-                        src="background.mp4" 
-                        autoPlay
-                        loop
-                        muted
-                        playsInline
-                        className="absolute inset-0 w-full h-full object-cover opacity-100"
-                    />
+                    <>
+                        <img 
+                           src="bg01.png" 
+                           className="absolute inset-0 w-full h-full object-cover opacity-60 animate-camera-drift"
+                        />
+                        <div className="absolute inset-0 bg-slate-950/70"></div>
+                    </>
                  )}
                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,rgba(0,0,0,0.4)_100%)]"></div>
             </div>
@@ -1360,7 +1433,6 @@ const App: React.FC = () => {
       )}
 
       {/* TITLE SCREEN & MAIN MENU */}
-      {/* ... [Title and Menu logic is largely same, condensed for XML space if untouched, but including full for safety] ... */}
       {status === GameStatus.TITLE && (
           <div className="relative z-30 h-full flex flex-col items-center justify-center animate-fade-in px-4">
               <h1 className="text-7xl md:text-9xl font-display font-black text-transparent bg-clip-text bg-gradient-to-b from-white to-slate-500 tracking-tighter filter drop-shadow-[0_0_25px_rgba(6,182,212,0.6)] mb-2 text-center transform hover:scale-105 transition-transform duration-500 animate-pulse">
@@ -1415,7 +1487,6 @@ const App: React.FC = () => {
 
       {status === GameStatus.MENU && !startCountdown && (
         <div className="relative z-30 h-full flex flex-col items-center justify-center animate-fade-in px-4 overflow-y-auto py-8">
-            {/* ... (Existing Menu JSX remains same) ... */}
           <button 
              onClick={() => { setStatus(GameStatus.TITLE); playUiSound('select'); }}
              className="absolute top-4 left-4 p-2 text-slate-400 hover:text-white flex items-center space-x-2 transition-colors"
@@ -1452,7 +1523,6 @@ const App: React.FC = () => {
                 </div>
             )}
             
-            {/* ... (Menu options truncated for brevity, assume same as before) ... */}
             <div className="animate-fade-in space-y-3">
                 <div className="flex justify-between items-end">
                     <label className={`text-sm font-bold tracking-widest text-cyan-400 block ${fontClass}`}>{t.SELECT_SOURCE}</label>
@@ -1463,11 +1533,18 @@ const App: React.FC = () => {
                     </div>
                 </div>
                 {songList.length === 0 ? (
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                        <button onClick={handlePlayDemo} className="flex flex-col items-center justify-center w-full h-20 border-2 border-green-600/50 border-dashed rounded cursor-pointer hover:bg-green-900/20 hover:border-green-400 transition-all bg-slate-900/50 group" onMouseEnter={() => playUiSound('hover')}>
+                            <div className="flex flex-col items-center justify-center">
+                                <span className="text-2xl mb-1 text-slate-500 group-hover:text-green-400">▶</span>
+                                <p className={`text-xs text-slate-400 ${fontClass} group-hover:text-green-300 transition-colors text-center font-bold`}>{t.PLAY_DEMO}</p>
+                            </div>
+                        </button>
+
                         <label className="flex flex-col items-center justify-center w-full h-20 border-2 border-slate-700 border-dashed rounded cursor-pointer hover:bg-slate-800 hover:border-cyan-500 transition-all bg-slate-900/50 group" onMouseEnter={() => playUiSound('hover')} onClick={() => playUiSound('select')}>
                             <div className="flex flex-col items-center justify-center">
                                 <span className="text-2xl mb-1 text-slate-500 group-hover:text-cyan-400">📄</span>
-                                <p className={`text-xs text-slate-400 ${fontClass} group-hover:text-cyan-300 transition-colors text-center`}>{t.LOAD_SINGLE}<br/><span className="text-[10px] opacity-60 font-mono">(MP4, MP3, WAV, OGG)</span></p>
+                                <p className={`text-xs text-slate-400 ${fontClass} group-hover:text-cyan-300 transition-colors text-center`}>{t.LOAD_SINGLE}<br/><span className="text-[10px] opacity-60 font-mono">(MP4, MP3)</span></p>
                             </div>
                             <input type="file" accept="video/*,audio/*" onChange={handleSingleFileUpload} className="hidden" />
                         </label>
