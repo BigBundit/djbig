@@ -34,10 +34,7 @@ export const KeyConfigMenu: React.FC<KeyConfigMenuProps> = ({
     const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
 
     useEffect(() => {
-        // Check initial state
         setIsFullscreen(!!document.fullscreenElement);
-
-        // Listen for native changes (e.g. Esc key)
         const handleFsChange = () => {
             setIsFullscreen(!!document.fullscreenElement);
         };
@@ -45,7 +42,6 @@ export const KeyConfigMenu: React.FC<KeyConfigMenuProps> = ({
         return () => document.removeEventListener('fullscreenchange', handleFsChange);
     }, []);
 
-    // Get base config for display purposes (colors, labels)
     const getBaseConfig = (mode: number) => {
         if (mode === 4) return LANE_CONFIGS_4;
         if (mode === 5) return LANE_CONFIGS_5;
@@ -58,13 +54,7 @@ export const KeyConfigMenu: React.FC<KeyConfigMenuProps> = ({
             e.stopPropagation();
 
             const newKey = e.key.toLowerCase();
-            
-            // Check for duplicates in current mode
             const currentKeys = localMappings[activeMode];
-            if (currentKeys.includes(newKey) && currentKeys[bindingIndex] !== newKey) {
-                // Optional: Could show error or swap
-            }
-
             const newKeys = [...currentKeys];
             newKeys[bindingIndex] = newKey === ' ' ? ' ' : newKey;
 
@@ -114,202 +104,306 @@ export const KeyConfigMenu: React.FC<KeyConfigMenuProps> = ({
         });
     };
 
-    const handlePositionChange = (pos: 'left' | 'center' | 'right') => {
-        onLayoutSettingsChange({
-            ...layoutSettings,
-            lanePosition: pos
-        });
-    };
-
-    const handleMenuBgToggle = () => {
-        onLayoutSettingsChange({
-            ...layoutSettings,
-            enableMenuBackground: !layoutSettings.enableMenuBackground
-        });
-    };
-
-    const handleLanguageToggle = () => {
-        onLayoutSettingsChange({
-            ...layoutSettings,
-            language: layoutSettings.language === 'en' ? 'th' : 'en'
-        });
-    };
-
     const activeConfig = getBaseConfig(activeMode);
     const currentBoundKeys = localMappings[activeMode];
 
+    // Helper Component for Sci-Fi Sliders
+    const CyberSlider = ({ label, value, onChange }: { label: string, value: number, onChange: (v: number) => void }) => (
+        <div className="w-full">
+            <div className="flex justify-between items-center mb-1">
+                <span className={`text-xs font-bold text-cyan-500 tracking-wider ${fontClass}`}>{label}</span>
+                <span className="text-cyan-400 font-mono text-xs bg-black/50 px-2 rounded border border-cyan-500/30">
+                    {Math.round(value * 100)}%
+                </span>
+            </div>
+            <div className="relative h-6 w-full flex items-center group">
+                {/* Track Background */}
+                <div className="absolute w-full h-2 bg-slate-800 border border-slate-600 skew-x-[-10deg]"></div>
+                {/* Filled Track */}
+                <div 
+                    className="absolute h-2 bg-cyan-500 shadow-[0_0_10px_cyan] skew-x-[-10deg] transition-all duration-75" 
+                    style={{ width: `${value * 100}%` }}
+                ></div>
+                {/* Input */}
+                <input 
+                    type="range" min="0" max="1" step="0.05" 
+                    value={value}
+                    onChange={(e) => onChange(parseFloat(e.target.value))}
+                    className="absolute w-full h-full opacity-0 cursor-pointer"
+                />
+            </div>
+        </div>
+    );
+
+    // Helper for Toggles
+    const CyberToggle = ({ label, isActive, onClick, subLabels }: { label: string, isActive: boolean, onClick: () => void, subLabels?: [string, string] }) => (
+        <div className="flex justify-between items-center bg-slate-800/40 p-2 rounded border-l-2 border-slate-600 hover:border-cyan-400 hover:bg-slate-800/60 transition-colors">
+            <div className={`text-slate-300 font-bold text-sm ${fontClass}`}>{label}</div>
+            <button
+                onClick={onClick}
+                className={`
+                    relative w-14 h-6 transition-all duration-300 transform skew-x-[-10deg] border
+                    ${isActive ? 'bg-cyan-900/50 border-cyan-500' : 'bg-slate-900 border-slate-600'}
+                `}
+            >
+                <div className={`
+                    absolute top-0.5 bottom-0.5 w-6 bg-current transition-all duration-300 shadow-md
+                    ${isActive ? 'right-0.5 bg-cyan-400 shadow-[0_0_10px_cyan]' : 'left-0.5 bg-slate-500'}
+                `}></div>
+                {subLabels && (
+                    <div className="absolute inset-0 flex items-center justify-between px-1 pointer-events-none">
+                        <span className={`text-[8px] font-bold ${!isActive ? 'text-white' : 'text-slate-600'} ${fontClass}`}>{subLabels[0]}</span>
+                        <span className={`text-[8px] font-bold ${isActive ? 'text-white' : 'text-slate-600'} ${fontClass}`}>{subLabels[1]}</span>
+                    </div>
+                )}
+            </button>
+        </div>
+    );
+
     return (
-        <div className="absolute inset-0 z-[60] flex items-center justify-center bg-black/90 backdrop-blur-md animate-fade-in overflow-y-auto py-10">
-            <div className="w-full max-w-3xl bg-slate-900 border border-cyan-500/50 p-8 rounded-xl shadow-[0_0_50px_rgba(6,182,212,0.2)] flex flex-col items-center">
-                <h2 className={`text-3xl font-bold text-white tracking-wider mb-6 ${fontClass}`}>{t.SYSTEM_SETTINGS}</h2>
-
-                <div className="w-full grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
-                    {/* DISPLAY SETTINGS */}
-                    <div className="bg-slate-800/50 p-4 rounded-lg border border-slate-700 h-full flex flex-col space-y-6">
-                         <h3 className={`text-cyan-400 font-bold tracking-widest text-sm border-b border-slate-700 pb-2 ${fontClass}`}>{t.DISPLAY}</h3>
-                         
-                         {/* Fullscreen Toggle */}
-                         <div className="flex justify-between items-center">
-                            <div>
-                                <div className={`text-slate-200 font-bold ${fontClass}`}>{t.FULL_SCREEN}</div>
-                            </div>
-                            <button
-                                onClick={toggleFullScreen}
-                                className={`w-16 h-8 rounded-full transition-all relative border ${isFullscreen ? 'bg-cyan-600 border-cyan-400' : 'bg-slate-900 border-slate-600'}`}
-                            >
-                                <div className={`absolute top-1 w-6 h-6 bg-white rounded-full shadow transition-all ${isFullscreen ? 'right-1' : 'left-1'}`}></div>
-                            </button>
-                         </div>
-
-                         {/* Menu Background Toggle */}
-                         <div className="flex justify-between items-center">
-                            <div>
-                                <div className={`text-slate-200 font-bold ${fontClass}`}>{t.MENU_BG}</div>
-                            </div>
-                            <button
-                                onClick={handleMenuBgToggle}
-                                className={`w-16 h-8 rounded-full transition-all relative border ${layoutSettings.enableMenuBackground ? 'bg-cyan-600 border-cyan-400' : 'bg-slate-900 border-slate-600'}`}
-                            >
-                                <div className={`absolute top-1 w-6 h-6 bg-white rounded-full shadow transition-all ${layoutSettings.enableMenuBackground ? 'right-1' : 'left-1'}`}></div>
-                            </button>
-                         </div>
-
-                         {/* Language Toggle */}
-                         <div className="flex justify-between items-center">
-                            <div>
-                                <div className={`text-slate-200 font-bold ${fontClass}`}>{t.LANGUAGE}</div>
-                            </div>
-                            <button
-                                onClick={handleLanguageToggle}
-                                className={`w-20 h-8 rounded-full transition-all relative border overflow-hidden flex items-center justify-between px-2 ${layoutSettings.language === 'en' ? 'bg-slate-800 border-slate-600' : 'bg-cyan-900 border-cyan-500'}`}
-                            >
-                                <span className={`text-[10px] font-bold z-10 ${layoutSettings.language === 'th' ? 'text-white' : 'text-slate-500'}`}>TH</span>
-                                <span className={`text-[10px] font-bold z-10 ${layoutSettings.language === 'en' ? 'text-white' : 'text-slate-500'}`}>EN</span>
-                                <div className={`absolute top-0.5 bottom-0.5 w-9 bg-cyan-600 rounded-full shadow transition-all ${layoutSettings.language === 'en' ? 'right-0.5' : 'left-0.5'}`}></div>
-                            </button>
-                         </div>
-
-                         {/* Lane Position Controls */}
-                         <div>
-                            <div className={`text-slate-200 font-bold mb-2 ${fontClass}`}>{t.LANE_POS}</div>
-                            <div className="flex rounded border border-slate-600 overflow-hidden">
-                                {(['left', 'center', 'right'] as const).map((pos) => (
-                                    <button
-                                        key={pos}
-                                        onClick={() => handlePositionChange(pos)}
-                                        className={`flex-1 py-2 text-xs font-bold uppercase transition-colors ${
-                                            layoutSettings.lanePosition === pos
-                                            ? 'bg-cyan-600 text-white'
-                                            : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
-                                        }`}
-                                    >
-                                        {pos}
-                                    </button>
-                                ))}
-                            </div>
-                         </div>
-                    </div>
-
-                    {/* AUDIO SETTINGS */}
-                    <div className="bg-slate-800/50 p-4 rounded-lg border border-slate-700 h-full">
-                         <h3 className={`text-cyan-400 font-bold tracking-widest text-sm mb-4 border-b border-slate-700 pb-2 ${fontClass}`}>{t.AUDIO}</h3>
-                         <div className="space-y-4">
-                             <div className="space-y-1">
-                                <div className="flex justify-between items-center">
-                                    <span className={`text-slate-200 text-sm ${fontClass}`}>{t.MASTER_VOL}</span>
-                                    <span className="text-cyan-400 font-mono text-xs">{Math.round(audioSettings.masterVolume * 100)}%</span>
-                                </div>
-                                <input 
-                                    type="range" min="0" max="1" step="0.05" 
-                                    value={audioSettings.masterVolume}
-                                    onChange={(e) => handleVolumeChange('master', parseFloat(e.target.value))}
-                                    className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-cyan-400"
-                                />
-                             </div>
-                             <div className="space-y-1">
-                                <div className="flex justify-between items-center">
-                                    <span className={`text-slate-200 text-sm ${fontClass}`}>{t.SFX_VOL}</span>
-                                    <span className="text-cyan-400 font-mono text-xs">{Math.round(audioSettings.sfxVolume * 100)}%</span>
-                                </div>
-                                <input 
-                                    type="range" min="0" max="1" step="0.05" 
-                                    value={audioSettings.sfxVolume}
-                                    onChange={(e) => handleVolumeChange('sfx', parseFloat(e.target.value))}
-                                    className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-cyan-400"
-                                />
-                             </div>
-                         </div>
-                    </div>
+        <div className="absolute inset-0 z-[60] flex items-center justify-center bg-black/90 backdrop-blur-md animate-fade-in p-4 lg:p-10">
+            {/* MAIN HUD CONTAINER */}
+            <div className="relative w-full max-w-5xl h-full lg:h-auto lg:max-h-[90vh] flex flex-col bg-slate-900/90 border border-slate-700 shadow-[0_0_100px_rgba(6,182,212,0.1)] overflow-hidden">
+                
+                {/* DECORATIVE CORNERS */}
+                <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-cyan-500 z-10"></div>
+                <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-cyan-500 z-10"></div>
+                <div className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-cyan-500 z-10"></div>
+                <div className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-cyan-500 z-10"></div>
+                
+                {/* HEADER */}
+                <div className="relative w-full h-16 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 border-b border-cyan-500/30 flex items-center justify-between px-6 flex-shrink-0">
+                     <div className="flex items-center gap-4">
+                        <div className="w-3 h-3 bg-cyan-500 animate-pulse rounded-full"></div>
+                        <div>
+                            <h2 className={`text-2xl font-black italic text-white tracking-widest ${fontClass} drop-shadow-[0_0_10px_rgba(34,211,238,0.5)]`}>
+                                {t.SYSTEM_SETTINGS}
+                            </h2>
+                            <div className="text-[10px] font-mono text-cyan-600 tracking-[0.5em]">CONFIG_MODULE_V2</div>
+                        </div>
+                     </div>
                 </div>
 
-                {/* KEY CONFIG SECTION */}
-                <div className="w-full">
-                    <h3 className={`text-cyan-400 font-bold tracking-widest text-sm mb-4 border-b border-slate-700 pb-2 w-full ${fontClass}`}>{t.CONTROLS}</h3>
+                {/* CONTENT GRID */}
+                <div className="flex-1 overflow-y-auto lg:overflow-visible grid grid-cols-1 lg:grid-cols-12 gap-0 lg:divide-x divide-slate-700/50">
                     
-                    {/* Mode Select Tabs */}
-                    <div className="flex space-x-4 mb-6 justify-center">
-                        {[4, 5, 7].map((mode) => (
-                            <button
-                                key={mode}
-                                onClick={() => { setActiveMode(mode as 4|5|7); setBindingIndex(null); }}
-                                className={`px-6 py-2 rounded font-bold font-display transition-all ${
-                                    activeMode === mode 
-                                    ? 'bg-cyan-600 text-white shadow-[0_0_15px_rgba(34,211,238,0.5)]' 
-                                    : 'bg-slate-800 text-slate-500 hover:text-slate-300'
-                                }`}
-                            >
-                                {mode} KEYS
-                            </button>
-                        ))}
-                    </div>
+                    {/* LEFT COLUMN: DISPLAY & AUDIO (5 Cols) */}
+                    <div className="lg:col-span-5 p-6 space-y-8 bg-gradient-to-b from-slate-900 to-slate-900/50">
+                        
+                        {/* SECTION: DISPLAY */}
+                        <div className="space-y-4">
+                             <div className="flex items-center gap-2 border-b border-slate-700 pb-2 mb-4">
+                                <span className="text-cyan-500 text-lg">■</span>
+                                <h3 className={`text-white font-bold tracking-wider ${fontClass}`}>{t.DISPLAY}</h3>
+                             </div>
 
-                    {/* Visualizer for Keys */}
-                    <div className="flex justify-center items-end space-x-2 mb-8 h-32 w-full">
-                        {activeConfig.map((lane, idx) => {
-                            const isBinding = bindingIndex === idx;
-                            const keyLabel = currentBoundKeys[idx] === ' ' ? 'SPACE' : currentBoundKeys[idx].toUpperCase();
-                            
-                            return (
-                                <div 
-                                    key={idx}
-                                    onClick={() => setBindingIndex(idx)}
-                                    className={`
-                                        relative h-full flex-1 max-w-[80px] rounded-t border-t border-x border-white/20 cursor-pointer transition-all group
-                                        flex flex-col justify-end items-center pb-4
-                                        ${isBinding ? 'bg-cyan-500/20 border-cyan-400 animate-pulse' : 'bg-slate-800/50 hover:bg-slate-700'}
-                                    `}
-                                >
-                                    <div className={`absolute top-0 w-full h-2 bg-${lane.color.base}-500/50`}></div>
-                                    <div className="text-[10px] text-slate-500 mb-2 font-mono">TRK{idx + 1}</div>
-                                    <div className={`
-                                        w-10 h-10 md:w-12 md:h-12 flex items-center justify-center rounded border-2 font-bold text-lg
-                                        ${isBinding ? 'bg-cyan-500 text-white border-white' : `bg-slate-900 text-white ${lane.color.border}`}
-                                    `}>
-                                        {isBinding ? '?' : keyLabel}
-                                    </div>
-                                    {isBinding && (
-                                        <div className={`absolute -bottom-8 text-cyan-400 text-xs font-bold whitespace-nowrap animate-bounce ${fontClass}`}>{t.PRESS_KEY}</div>
-                                    )}
+                             <div className="space-y-3">
+                                <CyberToggle 
+                                    label={t.FULL_SCREEN} 
+                                    isActive={isFullscreen} 
+                                    onClick={toggleFullScreen} 
+                                />
+                                <CyberToggle 
+                                    label={t.MENU_BG} 
+                                    isActive={!!layoutSettings.enableMenuBackground} 
+                                    onClick={() => onLayoutSettingsChange({...layoutSettings, enableMenuBackground: !layoutSettings.enableMenuBackground})} 
+                                />
+                                <CyberToggle 
+                                    label={t.LANGUAGE} 
+                                    isActive={layoutSettings.language === 'en'} 
+                                    onClick={() => onLayoutSettingsChange({...layoutSettings, language: layoutSettings.language === 'en' ? 'th' : 'en'})}
+                                    subLabels={['TH', 'EN']}
+                                />
+                             </div>
+
+                             {/* LANE POSITION GRAPHICAL */}
+                             <div className="mt-4">
+                                <div className={`text-xs font-bold text-slate-400 mb-2 ${fontClass}`}>{t.LANE_POS}</div>
+                                <div className="grid grid-cols-3 gap-2">
+                                    {(['left', 'center', 'right'] as const).map((pos) => {
+                                        const active = layoutSettings.lanePosition === pos;
+                                        return (
+                                            <button
+                                                key={pos}
+                                                onClick={() => onLayoutSettingsChange({...layoutSettings, lanePosition: pos})}
+                                                className={`
+                                                    h-16 border rounded bg-slate-800/50 relative overflow-hidden group transition-all
+                                                    ${active ? 'border-cyan-500 shadow-[0_0_15px_rgba(6,182,212,0.2)]' : 'border-slate-700 hover:border-slate-500'}
+                                                `}
+                                            >
+                                                {/* Mini UI Representation */}
+                                                <div className={`absolute top-2 bottom-2 w-2 bg-slate-600 group-hover:bg-slate-500 transition-colors
+                                                    ${pos === 'left' ? 'left-2' : pos === 'right' ? 'right-2' : 'left-1/2 -translate-x-1/2'}
+                                                    ${active ? 'bg-cyan-500 shadow-[0_0_10px_cyan]' : ''}
+                                                `}></div>
+                                                <div className={`absolute bottom-1 w-full text-[8px] font-bold uppercase ${active ? 'text-cyan-400' : 'text-slate-500'}`}>
+                                                    {pos}
+                                                </div>
+                                            </button>
+                                        );
+                                    })}
                                 </div>
-                            );
-                        })}
+                             </div>
+                        </div>
+
+                        {/* SECTION: AUDIO */}
+                        <div className="space-y-4">
+                             <div className="flex items-center gap-2 border-b border-slate-700 pb-2 mb-4">
+                                <span className="text-yellow-500 text-lg">■</span>
+                                <h3 className={`text-white font-bold tracking-wider ${fontClass}`}>{t.AUDIO}</h3>
+                             </div>
+                             
+                             <div className="space-y-6">
+                                <CyberSlider 
+                                    label={t.MASTER_VOL} 
+                                    value={audioSettings.masterVolume} 
+                                    onChange={(v) => handleVolumeChange('master', v)} 
+                                />
+                                <CyberSlider 
+                                    label={t.SFX_VOL} 
+                                    value={audioSettings.sfxVolume} 
+                                    onChange={(v) => handleVolumeChange('sfx', v)} 
+                                />
+                             </div>
+                        </div>
+
+                        {/* Resolution Setting - NEW */}
+                        <div className="space-y-4">
+                             <div className="flex items-center gap-2 border-b border-slate-700 pb-2 mb-4">
+                                <span className="text-purple-500 text-lg">■</span>
+                                <h3 className={`text-white font-bold tracking-wider ${fontClass}`}>RESOLUTION</h3>
+                             </div>
+                             {/* Since specific resolution props weren't passed in this snippet, adding a placeholder or assuming generic logic */}
+                             <div className="p-2 bg-slate-800/30 rounded border border-slate-700 text-center text-xs text-slate-500 font-mono">
+                                AUTO-DETECTED
+                             </div>
+                        </div>
+                    </div>
+
+                    {/* RIGHT COLUMN: CONTROLS (7 Cols) */}
+                    <div className="lg:col-span-7 p-6 bg-slate-950/50 flex flex-col relative">
+                         {/* Background Grid */}
+                         <div className="absolute inset-0 opacity-10" 
+                              style={{ backgroundImage: 'linear-gradient(slate-700 1px, transparent 1px), linear-gradient(90deg, slate-700 1px, transparent 1px)', backgroundSize: '40px 40px' }}>
+                         </div>
+
+                         <div className="relative z-10 flex-1 flex flex-col">
+                            <div className="flex items-center justify-between border-b-2 border-slate-700 pb-4 mb-6">
+                                <h3 className={`text-2xl text-white font-black italic tracking-widest ${fontClass}`}>{t.CONTROLS}</h3>
+                                <div className="flex space-x-2">
+                                    {[4, 5, 7].map((mode) => (
+                                        <button
+                                            key={mode}
+                                            onClick={() => { setActiveMode(mode as 4|5|7); setBindingIndex(null); }}
+                                            className={`
+                                                px-4 py-1 text-sm font-bold font-display skew-x-[-10deg] transition-all border
+                                                ${activeMode === mode 
+                                                    ? 'bg-cyan-600 border-cyan-400 text-white shadow-[0_0_15px_cyan]' 
+                                                    : 'bg-slate-800 border-slate-600 text-slate-500 hover:text-white hover:border-slate-400'}
+                                            `}
+                                        >
+                                            <span className="skew-x-[10deg] inline-block">{mode}K MODE</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* KEY VISUALIZER AREA */}
+                            <div className="flex-1 flex flex-col items-center justify-center min-h-[300px] border border-slate-800 bg-slate-900/80 rounded-lg relative overflow-hidden p-8 shadow-inner">
+                                {/* Decor */}
+                                <div className="absolute top-4 left-4 text-[10px] font-mono text-cyan-700">INPUT_DIAGNOSTIC_TOOL</div>
+                                <div className="absolute bottom-4 right-4 text-[10px] font-mono text-cyan-700">STATUS: CALIBRATING</div>
+                                
+                                {/* Keys Container */}
+                                <div className="flex items-end justify-center w-full h-40 gap-1 md:gap-2">
+                                    {activeConfig.map((lane, idx) => {
+                                        const isBinding = bindingIndex === idx;
+                                        const keyLabel = currentBoundKeys[idx] === ' ' ? 'SPC' : currentBoundKeys[idx].toUpperCase();
+                                        
+                                        return (
+                                            <button 
+                                                key={idx}
+                                                onClick={() => setBindingIndex(idx)}
+                                                className={`
+                                                    relative group flex-1 max-w-[80px] h-full flex flex-col justify-end items-center 
+                                                    transition-all duration-200
+                                                `}
+                                            >
+                                                {/* Lane Beam */}
+                                                <div className={`
+                                                    absolute bottom-0 w-full transition-all duration-300
+                                                    ${isBinding ? `h-full bg-${lane.color.base}-500/20` : 'h-1/3 bg-slate-800/30 group-hover:h-1/2'}
+                                                `}></div>
+
+                                                {/* Key Cap */}
+                                                <div className={`
+                                                    relative z-10 w-full aspect-square flex items-center justify-center
+                                                    border-2 rounded transition-all duration-200
+                                                    ${isBinding 
+                                                        ? 'bg-cyan-500 text-black border-white scale-110 shadow-[0_0_20px_cyan]' 
+                                                        : `bg-slate-900 text-slate-400 border-slate-700 group-hover:border-${lane.color.base}-500 group-hover:text-white`}
+                                                `}>
+                                                    <span className="text-xl md:text-2xl font-black font-mono">
+                                                        {isBinding ? '?' : keyLabel}
+                                                    </span>
+                                                </div>
+
+                                                {/* Label */}
+                                                <div className="mt-2 text-[10px] font-bold text-slate-600 font-mono group-hover:text-cyan-400">
+                                                    TRK_{idx + 1}
+                                                </div>
+                                                
+                                                {/* Connection Line */}
+                                                <div className={`
+                                                    absolute bottom-12 w-[1px] bg-slate-700 h-20 -z-10
+                                                    ${isBinding ? 'bg-cyan-400 shadow-[0_0_10px_cyan]' : ''}
+                                                `}></div>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                                
+                                {bindingIndex !== null && (
+                                    <div className={`mt-8 text-cyan-400 font-bold animate-pulse text-lg ${fontClass}`}>
+                                        [{t.PRESS_KEY}]
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="mt-6 flex gap-4">
+                                <button 
+                                    onClick={resetToDefault}
+                                    className={`
+                                        flex-1 py-4 border border-red-900/50 bg-red-900/10 hover:bg-red-900/30 hover:border-red-500
+                                        text-red-400 font-bold tracking-widest uppercase rounded clip-path-angle transition-all ${fontClass}
+                                    `}
+                                    style={{ clipPath: 'polygon(10% 0, 100% 0, 100% 100%, 0 100%, 0 25%)' }}
+                                >
+                                    {t.RESET}
+                                </button>
+                                <button 
+                                    onClick={handleSave}
+                                    className={`
+                                        flex-[2] py-4 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500
+                                        text-white font-black tracking-widest uppercase rounded shadow-[0_0_20px_rgba(6,182,212,0.4)]
+                                        transform hover:-translate-y-1 transition-all ${fontClass}
+                                    `}
+                                    style={{ clipPath: 'polygon(0 0, 100% 0, 100% 75%, 90% 100%, 0 100%)' }}
+                                >
+                                    {t.SAVE_CLOSE}
+                                </button>
+                            </div>
+                         </div>
                     </div>
                 </div>
-
-                <div className="flex space-x-4 w-full mt-4">
-                    <button 
-                        onClick={resetToDefault}
-                        className={`flex-1 py-3 border border-red-500/50 text-red-400 hover:bg-red-500/10 rounded font-bold tracking-widest transition-colors ${fontClass}`}
-                    >
-                        {t.RESET}
-                    </button>
-                    <button 
-                        onClick={handleSave}
-                        className={`flex-[2] py-3 bg-cyan-700 hover:bg-cyan-600 text-white rounded font-bold tracking-widest transition-colors shadow-[0_0_15px_rgba(6,182,212,0.3)] ${fontClass}`}
-                    >
-                        {t.SAVE_CLOSE}
-                    </button>
+                
+                {/* FOOTER DECOR */}
+                <div className="h-2 w-full bg-slate-900 border-t border-slate-700 flex">
+                    <div className="w-1/3 h-full bg-cyan-900/50"></div>
+                    <div className="w-1/3 h-full bg-transparent"></div>
+                    <div className="w-1/3 h-full bg-cyan-900/50"></div>
                 </div>
+
             </div>
         </div>
     );

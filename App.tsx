@@ -1129,8 +1129,8 @@ const App: React.FC = () => {
             />
         ))}
 
-        {/* Dark Gradient Overlay at Bottom (New) */}
-        <div className="absolute bottom-0 left-0 w-full h-1/3 bg-gradient-to-t from-black via-black/40 to-transparent pointer-events-none z-10"></div>
+        {/* Dark Gradient Overlay at Bottom (New) - Increased opacity and height for stronger fade */}
+        <div className="absolute bottom-0 left-0 w-full h-1/2 bg-gradient-to-t from-black via-black/80 to-transparent pointer-events-none z-10"></div>
 
         {/* Menu Button - Show in lanes for non-Ignore themes */}
         {currentThemeId !== 'ignore' && (
@@ -1572,7 +1572,7 @@ const App: React.FC = () => {
 
               {/* Copyright / Info Footer - Centered */}
               <div className="absolute bottom-8 w-full text-center">
-                  <p className="text-xs text-slate-500 font-mono">VER 2.5.0 // SYSTEM ONLINE</p>
+                  <p className="text-xs text-slate-500 font-mono">VER 2.5.0 // CREATED BY : IGNORE</p>
                   <p className="text-xs text-slate-600 font-mono mt-1">© 2024 DJBIG PROJECT. ALL RIGHTS RESERVED.</p>
               </div>
           </div>
