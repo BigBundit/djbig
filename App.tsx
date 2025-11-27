@@ -369,17 +369,17 @@ const App: React.FC = () => {
       }
   };
 
-  const loadDemoTrack = async () => {
+  const loadDemoTrack = async (filename: string, id: string) => {
     playUiSound('select');
     const ctx = initAudio();
     setIsAnalyzing(true);
-    setLocalFileName("DEMO_TRACK");
+    setLocalFileName(id);
     setMediaType('video');
     setSoundProfile('rock');
     setAnalyzedNotes(null); // Reset previous
 
     try {
-        const response = await fetch('demoplay.mp4');
+        const response = await fetch(filename);
         if (!response.ok) throw new Error("Demo file not found");
         
         const videoBlob = await response.blob();
@@ -400,7 +400,7 @@ const App: React.FC = () => {
         
     } catch (e) {
         console.error("Failed to load demo", e);
-        alert("Failed to load demo. Make sure 'demoplay.mp4' is in the public folder.");
+        alert(`Failed to load ${filename}. Make sure it is in the public folder.`);
         setIsAnalyzing(false);
     }
   };
@@ -1707,13 +1707,13 @@ const App: React.FC = () => {
 
                  {/* Unified Playlist - Added min-h-0 and flex-1 for proper scrolling */}
                  <div className="flex-1 min-h-0 overflow-y-auto pr-2 custom-scrollbar space-y-2">
-                    {/* Item 0: PLAY DEMO TRACK */}
+                    {/* Item 0: PLAY DEMO TRACK 01 */}
                     <div 
-                        onClick={loadDemoTrack} 
+                        onClick={() => loadDemoTrack('demoplay.mp4', 'DEMO_TRACK_01')} 
                         onMouseEnter={() => playUiSound('hover')}
                         className={`
                             group relative flex items-center p-3 border-l-4 transition-all cursor-pointer overflow-hidden
-                            ${localFileName === "DEMO_TRACK" 
+                            ${localFileName === "DEMO_TRACK_01" 
                                 ? 'bg-green-900/40 border-green-400 shadow-[inset_0_0_20px_rgba(34,197,94,0.2)]' 
                                 : 'bg-slate-800/30 border-green-800 hover:bg-slate-800 hover:border-green-500'
                             }
@@ -1723,12 +1723,36 @@ const App: React.FC = () => {
                             <span className="text-xl text-green-400">▶</span>
                          </div>
                          <div className="flex-1">
-                             <div className={`font-bold ${fontClass} ${localFileName === "DEMO_TRACK" ? 'text-green-300' : 'text-slate-300 group-hover:text-green-200'}`}>
-                                 {t.PLAY_DEMO}
+                             <div className={`font-bold ${fontClass} ${localFileName === "DEMO_TRACK_01" ? 'text-green-300' : 'text-slate-300 group-hover:text-green-200'}`}>
+                                 {t.PLAY_DEMO_01}
                              </div>
                              <div className="text-[10px] text-slate-500 font-mono">INTERNAL // HIGH SPEED ROCK</div>
                          </div>
-                         {localFileName === "DEMO_TRACK" && <div className="text-green-400 text-xl animate-pulse">●</div>}
+                         {localFileName === "DEMO_TRACK_01" && <div className="text-green-400 text-xl animate-pulse">●</div>}
+                    </div>
+
+                    {/* Item 0.5: PLAY DEMO TRACK 02 */}
+                    <div 
+                        onClick={() => loadDemoTrack('demoplay02.mp4', 'DEMO_TRACK_02')} 
+                        onMouseEnter={() => playUiSound('hover')}
+                        className={`
+                            group relative flex items-center p-3 border-l-4 transition-all cursor-pointer overflow-hidden
+                            ${localFileName === "DEMO_TRACK_02" 
+                                ? 'bg-amber-900/40 border-amber-400 shadow-[inset_0_0_20px_rgba(245,158,11,0.2)]' 
+                                : 'bg-slate-800/30 border-amber-800 hover:bg-slate-800 hover:border-amber-500'
+                            }
+                        `}
+                    >
+                         <div className="w-10 h-10 flex items-center justify-center bg-amber-900/50 rounded-full mr-4 border border-amber-500/30">
+                            <span className="text-xl text-amber-400">▶</span>
+                         </div>
+                         <div className="flex-1">
+                             <div className={`font-bold ${fontClass} ${localFileName === "DEMO_TRACK_02" ? 'text-amber-300' : 'text-slate-300 group-hover:text-amber-200'}`}>
+                                 {t.PLAY_DEMO_02}
+                             </div>
+                             <div className="text-[10px] text-slate-500 font-mono">INTERNAL // ALTERNATIVE MIX</div>
+                         </div>
+                         {localFileName === "DEMO_TRACK_02" && <div className="text-amber-400 text-xl animate-pulse">●</div>}
                     </div>
 
                     {/* Loaded Songs */}
