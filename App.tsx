@@ -317,8 +317,8 @@ const App: React.FC = () => {
     setMediaType('video');
     setSoundProfile('rock');
     
-    // FORCE EXPERT LEVEL FOR DEMO
-    setLevel(10);
+    // We do NOT force Level 10 anymore, let user decide difficulty
+    // setLevel(10); 
     
     try {
         // Fetch the local video file
@@ -336,8 +336,8 @@ const App: React.FC = () => {
         audioBufferRef.current = audioBuffer;
         audioDurationRef.current = audioBuffer.duration;
         
-        // ANALYZE AT LEVEL 10 (EXPERT)
-        const notes = await analyzeAudioAndGenerateNotes(audioBuffer, 10, keyMode);
+        // ANALYZE AT SELECTED LEVEL
+        const notes = await analyzeAudioAndGenerateNotes(audioBuffer, level, keyMode);
         setAnalyzedNotes(notes);
         setIsAnalyzing(false);
         
