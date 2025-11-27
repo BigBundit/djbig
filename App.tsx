@@ -1410,7 +1410,7 @@ const App: React.FC = () => {
                             playsInline
                             className="absolute inset-0 w-full h-full object-cover"
                         />
-                        <div className="absolute inset-0 bg-black/60 pattern-grid-lg"></div>
+                        <div className="absolute inset-0 led-screen-filter"></div>
                     </>
                 ) : (
                     <div className="absolute inset-0 bg-slate-950"></div>
