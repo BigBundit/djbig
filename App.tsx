@@ -1369,54 +1369,53 @@ const App: React.FC = () => {
   return (
     <div className={`relative w-full h-screen bg-black overflow-hidden text-slate-100 select-none ${isShaking ? 'animate-[shake_0.2s_ease-in-out]' : ''}`}>
       
-      {/* BACKGROUND LAYER */}
+      {/* BACKGROUND CONTAINER */}
       <div className="absolute inset-0 z-0 pointer-events-auto overflow-hidden bg-slate-900" ref={bgRef} style={{ transition: 'transform 0.05s, filter 0.05s' }}>
         
-        {status === GameStatus.PLAYING || status === GameStatus.PAUSED || status === GameStatus.OUTRO ? (
-             <>
-                {mediaType === 'audio' ? (
-                     <div className="absolute inset-0 w-full h-full bg-slate-900">
-                        <img 
-                            src="/bg01.png" 
-                            alt="concert bg"
-                            className="w-full h-full object-cover opacity-100 animate-camera-drift"
-                        />
-                        <div className="absolute inset-0 bg-slate-950/20"></div>
-                     </div>
+        {/* LAYER 1: Dynamic Background Effects (No Image) */}
+        {(status === GameStatus.MENU || status === GameStatus.TITLE) && (
+            <div className="absolute inset-0 z-10 pointer-events-none">
+                {layoutSettings.enableMenuBackground ? (
+                    <>
+                        {/* Animated Glow Blobs */}
+                        <div className="absolute top-[-10%] left-[-10%] w-[60%] h-[60%] bg-purple-900/40 rounded-full blur-[100px] animate-blob"></div>
+                        <div className="absolute top-[10%] right-[-10%] w-[50%] h-[50%] bg-cyan-900/40 rounded-full blur-[100px] animate-blob animation-delay-2000"></div>
+                        <div className="absolute bottom-[-20%] left-[20%] w-[60%] h-[60%] bg-blue-900/40 rounded-full blur-[100px] animate-blob animation-delay-4000"></div>
+                        
+                        {/* Grid Texture */}
+                        <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.05)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.05)_1px,transparent_1px)] bg-[size:40px_40px] opacity-10"></div>
+                    </>
                 ) : (
+                    // If disabled, just cover with solid color
+                    <div className="absolute inset-0 bg-slate-950"></div>
+                )}
+            </div>
+        )}
+
+        {/* LAYER 2: GAMEPLAY MEDIA */}
+        {(status === GameStatus.PLAYING || status === GameStatus.PAUSED || status === GameStatus.OUTRO) && (
+            <>
+                {mediaType === 'video' ? (
                     <video
                         ref={mediaRef as React.RefObject<HTMLVideoElement>}
                         src={localVideoSrc}
-                        className="w-full h-full object-cover opacity-80"
+                        className="absolute inset-0 w-full h-full object-cover z-20"
                         onEnded={triggerOutro}
+                        autoPlay
                     />
-                )}
-
-                {/* Demo Playback or Audio File Playback */}
-                {mediaType === 'audio' && localFileName !== "DEMO_TRACK" && (
-                    <audio
-                        ref={mediaRef as React.RefObject<HTMLAudioElement>}
-                        src={localVideoSrc}
-                        onEnded={triggerOutro}
-                    />
+                ) : (
+                    // Audio Mode
+                    <div className="absolute inset-0 z-20 bg-black/60 backdrop-blur-sm">
+                        <audio
+                            ref={mediaRef as React.RefObject<HTMLAudioElement>}
+                            src={localVideoSrc}
+                            onEnded={triggerOutro}
+                            autoPlay
+                        />
+                    </div>
                 )}
             </>
-        ) : (
-            <div className="w-full h-full relative overflow-hidden bg-black">
-                 {layoutSettings.enableMenuBackground && (
-                    <div className="absolute inset-0 w-full h-full">
-                        {/* Dynamic Light Background */}
-                        <div className="absolute inset-0 bg-slate-900"></div>
-                        <div className="absolute top-[-10%] left-[-10%] w-[60%] h-[60%] bg-purple-600/30 rounded-full mix-blend-screen filter blur-[100px] opacity-70 animate-blob"></div>
-                        <div className="absolute top-[0%] right-[-10%] w-[50%] h-[50%] bg-cyan-500/30 rounded-full mix-blend-screen filter blur-[100px] opacity-70 animate-blob animation-delay-2000"></div>
-                        <div className="absolute bottom-[-20%] left-[20%] w-[60%] h-[60%] bg-blue-600/30 rounded-full mix-blend-screen filter blur-[100px] opacity-70 animate-blob animation-delay-4000"></div>
-                        <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:40px_40px] [mask-image:radial-gradient(ellipse_at_center,black_40%,transparent_100%)] opacity-30"></div>
-                    </div>
-                 )}
-                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,rgba(0,0,0,0.6)_100%)]"></div>
-            </div>
         )}
-        <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-slate-950/20 to-transparent pointer-events-none"></div>
       </div>
 
       <div className="scanlines z-50 pointer-events-none opacity-40"></div>
