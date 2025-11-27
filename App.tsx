@@ -763,8 +763,9 @@ const App: React.FC = () => {
                 setHealth(h => Math.min(100, h + 0.1));
                 setFeedback({ text: "90%", color: "text-green-400", id: Date.now() });
             } else {
+                // BAD / 10%
                 setScore(s => s + 10);
-                setCombo(0);
+                // setCombo(0); // Removed: BAD now continues combo
                 setFeedback({ text: "10%", color: "text-yellow-400", id: Date.now() });
                 // Vibration for bad hit
                 if (typeof navigator !== 'undefined' && navigator.vibrate) {
@@ -772,14 +773,12 @@ const App: React.FC = () => {
                 }
             }
 
-            if (hitType !== ScoreRating.BAD) {
-                setCombo(c => {
-                    const newC = c + 1;
-                    if (newC > maxCombo) setMaxCombo(newC);
-                    setMaxCombo(prev => Math.max(prev, newC));
-                    return newC;
-                });
-            }
+            // Increment combo for all hit types (Perfect, Good, Bad)
+            setCombo(c => {
+                const newC = c + 1;
+                setMaxCombo(prev => Math.max(prev, newC));
+                return newC;
+            });
         }
     } 
   }, [status, isAutoPlay, combo, maxCombo, soundProfile]);
@@ -1398,21 +1397,22 @@ const App: React.FC = () => {
       {/* BACKGROUND CONTAINER */}
       <div className="absolute inset-0 z-0 pointer-events-auto overflow-hidden bg-slate-900" ref={bgRef} style={{ transition: 'transform 0.05s, filter 0.05s' }}>
         
-        {/* LAYER 3: Dynamic Background Effects (Menu Only) */}
+        {/* LAYER 3: Menu Background */}
         {(status === GameStatus.MENU || status === GameStatus.TITLE) && (
             <div className="absolute inset-0 z-10 pointer-events-none">
                 {layoutSettings.enableMenuBackground ? (
                     <>
-                        {/* Animated Glow Blobs (Blend Mode) */}
-                        <div className="absolute top-[-10%] left-[-10%] w-[60%] h-[60%] bg-purple-900/30 rounded-full blur-[100px] animate-blob"></div>
-                        <div className="absolute top-[10%] right-[-10%] w-[50%] h-[50%] bg-cyan-900/30 rounded-full blur-[100px] animate-blob animation-delay-2000"></div>
-                        <div className="absolute bottom-[-20%] left-[20%] w-[60%] h-[60%] bg-blue-900/30 rounded-full blur-[100px] animate-blob animation-delay-4000"></div>
-                        
-                        {/* Grid Texture */}
-                        <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.05)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.05)_1px,transparent_1px)] bg-[size:40px_40px] opacity-10"></div>
+                        <video
+                            src="/background.mp4"
+                            autoPlay
+                            loop
+                            muted
+                            playsInline
+                            className="absolute inset-0 w-full h-full object-cover"
+                        />
+                        <div className="absolute inset-0 bg-black/60 pattern-grid-lg"></div>
                     </>
                 ) : (
-                    // If disabled, just cover with solid color
                     <div className="absolute inset-0 bg-slate-950"></div>
                 )}
             </div>
