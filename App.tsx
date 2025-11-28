@@ -1687,7 +1687,7 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className={`relative w-full h-screen bg-black overflow-hidden text-slate-100 select-none ${isShaking ? 'animate-[shake_0.2s_ease-in-out]' : ''}`}>
+    <div className={`relative w-full h-full fixed inset-0 bg-black overflow-hidden text-slate-100 select-none ${isShaking ? 'animate-[shake_0.2s_ease-in-out]' : ''}`}>
       
       {/* MOBILE ENTRY OVERLAY */}
       {showMobileStart && (

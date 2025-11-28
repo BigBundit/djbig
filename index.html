@@ -1,19 +1,28 @@
+
 <!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>DJBIG</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
       @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&family=Prompt:wght@300;400;700;900&display=swap');
       
+      html, body {
+        height: 100%;
+        width: 100%;
+        background-color: #000000;
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+      }
+
       body {
         font-family: 'Share Tech Mono', monospace;
-        background-color: #020617;
-        overflow: hidden;
         touch-action: none; /* Prevent browser gestures */
       }
 
