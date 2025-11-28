@@ -1,0 +1,8 @@
+# ไฟล์ build ของเว็บ (Vite)
+dist/
+
+# ไฟล์ build ของ Android (Gradle)
+android/app/build/
+android/.gradle/
+android/.idea/
+*.apk

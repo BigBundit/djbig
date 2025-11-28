@@ -185,7 +185,8 @@ const App: React.FC = () => {
     // 1. Trigger Full Screen
     const docEl = document.documentElement;
     if (docEl.requestFullscreen) {
-        docEl.requestFullscreen().catch((err) => console.log("Fullscreen request denied", err));
+        // @ts-ignore
+        docEl.requestFullscreen({ navigationUI: "hide" }).catch((err) => console.log("Fullscreen request denied", err));
     } else if ((docEl as any).webkitRequestFullscreen) {
         (docEl as any).webkitRequestFullscreen();
     } else if ((docEl as any).webkitEnterFullscreen) {
