@@ -1631,6 +1631,7 @@ const App: React.FC = () => {
                             loop
                             muted
                             playsInline
+                            webkit-playsinline="true"
                             className="absolute inset-0 w-full h-full object-cover"
                         />
                         <div className="absolute inset-0 led-screen-filter"></div>
@@ -1650,7 +1651,8 @@ const App: React.FC = () => {
                         src={localVideoSrc}
                         className="absolute inset-0 w-full h-full object-cover z-20"
                         onEnded={triggerOutro}
-                        autoPlay
+                        playsInline
+                        webkit-playsinline="true"
                     />
                 ) : (
                     // Audio Mode
