@@ -30,7 +30,8 @@ import { HitEffect } from './components/HitEffect';
 import { KeyConfigMenu } from './components/KeyConfigMenu';
 import { ThemeSelectionMenu } from './components/ThemeSelectionMenu';
 import { analyzeAudioAndGenerateNotes } from './utils/audioAnalyzer';
-import { generateVideoThumbnail } from './utils/mediaUtils';
+import { generateVideoThumbnail, bufferToWave } from './utils/mediaUtils';
+import { generateRockDemo } from './utils/demoAudio';
 import { TRANSLATIONS } from './translations';
 
 const audioCtxRef = { current: null as AudioContext | null };
@@ -48,6 +49,24 @@ const DEFAULT_LAYOUT: LayoutSettings = {
     lanePosition: 'left',
     enableMenuBackground: true,
     language: 'en'
+};
+
+// --- HELPER COMPONENT FOR MARQUEE TEXT ---
+const MarqueeText: React.FC<{ text: string, className?: string }> = ({ text, className }) => {
+    const isLong = text.length > 15;
+    
+    if (isLong) {
+        return (
+            <div className={`overflow-hidden w-full relative ${className}`}>
+                <div className="animate-marquee">
+                    <span className="mr-8">{text}</span>
+                    <span className="mr-8">{text}</span>
+                </div>
+            </div>
+        );
+    }
+    
+    return <div className={`truncate ${className}`}>{text}</div>;
 };
 
 const App: React.FC = () => {
@@ -77,6 +96,7 @@ const App: React.FC = () => {
   const [localVideoSrc, setLocalVideoSrc] = useState<string>('');
   const [localFileName, setLocalFileName] = useState<string>('');
   const [mediaType, setMediaType] = useState<'audio' | 'video'>('video');
+  const [currentSongMetadata, setCurrentSongMetadata] = useState<SongMetadata | null>(null);
   
   // Sound Profile State (Dynamic Drum Sounds)
   const [soundProfile, setSoundProfile] = useState<'electronic' | 'rock' | 'chiptune'>('electronic');
@@ -108,6 +128,11 @@ const App: React.FC = () => {
   const [currentThemeId, setCurrentThemeId] = useState<ThemeId>('ignore');
   const [unlockedThemes, setUnlockedThemes] = useState<Set<ThemeId>>(new Set(['neon', 'ignore', 'titan', 'queen']));
   const [playerStats, setPlayerStats] = useState<PlayerStats>(DEFAULT_STATS);
+
+  // Preview Audio State
+  const [isPlayingPreview, setIsPlayingPreview] = useState<boolean>(false);
+  const previewAudioRef = useRef<HTMLAudioElement | null>(null);
+  const previewTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Translations Helper
   const t = TRANSLATIONS[layoutSettings.language];
@@ -164,15 +189,96 @@ const App: React.FC = () => {
   // Handle Background Music Playback
   useEffect(() => {
     if (bgMusicRef.current) {
-        if (status === GameStatus.TITLE || status === GameStatus.MENU) {
+        // Only play BGM if in Title/Menu AND NOT playing a song preview
+        if ((status === GameStatus.TITLE || status === GameStatus.MENU) && !isPlayingPreview) {
             bgMusicRef.current.play().catch(e => {
-                console.log("Auto-play prevented (User interaction needed first):", e);
+                // Autoplay might be blocked until interaction
             });
         } else {
             bgMusicRef.current.pause();
-            bgMusicRef.current.currentTime = 0;
+            if (status === GameStatus.PLAYING) {
+                bgMusicRef.current.currentTime = 0;
+            }
         }
     }
+  }, [status, isPlayingPreview]);
+
+  // Stop Preview Helper
+  const stopPreview = () => {
+    if (previewTimeoutRef.current) {
+        clearInterval(previewTimeoutRef.current as any); 
+        previewTimeoutRef.current = null;
+    }
+
+    if (previewAudioRef.current) {
+        previewAudioRef.current.pause();
+        previewAudioRef.current.currentTime = 0;
+    }
+    setIsPlayingPreview(false);
+  };
+
+  // Play Preview Helper
+  const playPreview = (src: string) => {
+    stopPreview(); // Stop existing
+
+    if (!previewAudioRef.current) {
+        previewAudioRef.current = new Audio();
+    }
+
+    const audio = previewAudioRef.current;
+    audio.src = src;
+    
+    // Apply volume mixing: Master * Music
+    const musicVol = audioSettings.musicVolume ?? 1.0;
+    const targetVolume = audioSettings.masterVolume * musicVol;
+    audio.volume = targetVolume;
+    
+    audio.play()
+        .then(() => {
+            setIsPlayingPreview(true);
+            
+            // Loop Logic: Play 15s, Fade out last 3s, Loop back to 0
+            const LOOP_LIMIT = 15; // 15 seconds
+            const FADE_START = 12; // Start fading at 12s
+
+            previewTimeoutRef.current = setInterval(() => {
+                if (!audio) return;
+                
+                const t = audio.currentTime;
+
+                // 1. Loop Reset
+                if (t >= LOOP_LIMIT || audio.ended) {
+                    audio.currentTime = 0;
+                    audio.volume = targetVolume;
+                    if (audio.paused) audio.play().catch(()=>{});
+                    return;
+                }
+
+                // 2. Fade Out
+                if (t >= FADE_START) {
+                    const remaining = LOOP_LIMIT - t;
+                    const fadeDuration = LOOP_LIMIT - FADE_START;
+                    const ratio = Math.max(0, remaining / fadeDuration);
+                    // Square the ratio for smoother fade
+                    audio.volume = targetVolume * (ratio * ratio);
+                } else {
+                     // Ensure volume is at target
+                     if (Math.abs(audio.volume - targetVolume) > 0.01) {
+                         audio.volume = targetVolume;
+                     }
+                }
+
+            }, 100); // Check every 100ms
+        })
+        .catch(err => console.warn("Preview playback failed", err));
+  };
+
+  // Cleanup Preview on Unmount or Game Start
+  useEffect(() => {
+      if (status === GameStatus.PLAYING) {
+          stopPreview();
+      }
+      return () => stopPreview();
   }, [status]);
 
   // Load Persistence Data
@@ -285,7 +391,7 @@ const App: React.FC = () => {
     }
     // Also try to play BG music if it was blocked by autoplay policy
     if (bgMusicRef.current && (status === GameStatus.TITLE || status === GameStatus.MENU)) {
-        bgMusicRef.current.play().catch(()=>{});
+        if (!isPlayingPreview) bgMusicRef.current.play().catch(()=>{});
     }
     return audioCtxRef.current;
   };
@@ -374,17 +480,32 @@ const App: React.FC = () => {
     const ctx = initAudio();
     setIsAnalyzing(true);
     setLocalFileName(id);
-    setMediaType('video');
-    setSoundProfile('rock');
     setAnalyzedNotes(null); // Reset previous
+    
+    // Set Metadata for UI
+    setCurrentSongMetadata({
+        id: id,
+        file: new File([], id), // Mock file
+        name: id === 'DEMO_TRACK_01' ? t.PLAY_DEMO_01 : t.PLAY_DEMO_02,
+        thumbnailUrl: null,
+        type: 'video'
+    });
 
+    const absolutePath = filename.startsWith('/') ? filename : `/${filename}`;
+    
+    // Try to load video, if fails (in sandbox), fallback to generated audio
     try {
-        const response = await fetch(filename);
+        const response = await fetch(absolutePath);
         if (!response.ok) throw new Error("Demo file not found");
         
         const videoBlob = await response.blob();
         const videoUrl = URL.createObjectURL(videoBlob);
         setLocalVideoSrc(videoUrl);
+        setMediaType('video');
+        setSoundProfile('rock');
+
+        // Play preview
+        playPreview(videoUrl);
 
         // Decode audio for analysis
         const arrayBuffer = await videoBlob.arrayBuffer();
@@ -397,15 +518,33 @@ const App: React.FC = () => {
         const notes = await analyzeAudioAndGenerateNotes(audioBuffer, level, keyMode);
         setAnalyzedNotes(notes);
         setIsAnalyzing(false);
-        
     } catch (e) {
-        console.error("Failed to load demo", e);
-        alert(`Failed to load ${filename}. Make sure it is in the public folder.`);
+        console.warn("Demo file missing or fetch error. Using generated fallback audio.");
+        
+        // Fallback: Generate Rock Audio
+        const audioBuf = generateRockDemo(ctx);
+        audioBufferRef.current = audioBuf;
+        audioDurationRef.current = audioBuf.duration;
+        
+        // Create Blob for Playback
+        const wavBlob = bufferToWave(audioBuf, audioBuf.length);
+        const audioUrl = URL.createObjectURL(wavBlob);
+        
+        setLocalVideoSrc(audioUrl);
+        setMediaType('audio'); // Must switch to audio since we don't have video
+        setSoundProfile('rock');
+        
+        // Play generated preview
+        playPreview(audioUrl);
+
+        // Analyze generated audio
+        const notes = await analyzeAudioAndGenerateNotes(audioBuf, level, keyMode);
+        setAnalyzedNotes(notes);
         setIsAnalyzing(false);
     }
   };
 
-  const handleFileSelect = async (file: File) => {
+  const handleFileSelect = async (file: File, meta?: SongMetadata) => {
     if (file) {
       // Init audio context on user interaction
       initAudio();
@@ -415,8 +554,25 @@ const App: React.FC = () => {
       setLocalVideoSrc(url);
       setLocalFileName(file.name);
       
+      // Update Active Metadata
+      if (meta) {
+          setCurrentSongMetadata(meta);
+      } else {
+          // Fallback if just a file was passed (e.g. single upload)
+          const isVideo = file.type.startsWith('video') || !!file.name.match(/\.(mp4|webm|ogg|mov|m4v)$/i);
+          setCurrentSongMetadata({
+              id: `temp-${Date.now()}`,
+              file: file,
+              name: file.name,
+              thumbnailUrl: null,
+              type: isVideo ? 'video' : 'audio'
+          });
+      }
+      
+      // Start 15s Preview
+      playPreview(url);
+
       // Determine Sound Profile based on file hash to ensure consistency
-      // This fulfills "sound changes according to each music file"
       const hash = file.name.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
       const profiles: ('electronic' | 'rock' | 'chiptune')[] = ['electronic', 'rock', 'chiptune'];
       const selectedProfile = profiles[hash % profiles.length];
@@ -469,7 +625,7 @@ const App: React.FC = () => {
           };
           
           setSongList(prev => [...prev, newSong]); // Append to list
-          handleFileSelect(file);
+          handleFileSelect(file, newSong);
       }
   };
 
@@ -478,8 +634,6 @@ const App: React.FC = () => {
       if (!files || files.length === 0) return;
 
       setIsLoadingFolder(true);
-      // We append folder contents, not replace
-      // setSongList([]); 
 
       const validExtensions = ['.mp4', '.mp3', '.m4a', '.wav', '.ogg', '.m4v', '.webm'];
       const loadedSongs: SongMetadata[] = [];
@@ -1075,6 +1229,7 @@ const App: React.FC = () => {
   const startCountdownSequence = () => {
     initAudio();
     playUiSound('select');
+    stopPreview(); // Ensure preview is stopped before starting game
 
     if (!localVideoSrc) {
         alert("Please select a track first.");
@@ -1151,10 +1306,10 @@ const App: React.FC = () => {
   };
 
   const DIFFICULTY_OPTIONS = [
-      { label: t.EASY, value: 7, color: 'border-green-500 text-green-400 shadow-green-500/20' },
-      { label: t.NORMAL, value: 8, color: 'border-yellow-500 text-yellow-400 shadow-yellow-500/20' },
-      { label: t.HARD, value: 9, color: 'border-orange-500 text-orange-400 shadow-orange-500/20' },
-      { label: t.EXPERT, value: 10, color: 'border-red-500 text-red-500 shadow-red-500/20' }
+      { label: t.EASY, value: 7, color: 'bg-green-500 shadow-green-500/50' },
+      { label: t.NORMAL, value: 8, color: 'bg-yellow-500 shadow-yellow-500/50' },
+      { label: t.HARD, value: 9, color: 'bg-orange-500 shadow-orange-500/50' },
+      { label: t.EXPERT, value: 10, color: 'bg-red-500 shadow-red-500/50' }
   ];
 
   const getCurrentDifficultyLabel = () => {
@@ -1665,296 +1820,256 @@ const App: React.FC = () => {
       )}
 
       {status === GameStatus.MENU && !startCountdown && (
-        <div className="relative z-30 h-full flex flex-col items-center justify-start lg:justify-center animate-fade-in px-4 pt-24 pb-8 lg:py-8 overflow-y-auto">
-          {/* Back Button */}
-          <button 
-             onClick={() => { setStatus(GameStatus.TITLE); playUiSound('select'); }}
-             className="absolute top-4 left-4 p-2 text-slate-400 hover:text-white flex items-center space-x-2 transition-colors z-50 bg-black/50 rounded-full active:scale-95"
-          >
-             <span className="text-2xl">←</span> <span className={`font-bold hidden md:inline ${fontClass}`}>{t.BACK}</span>
-          </button>
-
-           <button 
-             onClick={() => { setShowThemeMenu(true); playUiSound('select'); }}
-             className="absolute top-4 right-16 p-2 text-slate-400 hover:text-purple-400 transition-all duration-300 flex items-center space-x-2 z-50 bg-black/50 rounded-full px-4 active:scale-95"
-          >
-             <span className={`font-bold text-sm hidden md:inline ${fontClass}`}>{t.CUSTOMIZE}</span>
-             <svg className="w-6 h-6" viewBox="0 0 24 24" fill="currentColor"><path d="M12,22c4.97,0,9-4.03,9-9c0-4.97-4.03-9-9-9c-0.93,0-1.83,0.14-2.68,0.4c-0.61,0.18-0.95,0.83-0.77,1.44 c0.12,0.41,0.5,0.69,0.92,0.69c0.17,0,0.34-0.05,0.5-0.1C10.59,6.17,11.27,6,12,6c3.31,0,6,2.69,6,6c0,3.31-2.69,6-6,6 c-3.31,0-6-2.69-6-6c0-1.07,0.28-2.07,0.77-2.94C7.14,8.42,6.92,7.63,6.29,7.36C5.7,7.11,5.01,7.27,4.6,7.76 C3.57,9,2.98,10.45,3.01,12.04C3.06,17.26,7.5,21.75,12.72,21.99C17.94,22.23,22,17.88,22,12.65V12c0-0.55-0.45-1-1-1s-1,0.45-1,1 v0.65C20,16.89,16.33,20.08,12,20.08v0.01c-3.15,0-5.88-1.74-7.24-4.29l0,0l2.7-2.7c0.39-0.39,0.39-1.02,0-1.41 s-1.02-0.39-1.41,0l-2.7,2.7C2.45,13.43,2,12.74,2,12c0-0.55-0.45-1-1-1s-1,0.45-1,1c0,0.99,0.16,1.93,0.45,2.81l2.7-2.7 c0.39-0.39,1.02-0.39,1.41,0s0.39,1.02,0,1.41l-2.7,2.7C4.16,19.82,7.73,22,12,22z"/></svg>
-          </button>
-
-          <button 
-             onClick={() => { setShowKeyConfig(true); playUiSound('select'); }}
-             className="absolute top-4 right-4 p-2 text-slate-400 hover:text-cyan-400 hover:rotate-90 transition-all duration-500 z-50 bg-black/50 rounded-full active:scale-95"
-          >
-             <svg className="w-6 h-6" viewBox="0 0 24 24" fill="currentColor"><path d="M19.14,12.94c0.04-0.3,0.06-0.61,0.06-0.94c0-0.32-0.02-0.64-0.07-0.94l2.03-1.58c0.18-0.14,0.23-0.41,0.12-0.61 l-1.92-3.32c-0.12-0.22-0.37-0.29-0.59-0.22l-2.39,0.96c-0.5-0.38-1.03-0.7-1.62-0.94L14.4,2.81c-0.04-0.24-0.24-0.41-0.48-0.41 h-3.84c-0.24,0-0.43,0.17-0.47,0.41L9.25,5.35C8.66,5.59,8.12,5.92,7.63,6.29L5.24,5.33c-0.22-0.08-0.47,0-0.59,0.22L2.74,8.87 C2.62,9.08,2.66,9.34,2.86,9.48l2.03,1.58C4.84,11.36,4.8,11.69,4.8,12s0.02,0.64,0.07,0.94l-2.03,1.58 c-0.18,0.14-0.23,0.41-0.12-0.61l1.92,3.32c0.12-0.22,0.37,0.29,0.59,0.22l2.39-0.96c0.5,0.38,1.03,0.7,1.62,0.94l0.36,2.54 c0.05,0.24,0.24,0.41,0.48,0.41h3.84c0.24,0,0.44-0.17,0.47-0.41l0.36-2.54c0.59-0.24,1.13-0.56,1.62-0.94l2.39,0.96 c0.22,0.08,0.47,0,0.59-0.22l1.92-3.32c0.12-0.22,0.07-0.47-0.12-0.61L19.14,12.94z M12,15.6c-1.98,0-3.6-1.62-3.6-3.6 s1.62-3.6,3.6-3.6s3.6,1.62,3.6,3.6S13.98,15.6,12,15.6z"/></svg>
-          </button>
+        <div className="relative z-30 w-full h-full md:h-full flex flex-col md:flex-row animate-fade-in bg-slate-900/40 backdrop-blur-md overflow-y-auto md:overflow-hidden">
           
-          {/* Main Dashboard Container */}
-          <div 
-            className="w-full max-w-6xl mx-auto h-auto lg:h-[85vh] lg:overflow-hidden flex flex-col lg:grid lg:grid-cols-12 gap-6 p-4 md:p-6 backdrop-blur-xl border border-slate-700 bg-slate-900/90 shadow-[0_0_50px_rgba(0,0,0,0.8)] relative transition-all duration-50"
-            style={{ clipPath: 'polygon(2% 0, 98% 0, 100% 2%, 100% 98%, 98% 100%, 2% 100%, 0 98%, 0 2%)' }}
-          >
-             {/* LEFT COLUMN: UNIFIED TRACK SELECTOR (7 Cols) */}
-             <div className="lg:col-span-7 flex flex-col h-[50vh] min-h-[350px] lg:h-full lg:min-h-0 lg:border-r border-slate-700/50 lg:pr-4 mb-2 lg:mb-0 relative">
-                 <div className="flex-shrink-0 flex justify-between items-center border-b border-cyan-500/30 pb-2 mb-2">
-                    <h2 className={`text-xl md:text-2xl ${fontClass} font-black text-cyan-400 tracking-wider flex items-center gap-2`}>
-                        <span className="text-3xl md:text-4xl text-white">01</span> {t.SELECT_SOURCE}
-                    </h2>
-                    {songList.length > 0 && (
-                        <button onClick={() => { setSongList([]); setLocalFileName(''); setAnalyzedNotes(null); playUiSound('select'); }} className={`text-xs text-red-400 hover:text-red-300 underline font-bold uppercase tracking-widest ${fontClass}`}>{t.CLEAR_PLAYLIST}</button>
-                    )}
+          {/* HEADER BAR (MOBILE) */}
+          <div className="md:hidden sticky top-0 left-0 w-full h-16 bg-slate-900 flex items-center justify-between px-4 z-50 border-b border-slate-700 shrink-0">
+             <button onClick={() => { setStatus(GameStatus.TITLE); stopPreview(); }} className="text-white">← BACK</button>
+             <div className="text-cyan-400 font-bold">MUSIC SELECT</div>
+          </div>
+
+          {/* LEFT COLUMN: THE PLAYLIST (Data Strips) */}
+          <div className="w-full md:w-[40%] h-auto md:h-full flex flex-col bg-slate-950/80 border-r border-slate-700/50 pt-0 md:pt-0 relative overflow-hidden shrink-0">
+             
+             {/* Header */}
+             <div className="hidden md:flex h-24 items-end pb-4 px-8 border-b border-cyan-500/30 bg-gradient-to-b from-slate-900 to-transparent shrink-0">
+                 <h2 className={`text-4xl font-black italic text-white tracking-tighter ${fontClass} drop-shadow-md`}>
+                     SELECT <span className="text-cyan-400">MUSIC</span>
+                 </h2>
+             </div>
+
+             {/* Scrollable List */}
+             <div className="w-full md:flex-1 md:overflow-y-auto custom-scrollbar p-0 space-y-1">
+                 {/* Item 1: Demo 01 */}
+                 <div 
+                    onClick={() => loadDemoTrack('/demoplay.mp4', 'DEMO_TRACK_01')}
+                    onMouseEnter={() => playUiSound('hover')}
+                    className={`
+                        group relative h-20 w-full flex items-center px-6 cursor-pointer transition-all border-l-8 overflow-hidden
+                        ${localFileName === "DEMO_TRACK_01" 
+                            ? 'bg-gradient-to-r from-green-900/80 to-transparent border-green-400' 
+                            : 'bg-slate-900/50 border-slate-800 hover:bg-slate-800 hover:border-green-600'}
+                    `}
+                    style={{ clipPath: 'polygon(0 0, 100% 0, 95% 100%, 0% 100%)' }}
+                 >
+                     <div className={`font-black text-2xl mr-4 ${localFileName === "DEMO_TRACK_01" ? 'text-green-400' : 'text-slate-700 group-hover:text-green-800'}`}>01</div>
+                     <div className="flex-1 min-w-0">
+                         <MarqueeText 
+                             text={t.PLAY_DEMO_01} 
+                             className={`text-lg font-bold ${fontClass} ${localFileName === "DEMO_TRACK_01" ? 'text-white' : 'text-slate-400 group-hover:text-green-200'}`}
+                         />
+                         <div className="text-xs font-mono text-green-600/70">HIGH SPEED ROCK // 175 BPM</div>
+                     </div>
+                     {localFileName === "DEMO_TRACK_01" && <div className="text-green-400 text-xl animate-pulse">◀</div>}
                  </div>
 
-                 {/* Unified Playlist - Added min-h-0 and flex-1 for proper scrolling */}
-                 <div className="flex-1 min-h-0 overflow-y-auto pr-2 custom-scrollbar space-y-2">
-                    {/* Item 0: PLAY DEMO TRACK 01 */}
-                    <div 
-                        onClick={() => loadDemoTrack('demoplay.mp4', 'DEMO_TRACK_01')} 
-                        onMouseEnter={() => playUiSound('hover')}
-                        className={`
-                            group relative flex items-center p-3 border-l-4 transition-all cursor-pointer overflow-hidden
-                            ${localFileName === "DEMO_TRACK_01" 
-                                ? 'bg-green-900/40 border-green-400 shadow-[inset_0_0_20px_rgba(34,197,94,0.2)]' 
-                                : 'bg-slate-800/30 border-green-800 hover:bg-slate-800 hover:border-green-500'
-                            }
-                        `}
-                    >
-                         <div className="w-10 h-10 flex items-center justify-center bg-green-900/50 rounded-full mr-4 border border-green-500/30">
-                            <span className="text-xl text-green-400">▶</span>
-                         </div>
-                         <div className="flex-1">
-                             <div className={`font-bold ${fontClass} ${localFileName === "DEMO_TRACK_01" ? 'text-green-300' : 'text-slate-300 group-hover:text-green-200'}`}>
-                                 {t.PLAY_DEMO_01}
-                             </div>
-                             <div className="text-[10px] text-slate-500 font-mono">INTERNAL // HIGH SPEED ROCK</div>
-                         </div>
-                         {localFileName === "DEMO_TRACK_01" && <div className="text-green-400 text-xl animate-pulse">●</div>}
-                    </div>
+                 {/* Item 2: Demo 02 */}
+                 <div 
+                    onClick={() => loadDemoTrack('/demoplay02.mp4', 'DEMO_TRACK_02')}
+                    onMouseEnter={() => playUiSound('hover')}
+                    className={`
+                        group relative h-20 w-full flex items-center px-6 cursor-pointer transition-all border-l-8 overflow-hidden
+                        ${localFileName === "DEMO_TRACK_02" 
+                            ? 'bg-gradient-to-r from-amber-900/80 to-transparent border-amber-400' 
+                            : 'bg-slate-900/50 border-slate-800 hover:bg-slate-800 hover:border-amber-600'}
+                    `}
+                    style={{ clipPath: 'polygon(0 0, 100% 0, 95% 100%, 0% 100%)' }}
+                 >
+                     <div className={`font-black text-2xl mr-4 ${localFileName === "DEMO_TRACK_02" ? 'text-amber-400' : 'text-slate-700 group-hover:text-amber-800'}`}>02</div>
+                     <div className="flex-1 min-w-0">
+                         <MarqueeText 
+                             text={t.PLAY_DEMO_02} 
+                             className={`text-lg font-bold ${fontClass} ${localFileName === "DEMO_TRACK_02" ? 'text-white' : 'text-slate-400 group-hover:text-amber-200'}`}
+                         />
+                         <div className="text-xs font-mono text-amber-600/70">ALTERNATIVE MIX // 140 BPM</div>
+                     </div>
+                     {localFileName === "DEMO_TRACK_02" && <div className="text-amber-400 text-xl animate-pulse">◀</div>}
+                 </div>
 
-                    {/* Item 0.5: PLAY DEMO TRACK 02 */}
-                    <div 
-                        onClick={() => loadDemoTrack('demoplay02.mp4', 'DEMO_TRACK_02')} 
-                        onMouseEnter={() => playUiSound('hover')}
-                        className={`
-                            group relative flex items-center p-3 border-l-4 transition-all cursor-pointer overflow-hidden
-                            ${localFileName === "DEMO_TRACK_02" 
-                                ? 'bg-amber-900/40 border-amber-400 shadow-[inset_0_0_20px_rgba(245,158,11,0.2)]' 
-                                : 'bg-slate-800/30 border-amber-800 hover:bg-slate-800 hover:border-amber-500'
-                            }
-                        `}
-                    >
-                         <div className="w-10 h-10 flex items-center justify-center bg-amber-900/50 rounded-full mr-4 border border-amber-500/30">
-                            <span className="text-xl text-amber-400">▶</span>
-                         </div>
-                         <div className="flex-1">
-                             <div className={`font-bold ${fontClass} ${localFileName === "DEMO_TRACK_02" ? 'text-amber-300' : 'text-slate-300 group-hover:text-amber-200'}`}>
-                                 {t.PLAY_DEMO_02}
-                             </div>
-                             <div className="text-[10px] text-slate-500 font-mono">INTERNAL // ALTERNATIVE MIX</div>
-                         </div>
-                         {localFileName === "DEMO_TRACK_02" && <div className="text-amber-400 text-xl animate-pulse">●</div>}
-                    </div>
-
-                    {/* Loaded Songs */}
-                     {songList.map((song) => {
-                         const isActive = localFileName === song.name;
-                         const extension = song.name.split('.').pop()?.toUpperCase() || 'DAT';
-                         
-                         return (
-                            <div 
-                                key={song.id} 
-                                onClick={() => { handleFileSelect(song.file); playUiSound('select'); }} 
-                                onMouseEnter={() => playUiSound('hover')} 
-                                className={`
-                                    group relative flex items-center p-2 border-l-4 transition-all cursor-pointer overflow-hidden
-                                    ${isActive 
-                                        ? 'bg-cyan-900/40 border-cyan-400 shadow-[inset_0_0_20px_rgba(6,182,212,0.2)]' 
-                                        : 'bg-slate-800/30 border-slate-700 hover:bg-slate-800 hover:border-white'
-                                    }
-                                `}
-                            >
-                                {song.thumbnailUrl ? (
-                                     <div className={`w-12 h-12 flex-shrink-0 mr-4 rounded border-2 overflow-hidden relative ${isActive ? 'border-cyan-500' : 'border-slate-600'}`}>
-                                        <img src={song.thumbnailUrl} alt="thumb" className="w-full h-full object-cover" />
-                                        {isActive && <div className="absolute inset-0 bg-cyan-500/20"></div>}
-                                     </div>
-                                ) : (
-                                     <div className={`
-                                        w-12 h-12 flex-shrink-0 mr-4 rounded-full border-2 flex items-center justify-center relative shadow-lg
-                                        ${isActive ? 'border-cyan-500 animate-[spin_4s_linear_infinite]' : 'border-slate-600'}
-                                        bg-gradient-to-tr from-black to-slate-800
-                                    `}>
-                                        <div className={`w-3 h-3 rounded-full ${isActive ? 'bg-cyan-400' : 'bg-slate-500'}`}></div>
-                                    </div>
-                                )}
-                                
-                                <div className="flex-1 min-w-0 z-10">
-                                    <div className={`text-sm font-bold truncate ${isActive ? 'text-cyan-100' : 'text-slate-300 group-hover:text-white'} ${fontClass}`}>{song.name}</div>
-                                    <div className="flex items-center text-[10px] text-slate-500 font-mono space-x-2 mt-1">
-                                        <span className={`px-1 rounded text-[9px] font-bold ${extension === 'MP3' || extension === 'WAV' ? 'bg-yellow-900 text-yellow-200' : 'bg-blue-900 text-blue-200'}`}>
-                                            {extension}
-                                        </span>
-                                    </div>
-                                </div>
-                                {isActive && <div className="text-cyan-400 text-lg font-bold px-2 z-10">«</div>}
+                 {/* Loaded Songs */}
+                 {songList.map((song, idx) => {
+                     const isActive = localFileName === song.name;
+                     return (
+                        <div 
+                            key={song.id}
+                            onClick={() => { handleFileSelect(song.file, song); playUiSound('select'); }}
+                            onMouseEnter={() => playUiSound('hover')}
+                            className={`
+                                group relative h-20 w-full flex items-center px-6 cursor-pointer transition-all border-l-8 overflow-hidden
+                                ${isActive 
+                                    ? 'bg-gradient-to-r from-cyan-900/80 to-transparent border-cyan-400' 
+                                    : 'bg-slate-900/50 border-slate-800 hover:bg-slate-800 hover:border-cyan-600'}
+                            `}
+                            style={{ clipPath: 'polygon(0 0, 100% 0, 95% 100%, 0% 100%)' }}
+                        >
+                            <div className={`font-black text-2xl mr-4 ${isActive ? 'text-cyan-400' : 'text-slate-700 group-hover:text-cyan-800'}`}>{(idx + 3).toString().padStart(2, '0')}</div>
+                            <div className="flex-1 min-w-0 overflow-hidden">
+                                <MarqueeText 
+                                    text={song.name} 
+                                    className={`text-lg font-bold ${fontClass} ${isActive ? 'text-white' : 'text-slate-400 group-hover:text-cyan-200'}`} 
+                                />
+                                <div className="text-xs font-mono text-slate-600 group-hover:text-cyan-600/70 uppercase">{song.type.toUpperCase()} FILE</div>
                             </div>
-                         );
-                     })}
-                 </div>
+                        </div>
+                     );
+                 })}
+             </div>
 
-                 {/* PINNED FOOTER: LOAD ACTIONS */}
-                 <div className="mt-4 pt-4 border-t border-slate-700 grid grid-cols-2 gap-4 flex-shrink-0">
-                    {/* Item 1: ADD SINGLE FILE */}
-                    <label 
-                        onMouseEnter={() => playUiSound('hover')}
-                        onClick={() => playUiSound('select')}
-                        className="group relative flex flex-col items-center justify-center p-3 border border-cyan-900 hover:border-cyan-500 bg-slate-800/50 hover:bg-slate-800 transition-all cursor-pointer overflow-hidden rounded"
-                    >
-                        <div className="mb-2 text-2xl text-cyan-500 group-hover:scale-110 transition-transform">+</div>
-                        <div className={`font-bold ${fontClass} text-xs text-center text-slate-400 group-hover:text-cyan-300`}>
-                                {t.LOAD_SINGLE}
-                        </div>
-                        <input type="file" accept="video/*,audio/*" onChange={handleSingleFileUpload} className="hidden" />
-                    </label>
+             {/* Footer Input Source */}
+             <div className="bg-black/80 p-4 border-t border-slate-700 flex gap-2 shrink-0">
+                <label className="flex-1 h-12 bg-slate-800 hover:bg-cyan-900/50 border border-slate-600 hover:border-cyan-500 rounded flex items-center justify-center cursor-pointer transition-colors group">
+                     <span className={`text-xs font-bold text-slate-400 group-hover:text-cyan-400 ${fontClass}`}>+ {t.LOAD_SINGLE}</span>
+                     <input type="file" accept="video/*,audio/*" onChange={handleSingleFileUpload} className="hidden" />
+                </label>
+                <label className="flex-1 h-12 bg-slate-800 hover:bg-fuchsia-900/50 border border-slate-600 hover:border-fuchsia-500 rounded flex items-center justify-center cursor-pointer transition-colors group">
+                     <span className={`text-xs font-bold text-slate-400 group-hover:text-fuchsia-400 ${fontClass}`}>+ {t.LOAD_FOLDER}</span>
+                     {/* @ts-ignore */}
+                     <input type="file" webkitdirectory="" directory="" multiple onChange={handleFolderSelect} className="hidden" />
+                </label>
+             </div>
+          </div>
 
-                    {/* Item 2: LOAD FOLDER */}
-                    <label 
-                        onMouseEnter={() => playUiSound('hover')}
-                        onClick={() => playUiSound('select')}
-                        className="group relative flex flex-col items-center justify-center p-3 border border-fuchsia-900 hover:border-fuchsia-500 bg-slate-800/50 hover:bg-slate-800 transition-all cursor-pointer overflow-hidden rounded"
-                    >
-                        <div className="mb-2 text-2xl text-fuchsia-500 group-hover:scale-110 transition-transform">
-                             {isLoadingFolder ? (
-                                <div className="w-6 h-6 border-2 border-fuchsia-500 border-t-transparent rounded-full animate-spin"></div>
-                             ) : (
-                                <span>📂</span>
-                             )}
-                        </div>
-                        <div className={`font-bold ${fontClass} text-xs text-center text-slate-400 group-hover:text-fuchsia-300`}>
-                                {t.LOAD_FOLDER}
-                        </div>
-                        {/* @ts-ignore */}
-                        <input type="file" webkitdirectory="" directory="" multiple onChange={handleFolderSelect} className="hidden" />
-                    </label>
+          {/* RIGHT COLUMN: THE DECK (Info & Launch) */}
+          <div className="w-full md:w-[60%] h-auto md:h-full relative flex flex-col p-8 md:pl-12 justify-between shrink-0">
+             
+             {/* TOP BAR: SYSTEM NAVIGATION */}
+             <div className="hidden md:flex w-full justify-between items-start mb-8 z-20">
+                 <button 
+                    onClick={() => { setStatus(GameStatus.TITLE); playUiSound('select'); stopPreview(); }}
+                    className="flex items-center space-x-2 text-slate-500 hover:text-white transition-colors group"
+                 >
+                     <div className="w-8 h-8 rounded-full border border-slate-600 group-hover:border-white flex items-center justify-center">←</div>
+                     <span className={`font-bold tracking-widest ${fontClass}`}>{t.BACK}</span>
+                 </button>
+
+                 <div className="flex space-x-4">
+                     <button onClick={() => { setShowThemeMenu(true); playUiSound('select'); }} className="text-slate-500 hover:text-purple-400 font-bold text-sm tracking-widest">{t.CUSTOMIZE}</button>
+                     <button onClick={() => { setShowKeyConfig(true); playUiSound('select'); }} className="text-slate-500 hover:text-yellow-400 font-bold text-sm tracking-widest">{t.SETTING}</button>
                  </div>
              </div>
 
-             {/* RIGHT COLUMN: CONFIG (5 Cols) */}
-             <div className="lg:col-span-5 flex flex-col h-full relative min-h-0">
-                 <div className="border-b border-white/10 pb-2 mb-4 flex-shrink-0">
-                    <h2 className={`text-xl md:text-2xl ${fontClass} font-black text-slate-200 tracking-wider flex items-center gap-2`}>
-                        <span className="text-3xl md:text-4xl text-slate-600">02</span> {t.KEY_CONFIG}
-                    </h2>
-                 </div>
-                 
-                 <div className="space-y-6 flex-1 overflow-y-auto lg:overflow-visible custom-scrollbar">
-                     {/* Key Mode */}
-                     <div>
-                        <label className={`text-xs font-bold tracking-widest text-cyan-500 mb-2 block ${fontClass}`}>SYSTEM MODE</label>
-                        <div className="flex bg-slate-800 p-1 rounded">
-                            {[4, 5, 7].map((k) => (
-                                <button key={k} onClick={() => { setKeyMode(k as 4|5|7); playUiSound('select'); }} onMouseEnter={() => playUiSound('hover')} className={`flex-1 py-3 text-sm font-display font-black transition-all rounded ${keyMode === k ? 'bg-cyan-500 text-black shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}>{k}K</button>
-                            ))}
-                        </div>
-                     </div>
-
-                     {/* Difficulty */}
-                     <div>
-                        <div className="flex justify-between mb-2">
-                            <label className={`text-xs font-bold tracking-widest text-cyan-500 block ${fontClass}`}>{t.LEVEL}</label>
-                            <span className={`text-xs ${fontClass} font-bold text-white`}>{getCurrentDifficultyLabel()}</span>
-                        </div>
-                        <div className="space-y-2">
-                            {DIFFICULTY_OPTIONS.map((diff) => (
-                                <button 
-                                    key={diff.value} 
-                                    onClick={() => { setLevel(diff.value); playUiSound('select'); }} 
-                                    onMouseEnter={() => playUiSound('hover')} 
-                                    className={`
-                                        w-full p-2 flex items-center justify-between border-l-4 transition-all bg-slate-800/50 active:scale-[0.98]
-                                        ${level === diff.value 
-                                            ? `${diff.color.replace('shadow-','').replace('text-','border-')} bg-slate-800` 
-                                            : 'border-slate-700 text-slate-500 hover:bg-slate-700'
-                                        }
-                                    `}
-                                >
-                                    <span className={`${fontClass} font-bold text-sm ${level === diff.value ? 'text-white' : ''}`}>{diff.label}</span>
-                                    <div className="flex gap-0.5">
-                                        {[...Array(4)].map((_, i) => (
-                                            <div key={i} className={`w-2 h-4 transform skew-x-[-10deg] ${i < (diff.value - 6) ? (level === diff.value ? diff.color.match(/text-(\w+-\d+)/)?.[0] : 'bg-slate-600') : 'bg-slate-800'}`}></div>
-                                        ))}
-                                    </div>
-                                </button>
-                            ))}
-                        </div>
-                     </div>
-
-                     {/* Speed */}
-                     <div>
-                        <div className="flex justify-between mb-2">
-                            <label className={`text-xs font-bold tracking-widest text-cyan-500 ${fontClass}`}>{t.SCROLL_SPEED}</label>
-                            <span className="text-xl font-display font-bold text-white bg-black px-2 py-0.5 rounded border border-slate-700">{speedMod.toFixed(1)}</span>
-                        </div>
-                        <input 
-                            type="range" min="1.0" max="5.0" step="0.1" 
-                            value={speedMod} 
-                            onChange={(e) => setSpeedMod(parseFloat(e.target.value))} 
-                            onMouseDown={() => playUiSound('select')}
-                            className="w-full h-8 bg-slate-800 rounded-full appearance-none cursor-pointer accent-cyan-400 border border-slate-600 touch-pan-x" 
-                        />
-                        <div className="flex justify-between text-[10px] text-slate-500 font-mono mt-1">
-                            <span>SLOW</span>
-                            <span>HYPER</span>
-                        </div>
-                     </div>
-                 </div>
-
-                 {/* Start Button */}
-                 <div className="mt-8 pt-4 flex-shrink-0">
-                     <button 
-                        onClick={startCountdownSequence} 
-                        onMouseEnter={() => playUiSound('hover')} 
-                        disabled={isAnalyzing || !analyzedNotes} 
-                        className={`
-                            relative w-full h-20 group overflow-hidden transition-all active:scale-95
-                            ${(isAnalyzing || !analyzedNotes) ? 'opacity-50 cursor-not-allowed grayscale' : 'cursor-pointer'}
-                        `}
-                     >
-                        <div className="absolute inset-0 bg-gradient-to-r from-cyan-600 to-blue-600 transform skew-x-[-10deg] group-hover:from-cyan-500 group-hover:to-blue-500 transition-colors shadow-[0_0_20px_rgba(6,182,212,0.4)]"></div>
-                        <div className="absolute inset-0 flex items-center justify-center">
-                            {isAnalyzing ? (
-                                <div className="flex items-center gap-2">
-                                     <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                                     <span className={`font-bold font-mono text-white ${fontClass}`}>{t.ANALYZING}</span>
-                                </div>
-                            ) : (
-                                <div className="text-center">
-                                    <div className={`text-3xl font-black italic tracking-widest text-white drop-shadow-md ${fontClass}`}>{t.GAME_START}</div>
-                                    <div className="text-[10px] font-mono text-cyan-200 tracking-[0.5em] mt-1">INITIATE SEQUENCE</div>
-                                </div>
-                            )}
-                        </div>
-                        {/* Scanning Effect */}
-                        {!isAnalyzing && analyzedNotes && (
-                            <div className="absolute top-0 bottom-0 w-2 bg-white/50 blur-md animate-[scan_2s_linear_infinite]"></div>
-                        )}
-                     </button>
-                 </div>
+             {/* CENTER: ACTIVE SONG VISUALIZER */}
+             <div className="hidden md:flex absolute inset-0 items-center justify-center opacity-30 pointer-events-none z-0">
+                 {/* Giant Spinning Ring */}
+                 <div className="w-[80vw] h-[80vw] md:w-[600px] md:h-[600px] border border-cyan-500/20 rounded-full animate-[spin_60s_linear_infinite] border-dashed"></div>
+                 <div className="absolute w-[60vw] h-[60vw] md:w-[450px] md:h-[450px] border border-white/5 rounded-full animate-[spin-ccw_40s_linear_infinite]"></div>
              </div>
              
-             {/* Analysis Overlay */}
-             {isAnalyzing && (
-                <div className="absolute inset-0 z-50 bg-black/80 backdrop-blur-sm flex flex-col items-center justify-center">
-                     <div className="w-24 h-24 border-4 border-slate-700 rounded-full relative flex items-center justify-center">
-                        <div className="absolute inset-0 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin"></div>
-                        <div className="text-2xl">⚡</div>
+             {/* Song Details Card */}
+             <div className="relative z-10 flex flex-col items-center justify-center flex-1 my-8 md:my-0">
+                 {/* Disc Art */}
+                 <div className="relative w-48 h-48 md:w-80 md:h-80 mb-8 group">
+                      <div className="absolute inset-0 bg-cyan-500/20 rounded-full blur-xl animate-pulse"></div>
+                      <div className="relative w-full h-full rounded-full border-4 border-slate-800 bg-black overflow-hidden shadow-[0_0_50px_rgba(0,0,0,0.5)] animate-[spin_10s_linear_infinite]">
+                          {currentSongMetadata?.thumbnailUrl ? (
+                              <img src={currentSongMetadata.thumbnailUrl} className="w-full h-full object-cover opacity-80" alt="Cover" />
+                          ) : (
+                              <div className="w-full h-full bg-gradient-to-tr from-slate-800 to-slate-900 flex items-center justify-center">
+                                  <div className="w-1/3 h-1/3 bg-cyan-500 rounded-full blur-md"></div>
+                              </div>
+                          )}
+                          {/* Vinyl Shine */}
+                          <div className="absolute inset-0 bg-gradient-to-tr from-white/10 to-transparent pointer-events-none"></div>
+                      </div>
+                      {/* Center Hole */}
+                      <div className="absolute top-1/2 left-1/2 w-8 h-8 bg-slate-900 rounded-full transform -translate-x-1/2 -translate-y-1/2 border-2 border-slate-600 z-20"></div>
+                 </div>
+
+                 {/* Song Title Info */}
+                 <div className="text-center w-full max-w-lg">
+                     <h1 className={`text-3xl md:text-5xl font-black italic text-white tracking-tighter drop-shadow-[0_0_20px_rgba(6,182,212,0.8)] mb-2 ${fontClass}`}>
+                         {localFileName ? (
+                            <MarqueeText text={localFileName} />
+                         ) : t.SELECT_SOURCE}
+                     </h1>
+                     {localFileName && (
+                         <div className="inline-block bg-cyan-900/30 border border-cyan-500/30 px-4 py-1 rounded-full text-cyan-400 font-mono text-sm tracking-widest">
+                             {isPlayingPreview ? 'PREVIEWING...' : 'READY TO START'}
+                         </div>
+                     )}
+                 </div>
+             </div>
+
+             {/* BOTTOM: CONTROLS & LAUNCH */}
+             <div className="relative z-20 mt-8 grid grid-cols-1 lg:grid-cols-2 gap-8 pb-8 md:pb-0">
+                 {/* Config Panel */}
+                 <div className="bg-slate-900/80 border border-slate-700 p-6 rounded-lg backdrop-blur-md shadow-lg flex flex-col justify-between">
+                     {/* Difficulty Bars */}
+                     <div className="mb-6">
+                        <div className={`text-xs font-bold text-slate-500 mb-2 tracking-widest ${fontClass}`}>{t.LEVEL}</div>
+                        <div className="flex gap-2 h-16">
+                            {DIFFICULTY_OPTIONS.map((diff) => {
+                                const active = level === diff.value;
+                                return (
+                                    <button 
+                                        key={diff.value}
+                                        onClick={() => { setLevel(diff.value); playUiSound('select'); }}
+                                        className={`flex-1 flex flex-col justify-end p-1 rounded transition-all relative overflow-hidden group border ${active ? 'border-white/50' : 'border-transparent'}`}
+                                    >
+                                        <div className={`absolute inset-0 opacity-20 ${diff.color}`}></div>
+                                        <div className={`w-full transition-all duration-300 ${active ? 'h-full opacity-100' : 'h-1/3 opacity-40 group-hover:h-1/2'} ${diff.color}`}></div>
+                                        <span className={`relative z-10 text-[10px] md:text-xs font-bold text-center mt-1 truncate ${active ? 'text-white' : 'text-slate-500'} ${fontClass}`}>{diff.label}</span>
+                                    </button>
+                                )
+                            })}
+                        </div>
                      </div>
-                     <div className={`text-cyan-400 font-mono animate-pulse font-bold text-xl mt-4 ${fontClass}`}>
-                        {t.ANALYZING}
+
+                     {/* Speed & Key */}
+                     <div className="flex gap-4">
+                         <div className="flex-1">
+                             <div className={`text-xs font-bold text-slate-500 mb-1 ${fontClass}`}>{t.SCROLL_SPEED}</div>
+                             <div className="flex items-center bg-black rounded border border-slate-700 p-1">
+                                 <button onClick={()=>{setSpeedMod(Math.max(1,speedMod-0.5));playUiSound('select')}} className="w-8 h-8 bg-slate-800 text-slate-400 hover:text-white font-bold">-</button>
+                                 <div className="flex-1 text-center font-mono text-cyan-400 font-bold">{speedMod.toFixed(1)}</div>
+                                 <button onClick={()=>{setSpeedMod(Math.min(10,speedMod+0.5));playUiSound('select')}} className="w-8 h-8 bg-slate-800 text-slate-400 hover:text-white font-bold">+</button>
+                             </div>
+                         </div>
+                         <div className="flex-1">
+                             <div className={`text-xs font-bold text-slate-500 mb-1 ${fontClass}`}>KEY MODE</div>
+                             <div className="flex bg-black rounded border border-slate-700 p-1">
+                                 {[4,5,7].map(k => (
+                                     <button key={k} onClick={()=>{setKeyMode(k as any);playUiSound('select')}} className={`flex-1 h-8 text-xs font-bold ${keyMode===k ? 'bg-cyan-600 text-white' : 'text-slate-500 hover:text-slate-300'}`}>{k}K</button>
+                                 ))}
+                             </div>
+                         </div>
+                     </div>
+                 </div>
+
+                 {/* Launch Button */}
+                 <button 
+                    onClick={startCountdownSequence}
+                    disabled={isAnalyzing || !analyzedNotes}
+                    onMouseEnter={() => playUiSound('hover')}
+                    className={`
+                        group relative w-full h-full min-h-[140px] flex flex-col items-center justify-center
+                        transform transition-all duration-200 active:scale-95
+                        ${(isAnalyzing || !analyzedNotes) ? 'opacity-50 grayscale cursor-not-allowed' : 'cursor-pointer'}
+                    `}
+                 >
+                    {/* Button Background Shape */}
+                    <div className="absolute inset-0 bg-gradient-to-r from-cyan-600 to-blue-600 transform -skew-x-6 border-2 border-white/20 shadow-[0_0_30px_rgba(6,182,212,0.5)] group-hover:shadow-[0_0_60px_rgba(6,182,212,0.8)] transition-shadow"></div>
+                    <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-30 mix-blend-overlay"></div>
+                    
+                    {/* Content */}
+                    <div className="relative z-10 text-center transform -skew-x-6">
+                         {isAnalyzing ? (
+                             <>
+                                <div className="text-2xl font-black text-white animate-pulse">SYSTEM ANALYZING</div>
+                                <div className="w-48 h-2 bg-black/50 mt-2 rounded-full overflow-hidden mx-auto"><div className="h-full bg-white animate-progress"></div></div>
+                             </>
+                         ) : (
+                             <>
+                                <div className={`text-5xl font-black italic text-white tracking-tighter drop-shadow-lg ${fontClass}`}>{t.GAME_START}</div>
+                                <div className="text-sm font-mono text-cyan-200 tracking-[0.5em] mt-2">LAUNCH MISSION</div>
+                             </>
+                         )}
                     </div>
-                </div>
-             )}
+                 </button>
+             </div>
+
           </div>
+
         </div>
       )}
 

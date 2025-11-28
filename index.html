@@ -228,6 +228,27 @@
       .animation-delay-4000 {
         animation-delay: 4s;
       }
+
+      /* MARQUEE TEXT ANIMATION */
+      @keyframes marquee {
+        0% { transform: translateX(0%); }
+        100% { transform: translateX(-50%); }
+      }
+      .animate-marquee {
+        display: inline-flex;
+        white-space: nowrap;
+        animation: marquee 10s linear infinite;
+      }
+      /* Pause animation on hover if desired, but request implies auto loop */
+      /* .animate-marquee:hover { animation-play-state: paused; } */
+      
+      .no-scrollbar::-webkit-scrollbar {
+        display: none;
+      }
+      .no-scrollbar {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+      }
     </style>
   <script type="importmap">
 {
