@@ -742,6 +742,7 @@ const App: React.FC = () => {
           gain.gain.setValueAtTime(getVol(0.05), t);
           gain.gain.exponentialRampToValueAtTime(0.01, t + 0.1);
           osc.type = 'sine';
+          
           osc.connect(gain);
           gain.connect(ctx.destination);
           osc.start(t);
@@ -1696,17 +1697,23 @@ const App: React.FC = () => {
       
       {/* MOBILE ENTRY OVERLAY */}
       {showMobileStart && (
-         <div className="absolute inset-0 z-[100] bg-black flex flex-col items-center justify-center p-8 text-center cursor-pointer" onClick={handleMobileEnter}>
+         <div className="absolute inset-0 z-[100] bg-black/95 flex flex-col items-center justify-center p-8 text-center cursor-pointer" onClick={handleMobileEnter}>
             <div className="relative w-24 h-24 mb-8">
                  <div className="absolute inset-0 border-4 border-cyan-500 rounded-full animate-ping opacity-50"></div>
                  <div className="absolute inset-0 border-4 border-cyan-400 rounded-full flex items-center justify-center bg-cyan-900/20 backdrop-blur-md">
                      <span className="text-3xl">👆</span>
                  </div>
             </div>
-            <h1 className="text-3xl font-black italic text-white mb-2 animate-pulse tracking-widest font-display">SYSTEM INITIALIZE</h1>
-            <p className="text-cyan-400 font-mono text-sm tracking-[0.2em] mb-12">TOUCH SCREEN TO START</p>
+            <h1 className={`text-2xl md:text-3xl font-black italic text-white mb-4 animate-pulse tracking-widest ${fontClass}`}>
+                {t.WELCOME_TITLE}
+            </h1>
+            <div className="max-w-md bg-slate-900/50 border border-slate-700 p-4 rounded-lg mb-8 backdrop-blur-sm">
+                <p className={`text-slate-300 text-sm md:text-base whitespace-pre-line leading-relaxed ${fontClass}`}>
+                    {t.WELCOME_DESC}
+                </p>
+            </div>
             <div className="text-xs text-slate-600 font-mono border border-slate-800 px-4 py-2 rounded">
-                FULLSCREEN MODE REQUIRED
+                TAP TO INITIALIZE SYSTEM
             </div>
          </div>
       )}
@@ -1929,16 +1936,16 @@ const App: React.FC = () => {
       )}
 
       {status === GameStatus.MENU && !startCountdown && (
-        <div className="relative z-30 w-full h-full md:h-full flex flex-col md:flex-row animate-fade-in bg-slate-900/40 backdrop-blur-md overflow-y-auto md:overflow-hidden">
+        <div className="relative z-30 w-full h-full flex flex-col md:flex-row animate-fade-in bg-slate-900/40 backdrop-blur-md overflow-y-auto md:overflow-hidden">
           
-          {/* HEADER BAR (MOBILE) - ADDED SAFE AREA PADDING AND MIN HEIGHT */}
+          {/* HEADER BAR (MOBILE) */}
           <div className="md:hidden sticky top-0 left-0 w-full min-h-[4rem] bg-slate-900 flex items-center justify-between px-4 z-50 border-b border-slate-700 shrink-0 pt-[max(2rem,env(safe-area-inset-top))] pb-2">
              <button onClick={() => { setStatus(GameStatus.TITLE); stopPreview(); }} className="text-white">← BACK</button>
              <div className="text-cyan-400 font-bold">MUSIC SELECT</div>
           </div>
 
-          {/* LEFT COLUMN: THE PLAYLIST (Data Strips) */}
-          <div className="w-full md:w-[40%] h-auto md:h-full flex flex-col bg-slate-950/80 border-r border-slate-700/50 pt-0 md:pt-0 relative overflow-hidden shrink-0">
+          {/* LEFT COLUMN: THE PLAYLIST */}
+          <div className="w-full md:w-[55%] h-auto md:h-full flex flex-col bg-slate-950/80 border-r border-slate-700/50 pt-0 md:pt-0 relative shrink-0 md:overflow-hidden">
              
              {/* Header */}
              <div className="hidden md:flex h-24 items-end pb-4 px-8 border-b border-cyan-500/30 bg-gradient-to-b from-slate-900 to-transparent shrink-0">
@@ -2084,11 +2091,11 @@ const App: React.FC = () => {
              </div>
           </div>
 
-          {/* RIGHT COLUMN: THE DECK (Info & Launch) */}
-          <div className="w-full md:w-[60%] h-auto md:h-full relative flex flex-col p-8 md:pl-12 justify-between shrink-0">
+          {/* RIGHT COLUMN: THE DECK */}
+          <div className="w-full md:w-[45%] h-auto md:h-full relative flex flex-col p-4 md:p-6 justify-between shrink-0 md:overflow-hidden pb-32 md:pb-6">
              
              {/* TOP BAR: SYSTEM NAVIGATION */}
-             <div className="hidden md:flex w-full justify-between items-start mb-8 z-20">
+             <div className="hidden md:flex w-full justify-between items-start mb-4 z-20 shrink-0">
                  <button 
                     onClick={() => { setStatus(GameStatus.TITLE); playUiSound('select'); stopPreview(); }}
                     className="flex items-center space-x-2 text-slate-500 hover:text-white transition-colors group"
@@ -2105,15 +2112,14 @@ const App: React.FC = () => {
 
              {/* CENTER: ACTIVE SONG VISUALIZER */}
              <div className="hidden md:flex absolute inset-0 items-center justify-center opacity-30 pointer-events-none z-0">
-                 {/* Giant Spinning Ring */}
                  <div className="w-[80vw] h-[80vw] md:w-[600px] md:h-[600px] border border-cyan-500/20 rounded-full animate-[spin_60s_linear_infinite] border-dashed"></div>
                  <div className="absolute w-[60vw] h-[60vw] md:w-[450px] md:h-[450px] border border-white/5 rounded-full animate-[spin-ccw_40s_linear_infinite]"></div>
              </div>
              
              {/* Song Details Card */}
-             <div className="relative z-10 flex flex-col items-center justify-center flex-1 my-8 md:my-0">
+             <div className="relative z-10 flex flex-col items-center justify-center flex-1 my-8 md:my-0 min-h-0">
                  {/* Disc Art */}
-                 <div className="relative w-48 h-48 md:w-80 md:h-80 mb-8 group">
+                 <div className="relative w-40 h-40 md:w-48 md:h-48 lg:w-56 lg:h-56 mb-6 group shrink-0">
                       <div className="absolute inset-0 bg-cyan-500/20 rounded-full blur-xl animate-pulse"></div>
                       <div className="relative w-full h-full rounded-full border-4 border-slate-800 bg-black overflow-hidden shadow-[0_0_50px_rgba(0,0,0,0.5)] animate-[spin_10s_linear_infinite]">
                           {currentSongMetadata?.thumbnailUrl ? (
@@ -2123,15 +2129,13 @@ const App: React.FC = () => {
                                   <div className="w-1/3 h-1/3 bg-cyan-500 rounded-full blur-md"></div>
                               </div>
                           )}
-                          {/* Vinyl Shine */}
                           <div className="absolute inset-0 bg-gradient-to-tr from-white/10 to-transparent pointer-events-none"></div>
                       </div>
-                      {/* Center Hole */}
                       <div className="absolute top-1/2 left-1/2 w-8 h-8 bg-slate-900 rounded-full transform -translate-x-1/2 -translate-y-1/2 border-2 border-slate-600 z-20"></div>
                  </div>
 
                  {/* Song Title Info */}
-                 <div className="text-center w-full max-w-lg">
+                 <div className="text-center w-full max-w-lg shrink-0">
                      <h1 className={`text-3xl md:text-5xl font-black italic text-white tracking-tighter drop-shadow-[0_0_20px_rgba(6,182,212,0.8)] mb-2 ${fontClass}`}>
                          {localFileName ? (
                             <MarqueeText text={localFileName} />
@@ -2146,13 +2150,14 @@ const App: React.FC = () => {
              </div>
 
              {/* BOTTOM: CONTROLS & LAUNCH */}
-             <div className="relative z-20 mt-8 grid grid-cols-1 lg:grid-cols-2 gap-8 pb-8 md:pb-0">
+             <div className="relative z-20 mt-4 md:mt-0 space-y-4 pb-8 md:pb-0 shrink-0">
                  {/* Config Panel */}
-                 <div className="bg-slate-900/80 border border-slate-700 p-6 rounded-lg backdrop-blur-md shadow-lg flex flex-col justify-between">
-                     {/* Difficulty Bars */}
-                     <div className="mb-6">
+                 <div className="bg-slate-900/80 border border-slate-700 p-4 rounded-lg backdrop-blur-md shadow-lg flex flex-col space-y-2">
+                     
+                     {/* Row 1: Difficulty Bars */}
+                     <div>
                         <div className={`text-xs font-bold text-slate-500 mb-2 tracking-widest ${fontClass}`}>{t.LEVEL}</div>
-                        <div className="flex gap-2 h-16">
+                        <div className="flex gap-2 h-10">
                             {DIFFICULTY_OPTIONS.map((diff) => {
                                 const active = level === diff.value;
                                 return (
@@ -2170,53 +2175,67 @@ const App: React.FC = () => {
                         </div>
                      </div>
 
-                     {/* Speed & Key */}
-                     <div className="flex gap-4">
-                         <div className="flex-1">
-                             <div className={`text-xs font-bold text-slate-500 mb-1 ${fontClass}`}>{t.SCROLL_SPEED}</div>
-                             <div className="flex items-center bg-black rounded border border-slate-700 p-1">
-                                 <button onClick={()=>{setSpeedMod(Math.max(1,speedMod-0.5));playUiSound('select')}} className="w-8 h-8 bg-slate-800 text-slate-400 hover:text-white font-bold">-</button>
-                                 <div className="flex-1 text-center font-mono text-cyan-400 font-bold">{speedMod.toFixed(1)}</div>
-                                 <button onClick={()=>{setSpeedMod(Math.min(10,speedMod+0.5));playUiSound('select')}} className="w-8 h-8 bg-slate-800 text-slate-400 hover:text-white font-bold">+</button>
-                             </div>
-                         </div>
-                         <div className="flex-1">
-                             <div className={`text-xs font-bold text-slate-500 mb-1 ${fontClass}`}>KEY MODE</div>
-                             <div className="flex bg-black rounded border border-slate-700 p-1">
-                                 {[4,5,7].map(k => (
-                                     <button key={k} onClick={()=>{setKeyMode(k as any);playUiSound('select')}} className={`flex-1 h-8 text-xs font-bold ${keyMode===k ? 'bg-cyan-600 text-white' : 'text-slate-500 hover:text-slate-300'}`}>{k}K</button>
-                                 ))}
-                             </div>
+                     {/* Row 2: Key Mode Selection (Prominent) */}
+                     <div>
+                        <div className={`text-xs font-bold text-slate-500 mb-2 tracking-widest ${fontClass}`}>{t.KEY_MODE_LABEL || "KEY CONFIGURATION"}</div>
+                        <div className="flex gap-2 h-10">
+                            {[4, 5, 7].map((k) => {
+                                const active = keyMode === k;
+                                return (
+                                    <button 
+                                        key={k}
+                                        onClick={()=>{setKeyMode(k as any);playUiSound('select')}} 
+                                        className={`
+                                            flex-1 relative overflow-hidden rounded border transition-all duration-200 flex items-center justify-center
+                                            ${active 
+                                                ? 'bg-cyan-900/50 border-cyan-400 shadow-[0_0_10px_rgba(34,211,238,0.3)]' 
+                                                : 'bg-slate-800 border-slate-700 hover:border-cyan-600'}
+                                        `}
+                                    >
+                                        <div className={`text-xl font-black italic ${active ? 'text-white' : 'text-slate-500 group-hover:text-cyan-200'}`}>{k}K</div>
+                                        <div className={`text-[10px] ml-1 font-bold ${active ? 'text-cyan-400' : 'text-slate-600'}`}>MODE</div>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                     </div>
+
+                     {/* Row 3: Speed (Compact) */}
+                     <div>
+                         <div className={`text-xs font-bold text-slate-500 mb-1 ${fontClass}`}>{t.SCROLL_SPEED}</div>
+                         <div className="flex items-center bg-black rounded border border-slate-700 p-1">
+                             <button onClick={()=>{setSpeedMod(Math.max(1,speedMod-0.5));playUiSound('select')}} className="w-10 h-8 bg-slate-800 text-slate-400 hover:text-white font-bold rounded">-</button>
+                             <div className="flex-1 text-center font-mono text-cyan-400 font-bold text-lg">{speedMod.toFixed(1)}</div>
+                             <button onClick={()=>{setSpeedMod(Math.min(10,speedMod+0.5));playUiSound('select')}} className="w-10 h-8 bg-slate-800 text-slate-400 hover:text-white font-bold rounded">+</button>
                          </div>
                      </div>
                  </div>
 
-                 {/* Launch Button */}
+                 {/* Row 4: Launch Button (Smaller Height) */}
                  <button 
                     onClick={startCountdownSequence}
                     disabled={isAnalyzing || !analyzedNotes}
                     onMouseEnter={() => playUiSound('hover')}
                     className={`
-                        group relative w-full h-full min-h-[140px] flex flex-col items-center justify-center
+                        group relative w-full h-14 flex flex-col items-center justify-center
                         transform transition-all duration-200 active:scale-95
                         ${(isAnalyzing || !analyzedNotes) ? 'opacity-50 grayscale cursor-not-allowed' : 'cursor-pointer'}
                     `}
                  >
                     {/* Button Background Shape */}
-                    <div className="absolute inset-0 bg-gradient-to-r from-cyan-600 to-blue-600 transform -skew-x-6 border-2 border-white/20 shadow-[0_0_30px_rgba(6,182,212,0.5)] group-hover:shadow-[0_0_60px_rgba(6,182,212,0.8)] transition-shadow"></div>
+                    <div className="absolute inset-0 bg-gradient-to-r from-cyan-600 to-blue-600 transform -skew-x-2 border-2 border-white/20 shadow-[0_0_30px_rgba(6,182,212,0.5)] group-hover:shadow-[0_0_60px_rgba(6,182,212,0.8)] transition-shadow rounded"></div>
                     <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-30 mix-blend-overlay"></div>
                     
                     {/* Content */}
-                    <div className="relative z-10 text-center transform -skew-x-6">
+                    <div className="relative z-10 text-center transform -skew-x-2">
                          {isAnalyzing ? (
-                             <>
-                                <div className="text-2xl font-black text-white animate-pulse">SYSTEM ANALYZING</div>
-                                <div className="w-48 h-2 bg-black/50 mt-2 rounded-full overflow-hidden mx-auto"><div className="h-full bg-white animate-progress"></div></div>
-                             </>
+                             <div className="flex items-center gap-4">
+                                <div className="text-xl font-black text-white animate-pulse">SYSTEM ANALYZING</div>
+                                <div className="w-24 h-2 bg-black/50 rounded-full overflow-hidden"><div className="h-full bg-white animate-progress"></div></div>
+                             </div>
                          ) : (
                              <>
-                                <div className={`text-5xl font-black italic text-white tracking-tighter drop-shadow-lg ${fontClass}`}>{t.GAME_START}</div>
-                                <div className="text-sm font-mono text-cyan-200 tracking-[0.5em] mt-2">LAUNCH MISSION</div>
+                                <div className={`text-2xl font-black italic text-white tracking-tighter drop-shadow-lg ${fontClass}`}>{t.GAME_START}</div>
                              </>
                          )}
                     </div>
@@ -2230,56 +2249,38 @@ const App: React.FC = () => {
 
       {/* GAMEPLAY UI */}
       {(status === GameStatus.PLAYING || status === GameStatus.PAUSED) && (
-        <div className={`relative z-20 w-full h-full flex px-0 ${
-            layoutSettings.lanePosition === 'center' ? 'justify-center' :
-            layoutSettings.lanePosition === 'right' ? 'justify-end' : 'justify-start'
-        }`}>
-            
-            {/* RENDER THE ACTIVE THEME FRAME */}
-            {renderGameFrame()}
-
-            {/* DECORATIVE TEXT */}
-            <div className={`
-                absolute inset-0 z-10 hidden md:flex flex-col justify-end p-12 pointer-events-none
-                ${layoutSettings.lanePosition === 'right' ? 'items-start text-left' : 'items-end text-right'}
-            `}>
-                <div className="pointer-events-none">
-                    <h2 className="text-6xl font-display font-bold text-white/40 tracking-widest drop-shadow-md">
-                        {currentThemeId === 'ignore' ? 'IGNORE PROTOCOL' : currentThemeId === 'titan' ? 'TITAN CONSTRUCT' : currentThemeId === 'queen' ? 'QUEEN PROTOCOL' : 'NEON CORE'}
-                    </h2>
-                    <div className={`text-cyan-500/80 ${fontClass} mt-2 bg-black/60 inline-block px-4 py-1 rounded backdrop-blur-md border border-cyan-500/30`}>
-                        {t.SYSTEM_LINKED}: {localFileName ? localFileName : 'LOCAL_FILE'} // MODE: {keyMode}K
-                    </div>
-                </div>
-            </div>
-        </div>
+          <div className="absolute inset-0 z-40 flex items-center justify-center">
+              {renderGameFrame()}
+          </div>
       )}
-      
+
+      {/* PAUSE MENU */}
       {status === GameStatus.PAUSED && (
-        <PauseMenu 
-            onResume={() => { togglePause(); playUiSound('select'); }} 
-            onSettings={() => { setShowKeyConfig(true); playUiSound('select'); }}
-            onQuit={quitGame} 
-            t={t}
-            fontClass={fontClass}
-        />
+          <PauseMenu 
+             onResume={togglePause}
+             onSettings={() => setShowKeyConfig(true)}
+             onQuit={quitGame}
+             t={t}
+             fontClass={fontClass}
+          />
       )}
 
+      {/* END SCREEN */}
       {status === GameStatus.FINISHED && (
-        <EndScreen 
-            stats={{
-                score,
-                maxCombo,
-                miss: missCount,
-                perfect: perfectCount,
-                good: goodCount
-            }}
-            fileName={localFileName}
-            onRestart={() => { setStatus(GameStatus.MENU); playUiSound('select'); }}
-            onMenu={() => { setStatus(GameStatus.MENU); playUiSound('select'); }}
-            t={t}
-            fontClass={fontClass}
-        />
+          <EndScreen 
+             stats={{
+                 perfect: perfectCount,
+                 good: goodCount,
+                 miss: missCount,
+                 maxCombo: maxCombo,
+                 score: score
+             }}
+             fileName={currentSongMetadata?.name || "UNKNOWN"}
+             onRestart={startCountdownSequence}
+             onMenu={quitGame}
+             t={t}
+             fontClass={fontClass}
+          />
       )}
     </div>
   );

@@ -11,6 +11,10 @@ export const TRANSLATIONS = {
         BACK: "BACK",
         SETUP_PHASE: "SETUP PHASE",
         
+        // Mobile Welcome
+        WELCOME_TITLE: "WELCOME TO DJBIG",
+        WELCOME_DESC: "Welcome to DJBIG, the ultimate rhythm-tapping music game!\nPlay with your favorite tracks by importing your own .mp3 or .mp4 files. Customize your gameplay with adjustable difficulty, speed settings, and key layouts to fit your style.\n\nGet your fingers ready and dive into the beat you create! 🎧✨",
+
         // Setup Menu
         SELECT_SOURCE: "SELECT MUSIC SOURCE",
         CLEAR_PLAYLIST: "CLEAR PLAYLIST",
@@ -23,6 +27,7 @@ export const TRANSLATIONS = {
         PLAY_DEMO_04: "PLAY DEMO 04",
         KEY_CONFIG: "KEY CONFIGURATION",
         LEVEL: "DIFFICULTY",
+        KEY_MODE_LABEL: "KEY CONFIGURATION",
         SCROLL_SPEED: "SCROLL SPEED",
         GAME_START: "GAME START!!",
         ANALYZING: "ANALYZING...",
@@ -103,6 +108,10 @@ export const TRANSLATIONS = {
         EXIT: "ออก",
         BACK: "กลับ",
         SETUP_PHASE: "การเตรียมพร้อม",
+
+        // Mobile Welcome
+        WELCOME_TITLE: "ยินดีต้อนรับสู่ DJBIG",
+        WELCOME_DESC: "ยินดีต้อนรับสู่ DJBIG เกมดนตรีกดตามจังหวะสุดมันส์!\nสนุกไปกับเพลงโปรดของคุณได้ทันที เพราะเกมรองรับไฟล์ .mp3 และ .mp4 ให้คุณเลือกเล่นได้อย่างอิสระ พร้อมระบบปรับแต่งครบครัน ทั้งระดับความยาก ความเร็ว และรูปแบบปุ่มกด\n\nเตรียมนิ้วของคุณให้พร้อม แล้วลุยไปกับจังหวะที่คุณสร้างเองได้เลย! 🎵🔥",
         
         // Setup Menu
         SELECT_SOURCE: "เลือกแหล่งข้อมูลเพลง",
@@ -116,6 +125,7 @@ export const TRANSLATIONS = {
         PLAY_DEMO_04: "เพลงตัวอย่าง 04",
         KEY_CONFIG: "การตั้งค่าปุ่ม",
         LEVEL: "ความยาก",
+        KEY_MODE_LABEL: "รูปแบบปุ่ม",
         SCROLL_SPEED: "ความเร็ว",
         GAME_START: "เริ่มภารกิจ!!",
         ANALYZING: "กำลังวิเคราะห์...",

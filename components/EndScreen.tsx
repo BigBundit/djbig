@@ -135,27 +135,25 @@ export const EndScreen: React.FC<EndScreenProps> = ({ stats, fileName, onRestart
     const isFullCombo = stats.miss === 0 && stats.score > 0;
 
     return (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/90 backdrop-blur-sm p-4 overflow-y-auto">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/90 backdrop-blur-sm p-2 md:p-4 overflow-y-auto">
             {/* Background Texture */}
             <div className="fixed inset-0 opacity-20 pointer-events-none">
                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-slate-800 via-slate-950 to-black"></div>
                  <div className="absolute inset-0 pattern-grid-lg opacity-30"></div>
-                 {/* Rotating Ring */}
-                 <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] border border-cyan-500/10 rounded-full animate-[spin_30s_linear_infinite]"></div>
             </div>
 
             {/* MAIN CONTENT CONTAINER */}
-            <div className="relative w-full max-w-5xl h-auto md:h-auto lg:h-[70vh] flex flex-col md:flex-row shadow-[0_0_50px_rgba(0,0,0,0.8)] bg-slate-900/95 backdrop-blur-xl border border-slate-700 rounded-lg overflow-hidden shrink-0 my-auto">
+            <div className="relative w-full max-w-5xl h-auto md:h-auto lg:h-[70vh] flex flex-col md:flex-row shadow-[0_0_50px_rgba(0,0,0,0.8)] bg-slate-900/95 backdrop-blur-xl border border-slate-700 rounded-lg overflow-hidden shrink-0 my-auto min-h-0">
                 
                 {/* DECORATIVE BARS */}
                 <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-cyan-500 to-transparent z-10"></div>
                 <div className="absolute bottom-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-purple-500 to-transparent z-10"></div>
 
                 {/* LEFT PANEL: RANK & TITLE */}
-                <div className="w-full md:w-[45%] relative flex flex-col justify-center items-center p-6 md:p-8 border-b md:border-b-0 md:border-r border-slate-700/50 bg-gradient-to-br from-slate-800/50 to-transparent overflow-hidden min-h-[250px] md:min-h-0">
+                <div className="w-full md:w-[45%] relative flex flex-col justify-center items-center p-4 md:p-8 border-b md:border-b-0 md:border-r border-slate-700/50 bg-gradient-to-br from-slate-800/50 to-transparent min-h-[180px] md:min-h-0">
                     
                     {/* Song Name Badge */}
-                    <div className="absolute top-4 left-4 md:top-6 md:left-6 z-10">
+                    <div className="absolute top-2 left-2 md:top-6 md:left-6 z-10">
                          <div className="flex items-center gap-2">
                              <div className="w-1 h-6 bg-cyan-500"></div>
                              <div>
@@ -166,16 +164,16 @@ export const EndScreen: React.FC<EndScreenProps> = ({ stats, fileName, onRestart
                     </div>
 
                     {/* THE RANK */}
-                    <div className={`transform transition-all duration-500 flex flex-col items-center ${showRank ? 'scale-100 opacity-100 translate-y-0' : 'scale-150 opacity-0 translate-y-10'}`}>
-                        <h2 className={`text-xl md:text-2xl text-slate-400 font-black italic tracking-[0.5em] mb-2 md:mb-4 ${fontClass}`}>{t.MISSION_RESULTS}</h2>
-                        <div className={`text-8xl md:text-[9rem] lg:text-[11rem] leading-[0.8] font-black font-display italic ${getRankColor(rank)}`}>
+                    <div className={`transform transition-all duration-500 flex flex-col items-center mt-6 md:mt-0 ${showRank ? 'scale-100 opacity-100 translate-y-0' : 'scale-150 opacity-0 translate-y-10'}`}>
+                        <h2 className={`text-lg md:text-2xl text-slate-400 font-black italic tracking-[0.5em] mb-0 md:mb-4 ${fontClass}`}>{t.MISSION_RESULTS}</h2>
+                        <div className={`text-7xl md:text-[9rem] lg:text-[11rem] leading-[1.0] md:leading-[0.8] font-black font-display italic ${getRankColor(rank)}`}>
                             {rank}
                         </div>
                         
                         {/* Full Combo Badge */}
                         {isFullCombo && showRank && (
-                            <div className="mt-4 md:mt-8 animate-bounce-short">
-                                <div className="inline-block px-4 py-1 md:px-6 md:py-2 bg-gradient-to-r from-yellow-500 via-amber-300 to-yellow-500 text-black font-black text-lg md:text-xl italic transform -skew-x-12 shadow-[0_0_20px_rgba(251,191,36,0.6)]">
+                            <div className="mt-2 md:mt-8 animate-bounce-short">
+                                <div className="inline-block px-4 py-1 md:px-6 md:py-2 bg-gradient-to-r from-yellow-500 via-amber-300 to-yellow-500 text-black font-black text-sm md:text-xl italic transform -skew-x-12 shadow-[0_0_20px_rgba(251,191,36,0.6)]">
                                     FULL COMBO
                                 </div>
                             </div>
@@ -187,7 +185,7 @@ export const EndScreen: React.FC<EndScreenProps> = ({ stats, fileName, onRestart
                 <div className="flex-1 flex flex-col p-4 md:p-10 justify-center relative bg-black/20">
                     
                     {/* Main Score */}
-                    <div className="mb-6 md:mb-10 text-center md:text-left">
+                    <div className="mb-4 md:mb-10 text-center md:text-left">
                         <div className={`text-xs md:text-sm text-cyan-500 font-bold tracking-[0.3em] mb-1 md:mb-2 ${fontClass}`}>{t.TOTAL_SCORE}</div>
                         <div className="text-4xl md:text-6xl font-mono font-bold text-white tracking-tight drop-shadow-md">
                             {displayScore.toLocaleString()}
@@ -195,42 +193,42 @@ export const EndScreen: React.FC<EndScreenProps> = ({ stats, fileName, onRestart
                     </div>
 
                     {/* Stats Grid */}
-                    <div className="space-y-2 md:space-y-4 mb-6 md:mb-8">
+                    <div className="space-y-1 md:space-y-4 mb-4 md:mb-8">
                          {/* Perfect */}
-                         <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                         <div className="flex items-center justify-between border-b border-slate-800 pb-1 md:pb-2">
                              <div className="flex items-center gap-2">
                                  <div className="w-2 h-2 bg-cyan-400 rounded-full"></div>
-                                 <span className="text-slate-300 font-bold tracking-wider text-sm md:text-base">PERFECT</span>
+                                 <span className="text-slate-300 font-bold tracking-wider text-xs md:text-base">PERFECT</span>
                              </div>
-                             <span className="text-lg md:text-xl font-mono text-cyan-400">{stats.perfect}</span>
+                             <span className="text-base md:text-xl font-mono text-cyan-400">{stats.perfect}</span>
                          </div>
                          {/* Good */}
-                         <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                         <div className="flex items-center justify-between border-b border-slate-800 pb-1 md:pb-2">
                              <div className="flex items-center gap-2">
                                  <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-                                 <span className="text-slate-300 font-bold tracking-wider text-sm md:text-base">GOOD</span>
+                                 <span className="text-slate-300 font-bold tracking-wider text-xs md:text-base">GOOD</span>
                              </div>
-                             <span className="text-lg md:text-xl font-mono text-green-400">{stats.good}</span>
+                             <span className="text-base md:text-xl font-mono text-green-400">{stats.good}</span>
                          </div>
                          {/* Miss */}
-                         <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                         <div className="flex items-center justify-between border-b border-slate-800 pb-1 md:pb-2">
                              <div className="flex items-center gap-2">
                                  <div className="w-2 h-2 bg-red-400 rounded-full"></div>
-                                 <span className="text-slate-300 font-bold tracking-wider text-sm md:text-base">MISS</span>
+                                 <span className="text-slate-300 font-bold tracking-wider text-xs md:text-base">MISS</span>
                              </div>
-                             <span className="text-lg md:text-xl font-mono text-red-400">{stats.miss}</span>
+                             <span className="text-base md:text-xl font-mono text-red-400">{stats.miss}</span>
                          </div>
                          {/* Max Combo */}
-                         <div className="flex items-center justify-between border-b border-slate-800 pb-2 mt-4">
-                             <span className={`text-yellow-500 font-bold tracking-wider text-sm md:text-base ${fontClass}`}>{t.COMBO}</span>
-                             <span className="text-xl md:text-2xl font-display italic text-yellow-400">{stats.maxCombo}</span>
+                         <div className="flex items-center justify-between border-b border-slate-800 pb-1 md:pb-2 mt-2 md:mt-4">
+                             <span className={`text-yellow-500 font-bold tracking-wider text-xs md:text-base ${fontClass}`}>{t.COMBO}</span>
+                             <span className="text-lg md:text-2xl font-display italic text-yellow-400">{stats.maxCombo}</span>
                          </div>
                     </div>
 
                     {/* Record Handling */}
                     {isNewRecord && !nameSaved ? (
-                         <div className="bg-gradient-to-r from-cyan-900/40 to-transparent border-l-4 border-cyan-500 p-3 md:p-4 mb-6 md:mb-8 animate-pulse-slow rounded-r">
-                            <div className={`text-cyan-400 font-bold mb-2 flex items-center gap-2 text-sm md:text-base ${fontClass}`}>
+                         <div className="bg-gradient-to-r from-cyan-900/40 to-transparent border-l-4 border-cyan-500 p-2 md:p-4 mb-4 md:mb-8 animate-pulse-slow rounded-r">
+                            <div className={`text-cyan-400 font-bold mb-2 flex items-center gap-2 text-xs md:text-base ${fontClass}`}>
                                 <span className="text-lg">★</span> {t.NEW_RECORD}
                             </div>
                             <div className="flex gap-2 flex-col md:flex-row">
@@ -252,7 +250,7 @@ export const EndScreen: React.FC<EndScreenProps> = ({ stats, fileName, onRestart
                             </div>
                          </div>
                     ) : highScoreData ? (
-                        <div className="flex justify-between items-center text-xs md:text-sm font-mono text-slate-500 mb-6 md:mb-8 border border-slate-800 p-2 rounded bg-black/20">
+                        <div className="flex justify-between items-center text-xs md:text-sm font-mono text-slate-500 mb-4 md:mb-8 border border-slate-800 p-2 rounded bg-black/20">
                             <span>TOP: {highScoreData.playerName}</span>
                             <span>{highScoreData.score.toLocaleString()}</span>
                         </div>
