@@ -189,6 +189,80 @@ const App: React.FC = () => {
     }
   }, []);
 
+  // Stop Preview Helper (Defined early for usage in effect)
+  const stopPreview = useCallback(() => {
+    if (previewTimeoutRef.current) {
+        clearInterval(previewTimeoutRef.current as any); 
+        previewTimeoutRef.current = null;
+    }
+
+    if (previewAudioRef.current) {
+        previewAudioRef.current.pause();
+        previewAudioRef.current.currentTime = 0;
+    }
+    setIsPlayingPreview(false);
+  }, []);
+
+  // Toggle Pause (Defined early)
+  const togglePause = useCallback(() => {
+    if (statusRef.current === GameStatus.PLAYING) {
+        setStatus(GameStatus.PAUSED);
+        pauseTimeRef.current = performance.now();
+        if (mediaRef.current) mediaRef.current.pause();
+        if (audioCtxRef.current) audioCtxRef.current.suspend();
+        if (bgVideoRef.current) bgVideoRef.current.pause(); // Sync BG
+    } else if (statusRef.current === GameStatus.PAUSED) {
+        setStatus(GameStatus.PLAYING);
+        const pauseDuration = performance.now() - pauseTimeRef.current;
+        totalPauseDurationRef.current += pauseDuration;
+        if (mediaRef.current) mediaRef.current.play().catch(() => {});
+        if (bgVideoRef.current) bgVideoRef.current.play().catch(() => {}); // Sync BG
+        if (audioCtxRef.current) audioCtxRef.current.resume();
+    }
+  }, []); // Empty dep array because we rely on statusRef
+
+  // Listen for Visibility Change to Pause/Mute
+  useEffect(() => {
+      const handleVisibilityChange = () => {
+          if (document.hidden) {
+              // App is minimized or switched away
+              if (statusRef.current === GameStatus.PLAYING) {
+                  togglePause(); 
+              }
+              
+              // FORCE STOP PREVIEW
+              // If we minimize while previewing, stop it entirely so it doesn't get stuck in loop
+              if (isPlayingPreview) {
+                  stopPreview();
+              }
+
+              // Mute all audio contexts/elements
+              if (audioCtxRef.current && audioCtxRef.current.state === 'running') {
+                  audioCtxRef.current.suspend();
+              }
+              if (bgMusicRef.current) bgMusicRef.current.pause();
+              if (bgVideoRef.current) bgVideoRef.current.pause();
+              if (mediaRef.current) mediaRef.current.pause();
+          } else {
+              // App returned to foreground
+              if (audioCtxRef.current && audioCtxRef.current.state === 'suspended') {
+                  audioCtxRef.current.resume();
+              }
+              // Resume BGM if needed (Menu/Title), but ONLY if not previewing
+              if ((statusRef.current === GameStatus.TITLE || statusRef.current === GameStatus.MENU) && !isPlayingPreview && !showMobileStart) {
+                   if (bgMusicRef.current) bgMusicRef.current.play().catch(()=>{});
+                   if (bgVideoRef.current) bgVideoRef.current.play().catch(()=>{});
+              }
+              // If paused, we don't auto-resume game, user must press resume
+          }
+      };
+
+      document.addEventListener("visibilitychange", handleVisibilityChange);
+      return () => {
+          document.removeEventListener("visibilitychange", handleVisibilityChange);
+      };
+  }, [isPlayingPreview, togglePause, stopPreview, showMobileStart]);
+
   const handleMobileEnter = () => {
     // 1. Trigger Full Screen
     const docEl = document.documentElement;
@@ -207,8 +281,9 @@ const App: React.FC = () => {
     // 3. Play UI Sound AND PRIME VIBRATION
     playUiSound('select');
     if (typeof navigator !== 'undefined' && navigator.vibrate) {
-        // Short vibration to unlock the haptic engine on mobile browsers/webviews
-        navigator.vibrate(200);
+        // Short vibration to unlock the haptic engine on mobile browsers/webviews (WebView/APK)
+        // This is crucial for subsequent vibrations to work.
+        navigator.vibrate([100, 50, 100]); 
     }
 
     // 4. Hide Overlay
@@ -247,20 +322,6 @@ const App: React.FC = () => {
         }
     }
   }, [status, isPlayingPreview, showMobileStart]);
-
-  // Stop Preview Helper
-  const stopPreview = () => {
-    if (previewTimeoutRef.current) {
-        clearInterval(previewTimeoutRef.current as any); 
-        previewTimeoutRef.current = null;
-    }
-
-    if (previewAudioRef.current) {
-        previewAudioRef.current.pause();
-        previewAudioRef.current.currentTime = 0;
-    }
-    setIsPlayingPreview(false);
-  };
 
   // Play Preview Helper
   const playPreview = (src: string) => {
@@ -326,7 +387,7 @@ const App: React.FC = () => {
           stopPreview();
       }
       return () => stopPreview();
-  }, [status]);
+  }, [status, stopPreview]);
 
   // Load Persistence Data
   useEffect(() => {
@@ -997,24 +1058,6 @@ const App: React.FC = () => {
     playDrum('kick', ct); ct += 0.15;
     playDrum('crash', ct); 
   };
-
-  // Toggle Pause
-  const togglePause = useCallback(() => {
-    if (status === GameStatus.PLAYING) {
-        setStatus(GameStatus.PAUSED);
-        pauseTimeRef.current = performance.now();
-        if (mediaRef.current) mediaRef.current.pause();
-        if (audioCtxRef.current) audioCtxRef.current.suspend();
-        if (bgVideoRef.current) bgVideoRef.current.pause(); // Sync BG
-    } else if (status === GameStatus.PAUSED) {
-        setStatus(GameStatus.PLAYING);
-        const pauseDuration = performance.now() - pauseTimeRef.current;
-        totalPauseDurationRef.current += pauseDuration;
-        if (mediaRef.current) mediaRef.current.play().catch(() => {});
-        if (bgVideoRef.current) bgVideoRef.current.play().catch(() => {}); // Sync BG
-        if (audioCtxRef.current) audioCtxRef.current.resume();
-    }
-  }, [status]);
 
   // Handle Outro Transition
   const triggerOutro = useCallback(() => {
@@ -1972,8 +2015,6 @@ const App: React.FC = () => {
 
           {/* LEFT COLUMN: THE PLAYLIST */}
           <div className="w-full md:w-[55%] h-auto md:h-full flex flex-col bg-slate-950/80 border-r border-slate-700/50 pt-0 md:pt-0 relative shrink-0 md:overflow-hidden">
-             {/* ... (Playlist code remains same as previous but needs to be included in full file return) ... */}
-             {/* For brevity, assuming the rest of the playlist rendering code is identical to previous, just wrapped in the App component structure */}
              
              {/* Header */}
              <div className="hidden md:flex h-24 items-end pb-4 px-8 border-b border-cyan-500/30 bg-gradient-to-b from-slate-900 to-transparent shrink-0">
