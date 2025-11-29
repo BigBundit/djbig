@@ -749,12 +749,11 @@ const App: React.FC = () => {
   }, [level, keyMode]);
 
   const playHitSound = (laneIndex: number | 'select' | 'hover') => {
-    // ... (Keep existing PlayHitSound logic identical, just ensuring sound playback) ...
-    // Note: Copied previously, kept standard for brevity in this specific update
     if (!audioCtxRef.current) return;
     const ctx = audioCtxRef.current;
     const t = ctx.currentTime;
     
+    // 1. UI SOUNDS (UNCHANGED)
     if (laneIndex === 'hover') {
           const gain = ctx.createGain();
           const osc = ctx.createOscillator();
@@ -792,83 +791,81 @@ const App: React.FC = () => {
           return;
     }
 
+    // 2. GAMEPLAY SOUNDS: INTELLIGENT SONG SLICING
     if (typeof laneIndex === 'number' && audioBufferRef.current && statusRef.current === GameStatus.PLAYING) {
+        
+        // A. Determine Instrument Type based on Lane and KeyMode
+        // Mapping: 
+        // 7K: S(Hat), D(Snare), F(Perc), Space(Kick), J(Perc), K(Snare), L(Hat)
+        // 5K: D(Snare), F(Perc), Space(Kick), J(Perc), K(Snare)
+        // 4K: D(Snare), F(Kick), J(Kick), K(Snare)
+        
+        let drumType: 'kick' | 'snare' | 'hat' = 'hat';
+        
+        if (keyMode === 7) {
+            if (laneIndex === 3) drumType = 'kick'; // Space
+            else if (laneIndex === 1 || laneIndex === 5) drumType = 'snare';
+            else drumType = 'hat';
+        } else if (keyMode === 5) {
+            if (laneIndex === 2) drumType = 'kick'; // Space
+            else if (laneIndex === 0 || laneIndex === 4) drumType = 'snare';
+            else drumType = 'hat';
+        } else { // 4K
+            if (laneIndex === 1 || laneIndex === 2) drumType = 'kick';
+            else drumType = 'snare';
+        }
+
         const source = ctx.createBufferSource();
         source.buffer = audioBufferRef.current;
         
+        // Calculate song position
         let elapsed = 0;
         if (mediaRef.current && !mediaRef.current.paused) {
-            elapsed = mediaRef.current.currentTime * 1000 + START_OFFSET_MS; // SYNC SOUND WITH OFFSET
+            elapsed = mediaRef.current.currentTime * 1000 + START_OFFSET_MS;
         } else {
             const now = performance.now();
             elapsed = now - startTimeRef.current - totalPauseDurationRef.current;
         }
 
-        const songTime = Math.max(0, (elapsed - START_OFFSET_MS) / 1000); // Play actual song time
-        const duration = 0.15; 
-        
+        // Sampling Logic
+        // We take the current song time, but we FILTER it to make it sound like a drum
+        const songTime = Math.max(0, (elapsed - START_OFFSET_MS) / 1000); 
+        const sampleDuration = 0.12; // Short sample for percussive feel
+
+        // Filter Chain
         const filter = ctx.createBiquadFilter();
-        filter.type = 'highpass';
-        filter.frequency.value = 500;
-        
         const gain = ctx.createGain();
-        gain.gain.setValueAtTime(getVol(1.5), t); 
-        gain.gain.exponentialRampToValueAtTime(0.01, t + duration);
+
+        if (drumType === 'kick') {
+            // Low Pass: Isolate Bass/Kick from song
+            filter.type = 'lowpass';
+            filter.frequency.setValueAtTime(150, t); 
+            filter.Q.value = 1.0;
+            // Boost volume for kick punch
+            gain.gain.setValueAtTime(getVol(3.0), t); 
+        } else if (drumType === 'snare') {
+            // Band Pass: Isolate mid-range snap
+            filter.type = 'bandpass';
+            filter.frequency.setValueAtTime(2000, t);
+            filter.Q.value = 0.8;
+            gain.gain.setValueAtTime(getVol(2.0), t);
+        } else {
+            // High Pass: Isolate shakers/cymbals
+            filter.type = 'highpass';
+            filter.frequency.setValueAtTime(5000, t);
+            filter.Q.value = 1.0;
+            gain.gain.setValueAtTime(getVol(1.5), t);
+        }
+
+        // Envelope: Fast decay to simulate drum hit tightness
+        gain.gain.exponentialRampToValueAtTime(0.01, t + sampleDuration);
 
         source.connect(filter);
         filter.connect(gain);
         gain.connect(ctx.destination);
-        source.start(t, songTime, duration);
+        source.start(t, songTime, sampleDuration);
+        
         return;
-    }
-
-    // Fallback Synth Logic (Keep existing)
-    let isKick = false;
-    let isSnare = false;
-    if (keyMode === 5 && laneIndex === 2) isKick = true;
-    else if (keyMode === 7 && laneIndex === 3) isKick = true;
-    else if (keyMode === 4 && (laneIndex === 1 || laneIndex === 2)) isSnare = true;
-    else if ((keyMode === 5 || keyMode === 7) && (laneIndex % 2 !== 0)) isSnare = true;
-
-    if (isKick) {
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.frequency.setValueAtTime(150, t);
-        osc.frequency.exponentialRampToValueAtTime(0.01, t + 0.3);
-        gain.gain.setValueAtTime(getVol(1.0), t);
-        gain.gain.exponentialRampToValueAtTime(0.01, t + 0.3);
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.start(t);
-        osc.stop(t + 0.3);
-    } else if (isSnare) {
-        const noise = ctx.createBufferSource();
-        noise.buffer = getNoiseBuffer(ctx);
-        const noiseFilter = ctx.createBiquadFilter();
-        noiseFilter.type = 'lowpass';
-        noiseFilter.frequency.setValueAtTime(3000, t);
-        const noiseGain = ctx.createGain();
-        noiseGain.gain.setValueAtTime(getVol(0.8), t);
-        noiseGain.gain.exponentialRampToValueAtTime(0.01, t + 0.2);
-        noise.connect(noiseFilter);
-        noiseFilter.connect(noiseGain);
-        noiseGain.connect(ctx.destination);
-        noise.start(t);
-        noise.stop(t + 0.2);
-    } else {
-        const noise = ctx.createBufferSource();
-        noise.buffer = getNoiseBuffer(ctx);
-        const noiseFilter = ctx.createBiquadFilter();
-        noiseFilter.type = 'highpass';
-        noiseFilter.frequency.value = 8000;
-        const noiseGain = ctx.createGain();
-        noiseGain.gain.setValueAtTime(getVol(0.3), t);
-        noiseGain.gain.exponentialRampToValueAtTime(0.01, t + 0.05);
-        noise.connect(noiseFilter);
-        noiseFilter.connect(noiseGain);
-        noiseGain.connect(ctx.destination);
-        noise.start(t);
-        noise.stop(t + 0.05);
     }
   };
 
