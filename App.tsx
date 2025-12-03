@@ -1551,8 +1551,8 @@ const App: React.FC = () => {
       )}
 
       {status === GameStatus.MENU && !startCountdown && (
-        <div className="relative z-30 w-full h-full flex flex-col md:flex-row animate-fade-in bg-slate-900/40 backdrop-blur-md overflow-y-auto md:overflow-hidden">
-          <div className="md:hidden sticky top-0 left-0 w-full min-h-[4rem] bg-slate-900 flex items-center justify-between px-4 z-50 border-b border-slate-700 shrink-0 pt-[max(2rem,env(safe-area-inset-top))] pb-2">
+        <div className="relative z-30 w-full h-full flex flex-col md:flex-row animate-fade-in bg-slate-900/40 backdrop-blur-md overflow-hidden">
+          <div className="md:hidden w-full min-h-[4rem] bg-slate-900 flex items-center justify-between px-4 z-50 border-b border-slate-700 shrink-0 pt-[max(2rem,env(safe-area-inset-top))] pb-2">
              <button onClick={() => { setStatus(GameStatus.TITLE); stopPreview(); }} className="text-white font-bold text-sm flex items-center gap-1">← {t.BACK}</button>
              <div className="flex items-center gap-3">
                 {songList.length > 0 && (
@@ -1563,7 +1563,7 @@ const App: React.FC = () => {
                 <div className="text-cyan-400 font-bold text-sm hidden sm:block">MUSIC SELECT</div>
             </div>
           </div>
-          <div className={`w-full ${isMobile ? 'h-full' : 'md:w-[55%]'} h-auto md:h-full flex flex-col bg-slate-950/80 border-r border-slate-700/50 pt-0 md:pt-0 relative shrink-0 md:overflow-hidden pb-48 md:pb-0`}>
+          <div className={`w-full ${isMobile ? 'flex-1 min-h-0' : 'md:w-[55%] h-full'} flex flex-col bg-slate-950/80 border-r border-slate-700/50 relative shrink-0 overflow-hidden`}>
              <div className="hidden md:flex h-24 items-end justify-between pb-4 px-8 border-b border-cyan-500/30 bg-gradient-to-b from-slate-900 to-transparent shrink-0">
                 <h2 className={`text-4xl font-black italic text-white tracking-tighter ${fontClass} drop-shadow-md`}>SELECT <span className="text-cyan-400">MUSIC</span></h2>
                 {songList.length > 0 && (
@@ -1572,7 +1572,7 @@ const App: React.FC = () => {
                     </button>
                 )}
              </div>
-             <div className="w-full md:flex-1 md:overflow-y-auto custom-scrollbar p-0 space-y-1">
+             <div className="w-full flex-1 overflow-y-auto custom-scrollbar p-0 space-y-1 pb-48 md:pb-0">
                  {/* Demo Tracks */}
                  <div onClick={(e) => { loadDemoTrack('/demoplay.mp4', 'DEMO_TRACK_01'); e.currentTarget.scrollIntoView({ behavior: 'smooth', block: 'center' }); }} onMouseEnter={() => playUiSound('hover')} className={`group relative h-20 w-full flex items-center px-6 cursor-pointer transition-all border-l-8 overflow-hidden ${localFileName === "DEMO_TRACK_01" ? 'bg-gradient-to-r from-green-900/80 to-transparent border-green-400' : 'bg-slate-900/50 border-slate-800 hover:bg-slate-800 hover:border-green-600'}`} style={{ clipPath: 'polygon(0 0, 100% 0, 95% 100%, 0% 100%)' }}>
                     <div className={`mr-4 w-12 h-12 rounded-full flex items-center justify-center border-4 ${localFileName === "DEMO_TRACK_01" ? 'border-white animate-spin-slow' : 'border-slate-600'} bg-black overflow-hidden shadow-lg shrink-0`}>
