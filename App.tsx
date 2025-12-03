@@ -1563,7 +1563,7 @@ const App: React.FC = () => {
                 <div className="text-cyan-400 font-bold text-sm hidden sm:block">MUSIC SELECT</div>
             </div>
           </div>
-          <div className={`w-full ${isMobile ? 'h-full' : 'md:w-[55%]'} h-auto md:h-full flex flex-col bg-slate-950/80 border-r border-slate-700/50 pt-0 md:pt-0 relative shrink-0 md:overflow-hidden pb-24 md:pb-0`}>
+          <div className={`w-full ${isMobile ? 'h-full' : 'md:w-[55%]'} h-auto md:h-full flex flex-col bg-slate-950/80 border-r border-slate-700/50 pt-0 md:pt-0 relative shrink-0 md:overflow-hidden pb-48 md:pb-0`}>
              <div className="hidden md:flex h-24 items-end justify-between pb-4 px-8 border-b border-cyan-500/30 bg-gradient-to-b from-slate-900 to-transparent shrink-0">
                 <h2 className={`text-4xl font-black italic text-white tracking-tighter ${fontClass} drop-shadow-md`}>SELECT <span className="text-cyan-400">MUSIC</span></h2>
                 {songList.length > 0 && (
@@ -1630,30 +1630,49 @@ const App: React.FC = () => {
                  })}
              </div>
 
-            {/* MOBILE: Floating Play Button */}
-            {isMobile && currentSongMetadata && !showMobileSetup && (
-                <div className="fixed bottom-[calc(1.5rem+env(safe-area-inset-bottom))] left-0 w-full px-4 z-50">
-                    <button 
-                        onClick={() => { 
-                            playUiSound('select'); 
-                            if (typeof navigator !== 'undefined' && navigator.vibrate) {
-                                try { navigator.vibrate(50); } catch(e) {}
-                            }
-                            setShowMobileSetup(true); 
-                        }}
-                        className="w-full h-16 bg-gradient-to-r from-cyan-600 to-blue-600 rounded-xl shadow-[0_0_20px_rgba(6,182,212,0.6)] flex items-center justify-center border-2 border-white/20 animate-bounce-short hover:scale-105 transition-transform"
-                    >
-                        <span className={`text-2xl font-black italic text-white mr-2 ${fontClass}`}>PLAY</span>
-                        <span className="text-white/80 font-mono text-sm truncate max-w-[150px]">{currentSongMetadata.name}</span>
-                    </button>
+             {/* MOBILE FIXED BOTTOM BAR (STICKY) */}
+             {isMobile && !showMobileSetup && (
+                <div className="fixed bottom-0 left-0 w-full z-50 bg-slate-950/95 border-t border-slate-700 backdrop-blur-md pb-[env(safe-area-inset-bottom)]">
+                    {/* Floating Play Button (Integrated into bottom area) */}
+                    {currentSongMetadata && (
+                        <div className="px-4 pt-2 pb-2">
+                            <button 
+                                onClick={() => { 
+                                    playUiSound('select'); 
+                                    if (typeof navigator !== 'undefined' && navigator.vibrate) {
+                                        try { navigator.vibrate(50); } catch(e) {}
+                                    }
+                                    setShowMobileSetup(true); 
+                                }}
+                                className="w-full h-14 bg-gradient-to-r from-cyan-600 to-blue-600 rounded-xl shadow-[0_0_20px_rgba(6,182,212,0.6)] flex items-center justify-center border-2 border-white/20 animate-bounce-short hover:scale-105 transition-transform"
+                            >
+                                <span className={`text-xl font-black italic text-white mr-2 ${fontClass}`}>PLAY</span>
+                                <span className="text-white/80 font-mono text-xs truncate max-w-[200px]">{currentSongMetadata.name}</span>
+                            </button>
+                        </div>
+                    )}
+
+                    {/* Footer Buttons */}
+                    <div className="flex gap-2 p-2 pt-0">
+                        <label className="flex-1 h-10 bg-slate-800 hover:bg-cyan-900/50 border border-slate-600 hover:border-cyan-500 rounded flex items-center justify-center cursor-pointer transition-colors group">
+                            <span className={`text-[10px] font-bold text-slate-400 group-hover:text-cyan-400 ${fontClass}`}>+ {t.LOAD_SINGLE}</span>
+                            <input type="file" accept="video/*,audio/*" onChange={handleSingleFileUpload} className="hidden" />
+                        </label>
+                        <label className="flex-1 h-10 bg-slate-800 hover:bg-fuchsia-900/50 border border-slate-600 hover:border-fuchsia-500 rounded flex items-center justify-center cursor-pointer transition-colors group">
+                            <span className={`text-[10px] font-bold text-slate-400 group-hover:text-fuchsia-400 ${fontClass}`}>+ {t.LOAD_FOLDER}</span>
+                            <input type="file" multiple onChange={handleFolderSelect} className="hidden" {...({ webkitdirectory: "", directory: "" } as any)} />
+                        </label>
+                    </div>
                 </div>
-            )}
+             )}
              
-             {/* FOOTER BUTTONS */}
-             <div className="bg-black/80 p-4 border-t border-slate-700 flex gap-2 shrink-0 z-40 relative pb-[calc(1rem+env(safe-area-inset-bottom))]">
-                <label className="flex-1 h-12 bg-slate-800 hover:bg-cyan-900/50 border border-slate-600 hover:border-cyan-500 rounded flex items-center justify-center cursor-pointer transition-colors group"><span className={`text-xs font-bold text-slate-400 group-hover:text-cyan-400 ${fontClass}`}>+ {t.LOAD_SINGLE}</span><input type="file" accept="video/*,audio/*" onChange={handleSingleFileUpload} className="hidden" /></label>
-                <label className="flex-1 h-12 bg-slate-800 hover:bg-fuchsia-900/50 border border-slate-600 hover:border-fuchsia-500 rounded flex items-center justify-center cursor-pointer transition-colors group"><span className={`text-xs font-bold text-slate-400 group-hover:text-fuchsia-400 ${fontClass}`}>+ {t.LOAD_FOLDER}</span><input type="file" multiple onChange={handleFolderSelect} className="hidden" {...({ webkitdirectory: "", directory: "" } as any)} /></label>
-             </div>
+             {/* FOOTER BUTTONS (DESKTOP ONLY) */}
+             {!isMobile && (
+                <div className="bg-black/80 p-4 border-t border-slate-700 flex gap-2 shrink-0 z-40 relative pb-[calc(1rem+env(safe-area-inset-bottom))]">
+                    <label className="flex-1 h-12 bg-slate-800 hover:bg-cyan-900/50 border border-slate-600 hover:border-cyan-500 rounded flex items-center justify-center cursor-pointer transition-colors group"><span className={`text-xs font-bold text-slate-400 group-hover:text-cyan-400 ${fontClass}`}>+ {t.LOAD_SINGLE}</span><input type="file" accept="video/*,audio/*" onChange={handleSingleFileUpload} className="hidden" /></label>
+                    <label className="flex-1 h-12 bg-slate-800 hover:bg-fuchsia-900/50 border border-slate-600 hover:border-fuchsia-500 rounded flex items-center justify-center cursor-pointer transition-colors group"><span className={`text-xs font-bold text-slate-400 group-hover:text-fuchsia-400 ${fontClass}`}>+ {t.LOAD_FOLDER}</span><input type="file" multiple onChange={handleFolderSelect} className="hidden" {...({ webkitdirectory: "", directory: "" } as any)} /></label>
+                </div>
+             )}
           </div>
           
           {/* Right Column (Desktop) */}
@@ -1673,7 +1692,7 @@ const App: React.FC = () => {
           
           {/* MOBILE POPUP SETUP MODAL */}
           {showMobileSetup && isMobile && (
-              <div className="fixed inset-0 z-[60] bg-slate-900/95 backdrop-blur-xl flex flex-col p-6 animate-fade-in overflow-y-auto pb-[env(safe-area-inset-bottom)]">
+              <div className="fixed inset-0 z-[60] bg-slate-950/95 backdrop-blur-xl flex flex-col p-6 animate-fade-in overflow-y-auto pb-[env(safe-area-inset-bottom)]">
                   <button onClick={() => setShowMobileSetup(false)} className="absolute top-4 right-4 text-white p-2 z-50 bg-black/50 rounded-full border border-slate-600 mt-[env(safe-area-inset-top)] mr-[env(safe-area-inset-right)]">✕</button>
                   
                   <div className="flex flex-col items-center mb-6 mt-8 pt-[env(safe-area-inset-top)]">
