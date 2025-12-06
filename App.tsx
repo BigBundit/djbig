@@ -125,11 +125,29 @@ const App: React.FC = () => {
   const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
   const [analyzedNotes, setAnalyzedNotes] = useState<NoteType[] | null>(null);
 
-  const [level, setLevel] = useState<number>(7); // Default to 7 (Easy in new scale)
-  const [speedMod, setSpeedMod] = useState<number>(2.0); // Default 2x speed
+  // --- PERSISTENT SETTINGS ---
+  // Default Level: 7 (Easy)
+  const [level, setLevel] = useState<number>(() => {
+      const saved = localStorage.getItem('djbig_level');
+      return saved ? parseInt(saved, 10) : 7;
+  });
   
-  // Key Mode State
-  const [keyMode, setKeyMode] = useState<4 | 5 | 7>(7);
+  // Default Speed: 1.5x
+  const [speedMod, setSpeedMod] = useState<number>(() => {
+      const saved = localStorage.getItem('djbig_speed');
+      return saved ? parseFloat(saved) : 1.5;
+  });
+  
+  // Default Key Mode: 4 Keys
+  const [keyMode, setKeyMode] = useState<4 | 5 | 7>(() => {
+      const saved = localStorage.getItem('djbig_keymode');
+      if (saved) {
+          const parsed = parseInt(saved, 10);
+          if ([4, 5, 7].includes(parsed)) return parsed as 4 | 5 | 7;
+      }
+      return 4;
+  });
+
   const [keyMappings, setKeyMappings] = useState<KeyMapping>(DEFAULT_KEY_MAPPINGS);
   const [showKeyConfig, setShowKeyConfig] = useState<boolean>(false);
 
@@ -185,6 +203,9 @@ const App: React.FC = () => {
   const bgRef = useRef<HTMLDivElement>(null); // Ref for background pulse
   const progressBarRef = useRef<HTMLDivElement>(null); // Ref for progress bar
   
+  // OVERDRIVE SFX REF
+  const overdriveSfxRef = useRef<HTMLAudioElement | null>(null);
+  
   const audioBufferRef = useRef<AudioBuffer | null>(null); // Ref to store raw audio for re-analysis
   const audioDurationRef = useRef<number>(0); // Duration in seconds
 
@@ -211,6 +232,16 @@ const App: React.FC = () => {
         }
     };
     initCapacitor();
+  }, []);
+  
+  // Load Overdrive SFX
+  useEffect(() => {
+      try {
+          overdriveSfxRef.current = new Audio('/odeffect.m4a');
+          overdriveSfxRef.current.load();
+      } catch (e) {
+          console.warn("Failed to load overdrive sfx");
+      }
   }, []);
 
   // 2. Haptic Helper
@@ -509,7 +540,7 @@ const App: React.FC = () => {
       return () => stopPreview();
   }, [status, stopPreview]);
 
-  // Load Persistence Data (Same as before...)
+  // Load Persistence Data
   useEffect(() => {
       const storedKeys = localStorage.getItem('djbig_key_config');
       if (storedKeys) {
@@ -543,6 +574,11 @@ const App: React.FC = () => {
           } catch (e) { console.error("Failed to load layout", e); }
       }
   }, []);
+
+  // PERSISTENCE FOR GAME SETTINGS
+  useEffect(() => { localStorage.setItem('djbig_level', level.toString()); }, [level]);
+  useEffect(() => { localStorage.setItem('djbig_speed', speedMod.toString()); }, [speedMod]);
+  useEffect(() => { localStorage.setItem('djbig_keymode', keyMode.toString()); }, [keyMode]);
 
   const saveKeyMappings = (newMappings: KeyMapping) => {
       setKeyMappings(newMappings);
@@ -1235,7 +1271,17 @@ const App: React.FC = () => {
     // Auto-activate when full
     if (overdrive >= 100 && !isOverdrive) {
         setIsOverdrive(true);
-        playUiSound('scratch'); // Sfx for activation
+        
+        // PLAY OVERDRIVE SFX (odeffect.m4a)
+        if (overdriveSfxRef.current) {
+            const vol = audioSettingsRef.current.masterVolume * audioSettingsRef.current.sfxVolume;
+            overdriveSfxRef.current.volume = Math.min(1.0, Math.max(0, vol));
+            overdriveSfxRef.current.currentTime = 0;
+            overdriveSfxRef.current.play().catch(e => console.warn("Overdrive SFX failed", e));
+        } else {
+             playUiSound('scratch'); // Fallback
+        }
+
         triggerHaptic('heavy');
         setFeedback({ text: t.LIMIT_BREAK, color: "text-amber-400", id: Date.now() });
     }
