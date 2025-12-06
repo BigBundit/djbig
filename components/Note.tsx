@@ -7,9 +7,10 @@ interface NoteProps {
     totalLanes: number;
     color: LaneColor;
     theme: Theme;
+    isOverdrive?: boolean;
 }
 
-export const Note: React.FC<NoteProps> = ({ note, totalLanes, color, theme }) => {
+export const Note: React.FC<NoteProps> = ({ note, totalLanes, color, theme, isOverdrive }) => {
     const widthPerc = 100 / totalLanes;
     const leftPos = `${note.laneIndex * widthPerc}%`;
     
@@ -61,6 +62,11 @@ export const Note: React.FC<NoteProps> = ({ note, totalLanes, color, theme }) =>
         default: // rect
             shapeClass = `rounded-[2px] ${colorClass}`;
             break;
+    }
+
+    // Apply Overdrive Shake
+    if (isOverdrive) {
+        shapeClass += " animate-[note-power-shake_0.15s_infinite]";
     }
 
     // Adjust for specific themes having standard inner highlights

@@ -251,20 +251,23 @@ const App: React.FC = () => {
   }, []);
 
   // 2. Haptic Helper
-  const triggerHaptic = useCallback(async (intensity: 'light' | 'medium' | 'heavy' = 'light') => {
+  const triggerHaptic = useCallback((intensity: 'light' | 'medium' | 'heavy' = 'light') => {
       if (layoutSettings.enableVibration === false) return;
 
+      // 1. Force Web Vibration API (Works best for Android Chrome/Mobile Web)
+      if (typeof navigator !== 'undefined' && navigator.vibrate) {
+          const ms = intensity === 'heavy' ? 40 : (intensity === 'medium' ? 20 : 10);
+          try { navigator.vibrate(ms); } catch(e) {}
+      }
+
+      // 2. Attempt Capacitor Haptics
       try {
           let style = ImpactStyle.Light;
           if (intensity === 'medium') style = ImpactStyle.Medium;
           if (intensity === 'heavy') style = ImpactStyle.Heavy;
-          await Haptics.impact({ style });
+          Haptics.impact({ style }).catch(() => {});
       } catch (e) {
-          // Fallback to Web Vibration API
-          if (typeof navigator !== 'undefined' && navigator.vibrate) {
-              const ms = intensity === 'heavy' ? 200 : (intensity === 'medium' ? 100 : 50);
-              navigator.vibrate(ms);
-          }
+          // Ignore if module is missing
       }
   }, [layoutSettings.enableVibration]);
 
@@ -1573,7 +1576,23 @@ const App: React.FC = () => {
         )}
         {currentThemeId === 'ignore' ? ( <div className="absolute bottom-24 left-0 w-full h-1 bg-red-500 shadow-[0_0_15px_rgba(239,68,68,0.9)] z-20 opacity-80 pointer-events-none"></div> ) : currentThemeId === 'titan' ? ( <div className="absolute bottom-20 left-0 w-full h-[2px] bg-amber-500/80 shadow-[0_0_10px_rgba(245,158,11,0.5)] z-20 pointer-events-none"></div> ) : currentThemeId === 'queen' ? ( <div className="absolute bottom-16 left-0 w-full h-[2px] bg-pink-500 shadow-[0_0_15px_rgba(236,72,153,0.8)] z-20 pointer-events-none"></div> ) : ( <div className="absolute bottom-20 left-0 w-full h-px bg-white/20 pointer-events-none z-20"></div> )}
         {hitEffects.map(effect => { const width = 100 / keyMode; const left = effect.laneIndex * width; return ( <HitEffect key={effect.id} x={`${left}%`} width={`${width}%`} rating={effect.rating} /> ); })}
-        {renderNotes.map((note) => { const config = activeLaneConfig[note.laneIndex]; if (!config) return null; return ( <Note key={note.id} note={note} totalLanes={keyMode} color={config.color} theme={activeThemeObj} /> ); })}
+        
+        {/* RENDER NOTES WITH OVERDRIVE PROP */}
+        {renderNotes.map((note) => { 
+            const config = activeLaneConfig[note.laneIndex]; 
+            if (!config) return null; 
+            return ( 
+                <Note 
+                    key={note.id} 
+                    note={note} 
+                    totalLanes={keyMode} 
+                    color={config.color} 
+                    theme={activeThemeObj} 
+                    isOverdrive={isOverdrive} 
+                /> 
+            ); 
+        })}
+        
         <div className="absolute top-[30%] left-0 right-0 flex flex-col items-center pointer-events-none z-50">
             {isAutoPlay && ( <div className={`text-xl ${fontClass} font-bold text-fuchsia-500 animate-pulse mb-2 border border-fuchsia-500 px-2 bg-black/50`}>{t.AUTO_PILOT}</div> )}
             {isOverdrive && ( <div className={`text-2xl md:text-4xl ${fontClass} font-black italic text-amber-400 animate-pulse mb-2 tracking-widest overdrive-active whitespace-nowrap`} style={{textShadow: '0 0 10px #fbbf24'}}>{t.X2_BONUS}</div> )}
