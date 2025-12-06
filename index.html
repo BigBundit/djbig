@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
   <head>
@@ -140,14 +141,14 @@
         100% { text-shadow: 2px 0 #f00, -2px 0 #0ff; transform: translate(0,0); }
       }
 
-      /* RAINBOW STROBE FOR OVERDRIVE BAR */
+      /* RAINBOW STROBE FOR OVERDRIVE BAR (OPTIMIZED: NO BOX SHADOW) */
       @keyframes rainbow-bg {
-        0% { background-color: #ef4444; box-shadow: 0 0 20px #ef4444; }
-        20% { background-color: #eab308; box-shadow: 0 0 20px #eab308; }
-        40% { background-color: #22c55e; box-shadow: 0 0 20px #22c55e; }
-        60% { background-color: #06b6d4; box-shadow: 0 0 20px #06b6d4; }
-        80% { background-color: #a855f7; box-shadow: 0 0 20px #a855f7; }
-        100% { background-color: #ef4444; box-shadow: 0 0 20px #ef4444; }
+        0% { background-color: #ef4444; }
+        20% { background-color: #eab308; }
+        40% { background-color: #22c55e; }
+        60% { background-color: #06b6d4; }
+        80% { background-color: #a855f7; }
+        100% { background-color: #ef4444; }
       }
       .animate-rainbow {
         animation: rainbow-bg 0.3s linear infinite;

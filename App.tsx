@@ -1862,23 +1862,15 @@ const App: React.FC = () => {
 
       <audio ref={bgMusicRef} src="/musicbg.mp3" loop />
 
-      <div className={`absolute inset-0 z-0 pointer-events-auto overflow-hidden bg-slate-900 ${isOverdrive ? 'animate-pulse' : ''}`} ref={bgRef} style={{ transition: 'transform 0.05s, filter 0.05s' }}>
+      <div className={`absolute inset-0 z-0 pointer-events-auto overflow-hidden bg-slate-900`} ref={bgRef} style={{ transition: 'transform 0.05s, filter 0.05s' }}>
         
         {/* OPTIMIZED OVERDRIVE EFFECTS: Always present but hidden via opacity to prevent layout thrashing */}
         {status === GameStatus.PLAYING && (
             <div className={`absolute inset-0 z-10 pointer-events-none overflow-hidden transition-opacity duration-200 ${isOverdrive ? 'opacity-100' : 'opacity-0'}`}>
-                {/* 1. White Strobe Flashes */}
-                <div className="absolute inset-0 bg-white/10 mix-blend-overlay animate-lightning"></div>
+                {/* 1. White Strobe Flashes - Simplified */}
+                <div className="absolute inset-0 bg-white/5 mix-blend-overlay animate-lightning"></div>
                 
-                {/* 2. Lightning Bolts (SVG) */}
-                <svg className="absolute inset-0 w-full h-full opacity-60" viewBox="0 0 100 100" preserveAspectRatio="none">
-                    {/* Bolt 1 (Left) */}
-                    <path d="M 20 0 L 30 30 L 10 50 L 25 100" stroke="#fbbf24" strokeWidth="0.5" fill="none" className="lightning-bolt" style={{animationDelay: '0.2s'}} />
-                    {/* Bolt 2 (Right) */}
-                    <path d="M 80 0 L 60 40 L 90 60 L 70 100" stroke="#fbbf24" strokeWidth="0.5" fill="none" className="lightning-bolt" style={{animationDelay: '1.5s'}} />
-                     {/* Bolt 3 (Center) */}
-                    <path d="M 50 0 L 40 20 L 60 40 L 30 70 L 50 100" stroke="#ffffff" strokeWidth="0.8" fill="none" className="lightning-bolt" style={{animationDelay: '0.8s'}} />
-                </svg>
+                {/* REMOVED: SVG Lightning Bolts (Too expensive) */}
             </div>
         )}
 
@@ -1897,11 +1889,15 @@ const App: React.FC = () => {
         {(status === GameStatus.PLAYING || status === GameStatus.PAUSED || status === GameStatus.RESUMING || status === GameStatus.OUTRO) && (
             <>
                 {mediaType === 'video' ? (
-                    <video ref={mediaRef as React.RefObject<HTMLVideoElement>} src={localVideoSrc} className={`absolute inset-0 w-full h-full object-cover z-20 pointer-events-none touch-none ${isOverdrive ? 'overdrive-active brightness-125 saturate-150' : ''}`} onEnded={triggerOutro} playsInline 
+                    <video ref={mediaRef as React.RefObject<HTMLVideoElement>} src={localVideoSrc} className={`absolute inset-0 w-full h-full object-cover z-20 pointer-events-none touch-none`} onEnded={triggerOutro} playsInline 
                         // @ts-ignore
                         webkit-playsinline="true" disablePictureInPicture />
                 ) : (
                     <div className="absolute inset-0 z-20 bg-black/60 backdrop-blur-sm"><audio ref={mediaRef as React.RefObject<HTMLAudioElement>} src={localVideoSrc} onEnded={triggerOutro} /></div>
+                )}
+                {/* LIGHTWEIGHT OVERDRIVE TINT OVERLAY */}
+                {isOverdrive && (
+                    <div className="absolute inset-0 z-20 bg-amber-500/20 mix-blend-overlay pointer-events-none"></div>
                 )}
             </>
         )}

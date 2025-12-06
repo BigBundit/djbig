@@ -91,11 +91,6 @@ export const Note: React.FC<NoteProps> = ({ note, totalLanes, color, theme, isOv
             break;
     }
 
-    // Apply Overdrive Shake
-    if (isOverdrive) {
-        shapeClass += " animate-[note-power-shake_0.15s_infinite]";
-    }
-
     // Adjust for specific themes having standard inner highlights
     const showHighlight = theme.noteShape === 'rect' || theme.noteShape === 'circle' || theme.noteShape === 'square';
 
