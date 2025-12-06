@@ -203,8 +203,8 @@ const App: React.FC = () => {
   const bgRef = useRef<HTMLDivElement>(null); // Ref for background pulse
   const progressBarRef = useRef<HTMLDivElement>(null); // Ref for progress bar
   
-  // OVERDRIVE SFX REF
-  const overdriveSfxRef = useRef<HTMLAudioElement | null>(null);
+  // OVERDRIVE SFX REF (WEB AUDIO BUFFER)
+  const overdriveBufferRef = useRef<AudioBuffer | null>(null);
   
   const audioBufferRef = useRef<AudioBuffer | null>(null); // Ref to store raw audio for re-analysis
   const audioDurationRef = useRef<number>(0); // Duration in seconds
@@ -234,14 +234,20 @@ const App: React.FC = () => {
     initCapacitor();
   }, []);
   
-  // Load Overdrive SFX
+  // Load Overdrive SFX Buffer
   useEffect(() => {
-      try {
-          overdriveSfxRef.current = new Audio('/odeffect.m4a');
-          overdriveSfxRef.current.load();
-      } catch (e) {
-          console.warn("Failed to load overdrive sfx");
-      }
+      const loadSfx = async () => {
+          try {
+              const response = await fetch('/odeffect.m4a');
+              const arrayBuffer = await response.arrayBuffer();
+              const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+              const decoded = await ctx.decodeAudioData(arrayBuffer);
+              overdriveBufferRef.current = decoded;
+          } catch (e) {
+              console.warn("Failed to load overdrive sfx buffer", e);
+          }
+      };
+      loadSfx();
   }, []);
 
   // 2. Haptic Helper
@@ -1272,12 +1278,19 @@ const App: React.FC = () => {
     if (overdrive >= 100 && !isOverdrive) {
         setIsOverdrive(true);
         
-        // PLAY OVERDRIVE SFX (odeffect.m4a)
-        if (overdriveSfxRef.current) {
-            const vol = audioSettingsRef.current.masterVolume * audioSettingsRef.current.sfxVolume;
-            overdriveSfxRef.current.volume = Math.min(1.0, Math.max(0, vol));
-            overdriveSfxRef.current.currentTime = 0;
-            overdriveSfxRef.current.play().catch(e => console.warn("Overdrive SFX failed", e));
+        // PLAY OVERDRIVE SFX (Web Audio API Buffer Source for Low Latency)
+        if (audioCtxRef.current && overdriveBufferRef.current) {
+             const ctx = audioCtxRef.current;
+             const source = ctx.createBufferSource();
+             source.buffer = overdriveBufferRef.current;
+             
+             const gainNode = ctx.createGain();
+             const vol = audioSettingsRef.current.masterVolume * audioSettingsRef.current.sfxVolume;
+             gainNode.gain.setValueAtTime(vol, ctx.currentTime);
+             
+             source.connect(gainNode);
+             gainNode.connect(ctx.destination);
+             source.start(0);
         } else {
              playUiSound('scratch'); // Fallback
         }
