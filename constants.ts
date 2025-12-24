@@ -1,8 +1,7 @@
 
-
 import { LaneConfig, KeyMapping, Theme } from './types';
 
-export const BASE_FALL_SPEED_MS = 1500; 
+export const BASE_FALL_SPEED_MS = 2500; // เพิ่มเวลาเพื่อให้โน้ตไหลลงมาได้นานขึ้นและเห็นจากด้านบนชัดเจน
 export const HIT_WINDOW_PERFECT = 45;
 export const HIT_WINDOW_GOOD = 90;
 export const HIT_WINDOW_MISS = 130;

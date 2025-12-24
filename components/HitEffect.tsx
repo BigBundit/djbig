@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, memo } from 'react';
 import { ScoreRating } from '../types';
 
 interface HitEffectProps {
@@ -8,10 +8,9 @@ interface HitEffectProps {
     rating: ScoreRating;
 }
 
-export const HitEffect: React.FC<HitEffectProps> = ({ x, width, rating }) => {
+export const HitEffect: React.FC<HitEffectProps> = memo(({ x, width, rating }) => {
     const [visible, setVisible] = useState(true);
 
-    // Optimized spark trajectories - reduced count for performance
     const sparks = useMemo(() => {
         return Array.from({ length: 6 }).map((_, i) => {
             const angle = (Math.random() * 360) * (Math.PI / 180);
@@ -50,31 +49,9 @@ export const HitEffect: React.FC<HitEffectProps> = ({ x, width, rating }) => {
             className="absolute bottom-[8%] z-50 pointer-events-none flex justify-center items-center"
             style={{ left: x, width: width, height: '10%' }}
         >
-            {/* 1. SHOCKWAVE RING - Fast & Clean */}
-            <div className={`
-                absolute w-full pt-[100%] rounded-full 
-                border-white/50
-                opacity-0
-                animate-[explosion-ring_0.3s_ease-out_forwards]
-            `}></div>
-
-            {/* 2. MAIN CORE - Soft Gradient Fade */}
-            <div className={`
-                absolute w-[100%] pt-[100%] rounded-full 
-                bg-[radial-gradient(circle,_var(--tw-gradient-stops))] ${fireColors}
-                opacity-0 mix-blend-screen
-                animate-[explosion-core_0.3s_ease-out_forwards]
-            `}></div>
-
-            {/* 3. CENTER FLASH */}
-            <div className={`
-                absolute w-[40%] pt-[40%] rounded-full 
-                bg-white
-                opacity-0 mix-blend-screen
-                animate-[flash_0.15s_ease-out_forwards]
-            `}></div>
-            
-            {/* 4. SPARKS - GPU Accelerated */}
+            <div className={`absolute w-full pt-[100%] rounded-full border-white/50 opacity-0 animate-[explosion-ring_0.3s_ease-out_forwards]`}></div>
+            <div className={`absolute w-[100%] pt-[100%] rounded-full bg-[radial-gradient(circle,_var(--tw-gradient-stops))] ${fireColors} opacity-0 mix-blend-screen animate-[explosion-core_0.3s_ease-out_forwards]`}></div>
+            <div className={`absolute w-[40%] pt-[40%] rounded-full bg-white opacity-0 mix-blend-screen animate-[flash_0.15s_ease-out_forwards]`}></div>
             {sparks.map((s) => (
                 <div 
                     key={s.id}
@@ -90,4 +67,4 @@ export const HitEffect: React.FC<HitEffectProps> = ({ x, width, rating }) => {
             ))}
         </div>
     );
-};
+});

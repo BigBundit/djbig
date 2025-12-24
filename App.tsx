@@ -56,9 +56,9 @@ const DEFAULT_LAYOUT: LayoutSettings = {
     enableVibration: true
 };
 
-const START_OFFSET_MS = 3000; // 3 Seconds Silence/Delay at start
+const START_OFFSET_MS = 5000; // เวลาดีเลย์รวม (นับถอยหลัง 3 วิ + เตรียมพร้อม 2 วิ)
+const PRE_ROLL_MS = 3000; // ระยะเวลา padding เพื่อให้โน้ตไหลลงมาทันก่อนเพลงเริ่ม
 
-// --- HELPER COMPONENT FOR MARQUEE TEXT ---
 const MarqueeText: React.FC<{ text: string, className?: string }> = ({ text, className }) => {
     const isLong = text.length > 15;
     
@@ -76,7 +76,6 @@ const MarqueeText: React.FC<{ text: string, className?: string }> = ({ text, cla
     return <div className={`truncate ${className}`}>{text}</div>;
 };
 
-// HELPER: Convert Key Code to readable label
 const codeToLabel = (code: string) => {
     if (code === 'Space') return 'SPC';
     if (code.startsWith('Key')) return code.replace('Key', '');
@@ -85,66 +84,52 @@ const codeToLabel = (code: string) => {
 };
 
 const App: React.FC = () => {
-  // Game State
   const [status, setStatus] = useState<GameStatus>(GameStatus.TITLE);
   const [score, setScore] = useState<number>(0);
   const [combo, setCombo] = useState<number>(0);
   const [maxCombo, setMaxCombo] = useState<number>(0);
   const [health, setHealth] = useState<number>(100);
   
-  // NEW: OVERDRIVE SYSTEM (FEVER MODE)
-  const [overdrive, setOverdrive] = useState<number>(0); // 0-100
+  const [overdrive, setOverdrive] = useState<number>(0); 
   const [isOverdrive, setIsOverdrive] = useState<boolean>(false);
   
-  // Stats for Ranking
   const [perfectCount, setPerfectCount] = useState<number>(0);
   const [goodCount, setGoodCount] = useState<number>(0);
   const [missCount, setMissCount] = useState<number>(0);
   
-  // REAL-TIME RANKING STATE
   const [currentRank, setCurrentRank] = useState<string>('SSS');
 
   const [feedback, setFeedback] = useState<{ text: string; color: string; id: number } | null>(null);
   const [isAutoPlay, setIsAutoPlay] = useState<boolean>(false);
   
-  // Countdown State
   const [startCountdown, setStartCountdown] = useState<number | null>(null);
-  const [resumeCountdown, setResumeCountdown] = useState<number | null>(null); // NEW: Resume Countdown
-  const [isShaking, setIsShaking] = useState<boolean>(false);
+  const [resumeCountdown, setResumeCountdown] = useState<number | null>(null); 
 
-  // Visual Effects State
   const [hitEffects, setHitEffects] = useState<HitEffectData[]>([]);
 
-  // Local Media State
   const [localVideoSrc, setLocalVideoSrc] = useState<string>('');
   const [localFileName, setLocalFileName] = useState<string>('');
   const [mediaType, setMediaType] = useState<'audio' | 'video'>('video');
   const [currentSongMetadata, setCurrentSongMetadata] = useState<SongMetadata | null>(null);
   
-  // Sound Profile State (Dynamic Drum Sounds)
   const [soundProfile, setSoundProfile] = useState<'electronic' | 'rock' | 'chiptune'>('electronic');
 
-  // Folder / Song Selection State
   const [songList, setSongList] = useState<SongMetadata[]>([]);
   const [isLoadingFolder, setIsLoadingFolder] = useState<boolean>(false);
   
   const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
   const [analyzedNotes, setAnalyzedNotes] = useState<NoteType[] | null>(null);
 
-  // --- PERSISTENT SETTINGS ---
-  // Default Level: 7 (Easy)
   const [level, setLevel] = useState<number>(() => {
       const saved = localStorage.getItem('djbig_level');
       return saved ? parseInt(saved, 10) : 7;
   });
   
-  // Default Speed: 1.5x
   const [speedMod, setSpeedMod] = useState<number>(() => {
       const saved = localStorage.getItem('djbig_speed');
       return saved ? parseFloat(saved) : 1.5;
   });
   
-  // Default Key Mode: 4 Keys
   const [keyMode, setKeyMode] = useState<4 | 5 | 7>(() => {
       const saved = localStorage.getItem('djbig_keymode');
       if (saved) {
@@ -154,7 +139,6 @@ const App: React.FC = () => {
       return 4;
   });
 
-  // GAME MODIFIERS STATE
   const [modifiers, setModifiers] = useState<GameModifiers>(() => {
       const saved = localStorage.getItem('djbig_modifiers');
       return saved ? JSON.parse(saved) : { mirror: false, sudden: false, hidden: false };
@@ -163,78 +147,59 @@ const App: React.FC = () => {
   const [keyMappings, setKeyMappings] = useState<KeyMapping>(DEFAULT_KEY_MAPPINGS);
   const [showKeyConfig, setShowKeyConfig] = useState<boolean>(false);
 
-  // Audio Settings
   const [audioSettings, setAudioSettings] = useState<AudioSettings>({ masterVolume: 0.5, sfxVolume: 1.0, musicVolume: 0.5, audioOffset: 0 });
   const [isBgMusicMuted, setIsBgMusicMuted] = useState<boolean>(false);
   
-  // Layout Settings
   const [layoutSettings, setLayoutSettings] = useState<LayoutSettings>(DEFAULT_LAYOUT);
 
-  // Theme & Progress System
   const [currentThemeId, setCurrentThemeId] = useState<ThemeId>('ignore');
   const [playerStats, setPlayerStats] = useState<PlayerStats>(DEFAULT_STATS);
 
-  // Preview Audio State
   const [isPlayingPreview, setIsPlayingPreview] = useState<boolean>(false);
   const previewAudioRef = useRef<HTMLAudioElement | null>(null);
   const previewTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   
-  // Mobile States
   const [showMobileStart, setShowMobileStart] = useState<boolean>(false);
   const [isMobile, setIsMobile] = useState<boolean>(false);
   const [showMobileSetup, setShowMobileSetup] = useState<boolean>(false);
   
-  // Refs for scrolling
   const mobileSetupStartBtnRef = useRef<HTMLButtonElement>(null);
 
-  // Translations Helper
   const t = TRANSLATIONS[layoutSettings.language];
   const fontClass = layoutSettings.language === 'th' ? 'font-thai' : 'font-display';
 
-  // Ref to hold audio settings for access within game loop/closures without dependency issues
   const audioSettingsRef = useRef<AudioSettings>(audioSettings);
 
-  // Engine State (Refs for performance)
   const frameRef = useRef<number>(0);
   const startTimeRef = useRef<number>(0);
   const pauseTimeRef = useRef<number>(0);
   const totalPauseDurationRef = useRef<number>(0);
   
-  // Ref to track status inside callbacks/closures
   const statusRef = useRef<GameStatus>(GameStatus.TITLE);
   
   const notesRef = useRef<NoteType[]>([]);
-  const activeKeysRef = useRef<boolean[]>(new Array(7).fill(false)); // Max 7
+  const activeKeysRef = useRef<boolean[]>(new Array(7).fill(false)); 
   
-  // VISUAL STATE: Tracks key press visuals separately to force re-renders immediately
   const [activeLanesState, setActiveLanesState] = useState<boolean[]>(new Array(7).fill(false));
 
-  const mediaRef = useRef<HTMLMediaElement>(null); // Ref for audio/video playback
-  const bgVideoRef = useRef<HTMLVideoElement>(null); // Ref for background video loop
-  const bgMusicRef = useRef<HTMLAudioElement>(null); // Ref for background music (Intro)
-  const bgRef = useRef<HTMLDivElement>(null); // Ref for background pulse
-  const progressBarRef = useRef<HTMLDivElement>(null); // Ref for progress bar
+  const mediaRef = useRef<HTMLMediaElement>(null); 
+  const bgVideoRef = useRef<HTMLVideoElement>(null); 
+  const bgMusicRef = useRef<HTMLAudioElement>(null); 
+  const bgRef = useRef<HTMLDivElement>(null); 
+  const progressBarRef = useRef<HTMLDivElement>(null); 
   
-  // OVERDRIVE SFX REF (WEB AUDIO BUFFER)
-  const overdriveBufferRef = useRef<AudioBuffer | null>(null);
-  
-  const audioBufferRef = useRef<AudioBuffer | null>(null); // Ref to store raw audio for re-analysis
-  const audioDurationRef = useRef<number>(0); // Duration in seconds
+  const audioBufferRef = useRef<AudioBuffer | null>(null); 
+  const audioDurationRef = useRef<number>(0); 
 
-  const noiseBufferRef = useRef<AudioBuffer | null>(null); // Ref to cache noise buffer for performance
+  const noiseBufferRef = useRef<AudioBuffer | null>(null); 
   
-  // Touch Input State
   const laneContainerRef = useRef<HTMLDivElement>(null);
   const touchedLanesRef = useRef<Set<number>>(new Set());
   
   const lastPauseTitleClickRef = useRef<number>(0);
 
-  // Visual State for React Render
   const [renderNotes, setRenderNotes] = useState<NoteType[]>([]);
 
-  // --- CAPACITOR INTEGRATION ---
-  
-  // 1. Hide StatusBar on Mount
   useEffect(() => {
     const initCapacitor = async () => {
         try {
@@ -246,44 +211,23 @@ const App: React.FC = () => {
     initCapacitor();
   }, []);
   
-  // Load Overdrive SFX Buffer
-  useEffect(() => {
-      const loadSfx = async () => {
-          try {
-              const response = await fetch('/odeffect.m4a');
-              const arrayBuffer = await response.arrayBuffer();
-              const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
-              const decoded = await ctx.decodeAudioData(arrayBuffer);
-              overdriveBufferRef.current = decoded;
-          } catch (e) {
-              console.warn("Failed to load overdrive sfx buffer", e);
-          }
-      };
-      loadSfx();
-  }, []);
-
-  // 2. Haptic Helper
   const triggerHaptic = useCallback((intensity: 'light' | 'medium' | 'heavy' = 'light') => {
       if (layoutSettings.enableVibration === false) return;
 
-      // 1. Force Web Vibration API (Works best for Android Chrome/Mobile Web)
       if (typeof navigator !== 'undefined' && navigator.vibrate) {
           const ms = intensity === 'heavy' ? 40 : (intensity === 'medium' ? 20 : 10);
           try { navigator.vibrate(ms); } catch(e) {}
       }
 
-      // 2. Attempt Capacitor Haptics
       try {
           let style = ImpactStyle.Light;
           if (intensity === 'medium') style = ImpactStyle.Medium;
           if (intensity === 'heavy') style = ImpactStyle.Heavy;
           Haptics.impact({ style }).catch(() => {});
       } catch (e) {
-          // Ignore if module is missing
       }
   }, [layoutSettings.enableVibration]);
 
-  // Detect Mobile on Mount
   useEffect(() => {
     const checkMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
     setIsMobile(checkMobile);
@@ -292,7 +236,6 @@ const App: React.FC = () => {
     }
   }, []);
 
-  // LOAD PERSISTED SONGS ON START
   useEffect(() => {
       const loadSongs = async () => {
           try {
@@ -307,7 +250,6 @@ const App: React.FC = () => {
       loadSongs();
   }, []);
 
-  // Scroll to Game Start button on mobile setup open
   useEffect(() => {
     if (showMobileSetup && mobileSetupStartBtnRef.current) {
         setTimeout(() => {
@@ -316,7 +258,6 @@ const App: React.FC = () => {
     }
   }, [showMobileSetup]);
 
-  // Stop Preview Helper (Defined early for usage in effect)
   const stopPreview = useCallback(() => {
     if (previewTimeoutRef.current) {
         clearInterval(previewTimeoutRef.current as any); 
@@ -330,32 +271,24 @@ const App: React.FC = () => {
     setIsPlayingPreview(false);
   }, []);
 
-  // Toggle Pause (UPDATED with Rewind & Countdown)
   const togglePause = useCallback(() => {
     if (statusRef.current === GameStatus.PLAYING) {
-        // PAUSE ACTION
         setStatus(GameStatus.PAUSED);
         pauseTimeRef.current = performance.now();
         if (mediaRef.current) mediaRef.current.pause();
         if (audioCtxRef.current) audioCtxRef.current.suspend();
         if (bgVideoRef.current) bgVideoRef.current.pause();
     } else if (statusRef.current === GameStatus.PAUSED) {
-        // RESUME ACTION -> ENTER RESUMING STATE
         setStatus(GameStatus.RESUMING);
         setResumeCountdown(2);
 
-        // REWIND LOGIC
         if (mediaRef.current) {
-             // Rewind 2 seconds
              const newTime = Math.max(0, mediaRef.current.currentTime - 2);
              mediaRef.current.currentTime = newTime;
         }
-
-        // Adjust timings will happen after countdown finishes
     }
-  }, []); // Empty dep array
+  }, []);
 
-  // Resume Sequence Effect
   useEffect(() => {
     if (status === GameStatus.RESUMING && resumeCountdown !== null) {
         if (resumeCountdown > 0) {
@@ -364,20 +297,18 @@ const App: React.FC = () => {
             }, 1000);
             return () => clearTimeout(timer);
         } else {
-            // COUNTDOWN FINISHED -> GO TO PLAYING
             setResumeCountdown(null);
             
-            // Re-calc timing offset
             const now = performance.now();
             let mediaTimeMs = 0;
             if (mediaRef.current) {
                 mediaTimeMs = mediaRef.current.currentTime * 1000;
             }
             
-            // Reset pause tracking because we just hard-synced start time
             totalPauseDurationRef.current = 0;
             pauseTimeRef.current = 0;
-            startTimeRef.current = now - mediaTimeMs - START_OFFSET_MS;
+            // SYNC FIX: Re-align startTime based on media currentTime + offsets
+            startTimeRef.current = now - mediaTimeMs - (START_OFFSET_MS + PRE_ROLL_MS);
             
             setStatus(GameStatus.PLAYING);
             if (mediaRef.current) mediaRef.current.play().catch(() => {});
@@ -387,13 +318,10 @@ const App: React.FC = () => {
     }
   }, [status, resumeCountdown]);
 
-  // Listen for Visibility Change to Pause/Mute
   useEffect(() => {
       const handleVisibilityChange = () => {
           if (document.hidden) {
-              // App is minimized or switched away
               if (statusRef.current === GameStatus.PLAYING || statusRef.current === GameStatus.RESUMING) {
-                   // Force pause without resume logic
                    setStatus(GameStatus.PAUSED);
                    pauseTimeRef.current = performance.now();
                    if (mediaRef.current) mediaRef.current.pause();
@@ -401,12 +329,10 @@ const App: React.FC = () => {
                    if (bgVideoRef.current) bgVideoRef.current.pause();
               }
               
-              // FORCE STOP PREVIEW
               if (isPlayingPreview) {
                   stopPreview();
               }
 
-              // Mute all audio contexts/elements
               if (audioCtxRef.current && audioCtxRef.current.state === 'running') {
                   audioCtxRef.current.suspend();
               }
@@ -414,11 +340,9 @@ const App: React.FC = () => {
               if (bgVideoRef.current) bgVideoRef.current.pause();
               if (mediaRef.current) mediaRef.current.pause();
           } else {
-              // App returned to foreground
               if (audioCtxRef.current && audioCtxRef.current.state === 'suspended') {
                   audioCtxRef.current.resume();
               }
-              // Resume BGM if needed
               if ((statusRef.current === GameStatus.TITLE || statusRef.current === GameStatus.MENU) && !isPlayingPreview && !showMobileStart) {
                    if (bgMusicRef.current) bgMusicRef.current.play().catch(()=>{});
                    if (bgVideoRef.current) bgVideoRef.current.play().catch(()=>{});
@@ -433,58 +357,37 @@ const App: React.FC = () => {
   }, [isPlayingPreview, togglePause, stopPreview, showMobileStart]);
 
   const handleMobileEnter = async () => {
-    // 1. Trigger Full Screen
     const docEl = document.documentElement;
 
-    // Attempt to lock orientation to portrait (if supported)
-    // @ts-ignore
-    if (screen.orientation && screen.orientation.lock) {
+    if (screen.orientation && (screen.orientation as any).lock) {
         try {
-            // @ts-ignore
-            await screen.orientation.lock('portrait');
-        } catch (e) {
-            console.log("Orientation lock not supported or denied");
-        }
+            await (screen.orientation as any).lock('portrait');
+        } catch (e) {}
     }
 
     try {
         if (docEl.requestFullscreen) {
-            // @ts-ignore
             await docEl.requestFullscreen({ navigationUI: "hide" });
         } else if ((docEl as any).webkitRequestFullscreen) {
             await (docEl as any).webkitRequestFullscreen();
-        } else if ((docEl as any).webkitEnterFullscreen) {
-             await (docEl as any).webkitEnterFullscreen();
         }
-    } catch (err) {
-        console.log("Fullscreen request denied", err);
-    }
+    } catch (err) {}
     
-    // 1.5 REQUEST WAKE LOCK (Prevent screen dimming)
     if ('wakeLock' in navigator) {
         try {
-            // @ts-ignore
-            const wakeLock = await navigator.wakeLock.request('screen');
-        } catch (err) {
-             console.log("Wake Lock failed", err);
-        }
+            await (navigator as any).wakeLock.request('screen');
+        } catch (err) {}
     }
 
-    // 2. Init Audio immediately on user interaction
     initAudio();
-    
-    // 3. Play UI Sound AND PRIME VIBRATION
     playUiSound('select');
-    triggerHaptic('heavy'); // Using new helper
-
-    // 4. Hide Overlay
+    triggerHaptic('heavy'); 
     setShowMobileStart(false);
   };
 
   const handlePauseTitleClick = () => {
       const now = Date.now();
       if (now - lastPauseTitleClickRef.current < 500) {
-          // Double Tap Detected
           setIsAutoPlay(prev => {
               const newState = !prev;
               setFeedback({ 
@@ -495,37 +398,28 @@ const App: React.FC = () => {
               return newState;
           });
           playUiSound('select');
-          triggerHaptic('medium'); // Using new helper
-          lastPauseTitleClickRef.current = 0; // Reset
+          triggerHaptic('medium'); 
+          lastPauseTitleClickRef.current = 0; 
       } else {
           lastPauseTitleClickRef.current = now;
       }
   };
 
-  // Update ref and media volume when state changes
   useEffect(() => {
       audioSettingsRef.current = audioSettings;
-      
-      // Update Gameplay Media Volume
       if (mediaRef.current) {
           mediaRef.current.volume = audioSettings.masterVolume;
       }
-
-      // Update Background Music Volume
       if (bgMusicRef.current) {
           const effectiveVolume = isBgMusicMuted ? 0 : (audioSettings.masterVolume * audioSettings.musicVolume);
           bgMusicRef.current.volume = effectiveVolume;
       }
   }, [audioSettings, isBgMusicMuted]);
 
-  // Handle Background Music Playback
   useEffect(() => {
     if (bgMusicRef.current) {
-        // Only play BGM if in Title/Menu AND NOT playing a song preview
         if ((status === GameStatus.TITLE || status === GameStatus.MENU) && !isPlayingPreview && !showMobileStart) {
-            bgMusicRef.current.play().catch(e => {
-                // Autoplay might be blocked until interaction
-            });
+            bgMusicRef.current.play().catch(e => {});
         } else {
             bgMusicRef.current.pause();
             if (status === GameStatus.PLAYING) {
@@ -535,9 +429,8 @@ const App: React.FC = () => {
     }
   }, [status, isPlayingPreview, showMobileStart]);
 
-  // Play Preview Helper
   const playPreview = (src: string) => {
-    stopPreview(); // Stop existing
+    stopPreview(); 
 
     if (!previewAudioRef.current) {
         previewAudioRef.current = new Audio();
@@ -546,7 +439,6 @@ const App: React.FC = () => {
     const audio = previewAudioRef.current;
     audio.src = src;
     
-    // Apply volume mixing: Master * Music
     const musicVol = audioSettings.musicVolume ?? 1.0;
     const targetVolume = audioSettings.masterVolume * musicVol;
     audio.volume = targetVolume;
@@ -554,19 +446,16 @@ const App: React.FC = () => {
     audio.play()
         .then(() => {
             setIsPlayingPreview(true);
-            
-            // Loop Logic: Play 15s, Fade out last 3s, Loop back to 0
-            const LOOP_LIMIT = 15; // 15 seconds
-            const FADE_START = 12; // Start fading at 12s
+            const LOOP_LIMIT = 15; 
+            const FADE_START = 12; 
 
-            audio.loop = true; // Ensure basic looping is enabled
+            audio.loop = true; 
 
             previewTimeoutRef.current = setInterval(() => {
                 if (!audio) return;
                 
                 const t = audio.currentTime;
 
-                // 1. Loop Reset
                 if (t >= LOOP_LIMIT || audio.ended) {
                     audio.currentTime = 0;
                     audio.volume = targetVolume;
@@ -574,7 +463,6 @@ const App: React.FC = () => {
                     return;
                 }
 
-                // 2. Fade Out
                 if (t >= FADE_START) {
                     const remaining = LOOP_LIMIT - t;
                     const fadeDuration = LOOP_LIMIT - FADE_START;
@@ -591,7 +479,6 @@ const App: React.FC = () => {
         .catch(err => console.warn("Preview playback failed", err));
   };
 
-  // Cleanup Preview on Unmount or Game Start
   useEffect(() => {
       if (status === GameStatus.PLAYING) {
           stopPreview();
@@ -599,7 +486,6 @@ const App: React.FC = () => {
       return () => stopPreview();
   }, [status, stopPreview]);
 
-  // Load Persistence Data
   useEffect(() => {
       const storedKeys = localStorage.getItem('djbig_key_config');
       if (storedKeys) {
@@ -634,12 +520,10 @@ const App: React.FC = () => {
       }
   }, []);
 
-  // PERSISTENCE FOR GAME SETTINGS
   useEffect(() => { localStorage.setItem('djbig_level', level.toString()); }, [level]);
   useEffect(() => { localStorage.setItem('djbig_speed', speedMod.toString()); }, [speedMod]);
   useEffect(() => { localStorage.setItem('djbig_keymode', keyMode.toString()); }, [keyMode]);
   
-  // Persist Modifiers
   useEffect(() => { localStorage.setItem('djbig_modifiers', JSON.stringify(modifiers)); }, [modifiers]);
 
   const saveKeyMappings = (newMappings: KeyMapping) => {
@@ -735,25 +619,20 @@ const App: React.FC = () => {
           osc.start(t);
           osc.stop(t + 0.1);
       } else if (type === 'scratch') {
-          // HEAVY IMPACT / SCRATCH - BOOSTED VOLUME
           const noise = ctx.createBufferSource();
           noise.buffer = getNoiseBuffer(ctx);
           const filter = ctx.createBiquadFilter();
           filter.type = 'lowpass';
           filter.frequency.setValueAtTime(1000, t);
           filter.frequency.exponentialRampToValueAtTime(100, t + 0.5);
-          
-          // Boosted gain from 0.8 to 1.5 to ensure audibility
           gain.gain.setValueAtTime(getVol(1.5), t);
           gain.gain.exponentialRampToValueAtTime(0.01, t + 0.5);
-          
           noise.connect(filter);
           filter.connect(gain);
           gain.connect(ctx.destination);
           noise.start(t);
           noise.stop(t + 0.5);
       } else {
-          // SELECT
           const noise = ctx.createBufferSource();
           noise.buffer = getNoiseBuffer(ctx);
           noise.loop = true;
@@ -774,14 +653,12 @@ const App: React.FC = () => {
       }
   };
 
-  // ASYNC ANALYSIS WRAPPER TO PREVENT STUTTER
   const performAnalysis = async (buffer: AudioBuffer) => {
       setIsAnalyzing(true);
-      // Use setTimeout to yield to main thread so UI updates to "Analyzing" first
       setTimeout(async () => {
           try {
-            // Pass START_OFFSET_MS to analysis
-            const notes = await analyzeAudioAndGenerateNotes(buffer, level, keyMode, START_OFFSET_MS);
+            // Note: Use combined offset for analysis to match gameplay timeline
+            const notes = await analyzeAudioAndGenerateNotes(buffer, level, keyMode, START_OFFSET_MS + PRE_ROLL_MS);
             setAnalyzedNotes(notes);
           } catch (error) {
             console.error("Analysis failed");
@@ -809,68 +686,37 @@ const App: React.FC = () => {
     try {
         const response = await fetch(absolutePath);
         if (!response.ok) throw new Error("Demo file not found");
-        
         const videoBlob = await response.blob();
         const videoUrl = URL.createObjectURL(videoBlob);
-        
-        // GENERATE THUMBNAIL FOR DISC
         let thumbUrl = null;
         try {
             const tempFile = new File([videoBlob], "demo_thumb_gen.mp4", { type: "video/mp4" });
             thumbUrl = await generateVideoThumbnail(tempFile);
-        } catch (e) {
-            console.warn("Failed to generate demo thumbnail", e);
-        }
-
-        setCurrentSongMetadata({
-            id: id,
-            file: new File([], id),
-            name: demoTitle,
-            thumbnailUrl: thumbUrl,
-            type: 'video'
-        });
-
+        } catch (e) {}
+        setCurrentSongMetadata({ id, file: new File([], id), name: demoTitle, thumbnailUrl: thumbUrl, type: 'video' });
         setLocalVideoSrc(videoUrl);
         setMediaType('video');
         setSoundProfile('rock');
-
         playPreview(videoUrl);
-
         const arrayBuffer = await videoBlob.arrayBuffer();
         const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
-
         audioBufferRef.current = audioBuffer;
         audioDurationRef.current = audioBuffer.duration;
-        
-        // Pass Offset
-        const notes = await analyzeAudioAndGenerateNotes(audioBuffer, level, keyMode, START_OFFSET_MS);
+        const notes = await analyzeAudioAndGenerateNotes(audioBuffer, level, keyMode, START_OFFSET_MS + PRE_ROLL_MS);
         setAnalyzedNotes(notes);
         setIsAnalyzing(false);
     } catch (e) {
-        console.warn("Demo file missing or fetch error. Using generated fallback audio.");
-        
         const audioBuf = generateRockDemo(ctx);
         audioBufferRef.current = audioBuf;
         audioDurationRef.current = audioBuf.duration;
-        
         const wavBlob = bufferToWave(audioBuf, audioBuf.length);
         const audioUrl = URL.createObjectURL(wavBlob);
-        
-        // Fallback metadata without custom thumb
-        setCurrentSongMetadata({
-            id: id,
-            file: new File([], id),
-            name: demoTitle,
-            thumbnailUrl: null,
-            type: 'audio'
-        });
-
+        setCurrentSongMetadata({ id, file: new File([], id), name: demoTitle, thumbnailUrl: null, type: 'audio' });
         setLocalVideoSrc(audioUrl);
         setMediaType('audio'); 
         setSoundProfile('rock');
         playPreview(audioUrl);
-
-        const notes = await analyzeAudioAndGenerateNotes(audioBuf, level, keyMode, START_OFFSET_MS);
+        const notes = await analyzeAudioAndGenerateNotes(audioBuf, level, keyMode, START_OFFSET_MS + PRE_ROLL_MS);
         setAnalyzedNotes(notes);
         setIsAnalyzing(false);
     }
@@ -879,37 +725,22 @@ const App: React.FC = () => {
   const handleFileSelect = async (file: File, meta?: SongMetadata) => {
     if (file) {
       initAudio();
-      
       if (localVideoSrc) URL.revokeObjectURL(localVideoSrc);
       const url = URL.createObjectURL(file);
       setLocalVideoSrc(url);
       setLocalFileName(file.name);
-      
-      if (meta) {
-          setCurrentSongMetadata(meta);
-      } else {
+      if (meta) setCurrentSongMetadata(meta);
+      else {
           const isVideo = file.type.startsWith('video') || !!file.name.match(/\.(mp4|webm|ogg|mov|m4v)$/i);
-          setCurrentSongMetadata({
-              id: `temp-${Date.now()}`,
-              file: file,
-              name: file.name,
-              thumbnailUrl: null,
-              type: isVideo ? 'video' : 'audio'
-          });
+          setCurrentSongMetadata({ id: `temp-${Date.now()}`, file, name: file.name, thumbnailUrl: null, type: isVideo ? 'video' : 'audio' });
       }
-      
       playPreview(url);
-
       const hash = file.name.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
       const profiles: ('electronic' | 'rock' | 'chiptune')[] = ['electronic', 'rock', 'chiptune'];
-      const selectedProfile = profiles[hash % profiles.length];
-      setSoundProfile(selectedProfile);
-
+      setSoundProfile(profiles[hash % profiles.length]);
       const isVideo = file.type.startsWith('video') || !!file.name.match(/\.(mp4|webm|ogg|mov|m4v)$/i);
       setMediaType(isVideo ? 'video' : 'audio');
-
       setAnalyzedNotes(null); 
-      
       try {
         setIsAnalyzing(true);
         const arrayBuffer = await file.arrayBuffer();
@@ -917,11 +748,8 @@ const App: React.FC = () => {
         const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
         audioBufferRef.current = audioBuffer; 
         audioDurationRef.current = audioBuffer.duration;
-        
         await performAnalysis(audioBuffer);
       } catch (error) {
-        console.error("Audio decode failed");
-        alert("Could not analyze audio file.");
         setIsAnalyzing(false);
       }
     }
@@ -932,18 +760,9 @@ const App: React.FC = () => {
       if (file) {
           const isVideo = file.type.startsWith('video') || !!file.name.match(/\.(mp4|webm|ogg|mov|m4v)$/i);
           let thumb: string | null = null;
-          if (isVideo) {
-             try { thumb = await generateVideoThumbnail(file); } catch (err) {}
-          }
-          const newSong: SongMetadata = {
-              id: `single-${Date.now()}`,
-              file: file,
-              name: file.name,
-              thumbnailUrl: thumb,
-              type: isVideo ? 'video' : 'audio'
-          };
+          if (isVideo) { try { thumb = await generateVideoThumbnail(file); } catch (err) {} }
+          const newSong: SongMetadata = { id: `single-${Date.now()}`, file, name: file.name, thumbnailUrl: thumb, type: isVideo ? 'video' : 'audio' };
           setSongList(prev => [...prev, newSong]); 
-          // SAVE TO INDEXED DB
           saveSongToDB(newSong).catch(e => console.error("Save failed", e)); 
           handleFileSelect(file, newSong);
       }
@@ -962,18 +781,9 @@ const App: React.FC = () => {
           if (isValid) {
               const isVideo = lowerName.endsWith('.mp4') || lowerName.endsWith('.m4v') || lowerName.endsWith('.webm') || lowerName.endsWith('.mov');
               let thumb: string | null = null;
-              if (isVideo) {
-                 try { thumb = await generateVideoThumbnail(file); } catch (err) {}
-              }
-              const song: SongMetadata = {
-                  id: `${Date.now()}-${i}-${file.name}`,
-                  file: file,
-                  name: file.name,
-                  thumbnailUrl: thumb,
-                  type: isVideo ? 'video' : 'audio'
-              };
+              if (isVideo) { try { thumb = await generateVideoThumbnail(file); } catch (err) {} }
+              const song: SongMetadata = { id: `${Date.now()}-${i}-${file.name}`, file, name: file.name, thumbnailUrl: thumb, type: isVideo ? 'video' : 'audio' };
               loadedSongs.push(song);
-              // SAVE EACH SONG TO DB
               saveSongToDB(song).catch(e => console.error("Save failed", e));
           }
       }
@@ -982,15 +792,10 @@ const App: React.FC = () => {
   };
 
   const handleDeleteSong = async (e: React.MouseEvent, songId: string) => {
-      e.stopPropagation(); // Prevent selecting the song
+      e.stopPropagation(); 
       if (confirm("Delete this track?")) {
-          // Update State
           setSongList(prev => prev.filter(s => s.id !== songId));
-          
-          // Update DB
           await deleteSongFromDB(songId);
-
-          // If current song is deleted
           if (currentSongMetadata?.id === songId) {
                if (localVideoSrc) URL.revokeObjectURL(localVideoSrc);
                setLocalVideoSrc("");
@@ -1002,46 +807,22 @@ const App: React.FC = () => {
   };
 
   const handleClearPlaylist = async () => {
-      // 1. Force Clear State IMMEDIATELY
       setSongList([]);
       setLocalFileName("");
       setAnalyzedNotes(null);
       setCurrentSongMetadata(null);
-      
-      // Stop Audio
       stopPreview();
-      
-      if (localVideoSrc) {
-           try { URL.revokeObjectURL(localVideoSrc); } catch(e) {}
-      }
+      if (localVideoSrc) { try { URL.revokeObjectURL(localVideoSrc); } catch(e) {} }
       setLocalVideoSrc("");
-
-      if (mediaRef.current) {
-          try {
-              mediaRef.current.pause();
-              mediaRef.current.src = "";
-          } catch(e) {}
-      }
-      
-      try {
-          playUiSound('select');
-          // 2. Clear DB background
-          await clearAllSongsFromDB();
-      } catch (e) {
-          console.error("Clear playlist error", e);
-      }
+      if (mediaRef.current) { try { mediaRef.current.pause(); mediaRef.current.src = ""; } catch(e) {} }
+      try { playUiSound('select'); await clearAllSongsFromDB(); } catch (e) {}
   };
 
-  // Re-analyze when level/key changes
   useEffect(() => {
-    // Clear notes immediately to prevent playing with wrong chart
     setAnalyzedNotes(null);
-    
     if (audioBufferRef.current && !isAnalyzing) {
        const timeoutId = setTimeout(() => {
-           if (audioBufferRef.current) {
-               performAnalysis(audioBufferRef.current);
-           }
+           if (audioBufferRef.current) performAnalysis(audioBufferRef.current);
        }, 100);
        return () => clearTimeout(timeoutId);
     }
@@ -1051,18 +832,9 @@ const App: React.FC = () => {
     if (!audioCtxRef.current) return;
     const ctx = audioCtxRef.current;
     const t = ctx.currentTime;
-    
-    // 1. UI SOUNDS
-    if (laneIndex === 'hover') {
-          playUiSound('hover'); return;
-    } 
-    if (laneIndex === 'select') {
-          playUiSound('select'); return;
-    }
-
-    // 2. GAMEPLAY SOUNDS: SOFT DRUM KIT (Kick, Tom, Hat) - VOLUME REDUCED 70%
+    if (laneIndex === 'hover') { playUiSound('hover'); return; } 
+    if (laneIndex === 'select') { playUiSound('select'); return; }
     if (typeof laneIndex === 'number') {
-        // Determine Instrument based on lane
         let type = 'tom';
         if (keyMode === 7) {
             if (laneIndex === 3) type = 'kick';
@@ -1076,67 +848,49 @@ const App: React.FC = () => {
             if (laneIndex === 1 || laneIndex === 2) type = 'kick';
             else type = 'hat';
         }
-
         const gain = ctx.createGain();
         gain.connect(ctx.destination);
-
         if (type === 'kick') {
-            // SOFT KICK / LOW TOM
             const osc = ctx.createOscillator();
             osc.type = 'sine';
             osc.frequency.setValueAtTime(80, t);
             osc.frequency.exponentialRampToValueAtTime(30, t + 0.15);
-            
-            // Soft Attack/Decay - VOLUME 0.12 (30% of 0.4)
             gain.gain.setValueAtTime(getVol(0.12), t); 
             gain.gain.exponentialRampToValueAtTime(0.01, t + 0.15);
-            
             osc.connect(gain);
             osc.start(t);
             osc.stop(t + 0.15);
         } else if (type === 'hat') {
-            // SOFT HAT (Closed Tsk)
             const noise = ctx.createBufferSource();
             noise.buffer = getNoiseBuffer(ctx);
-            
             const filter = ctx.createBiquadFilter();
             filter.type = 'highpass';
             filter.frequency.setValueAtTime(6000, t); 
-            
-            // Very soft - VOLUME 0.045 (30% of 0.15)
             gain.gain.setValueAtTime(getVol(0.045), t); 
             gain.gain.exponentialRampToValueAtTime(0.01, t + 0.05);
-            
             noise.connect(filter);
             filter.connect(gain);
             noise.start(t);
             noise.stop(t + 0.05);
         } else {
-            // SOFT TOM / MUFFLED SNARE
             const osc = ctx.createOscillator();
             osc.type = 'triangle';
             osc.frequency.setValueAtTime(120, t);
             osc.frequency.linearRampToValueAtTime(60, t + 0.1);
-            
             const noise = ctx.createBufferSource();
             noise.buffer = getNoiseBuffer(ctx);
             const noiseFilter = ctx.createBiquadFilter();
             noiseFilter.type = 'lowpass';
             noiseFilter.frequency.value = 800;
-            
             const noiseGain = ctx.createGain();
             noiseGain.gain.setValueAtTime(0.1, t);
             noiseGain.gain.exponentialRampToValueAtTime(0.01, t + 0.05);
-            
-            // Overall Volume - VOLUME 0.075 (30% of 0.25)
             gain.gain.setValueAtTime(getVol(0.075), t); 
             gain.gain.exponentialRampToValueAtTime(0.01, t + 0.15);
-            
             osc.connect(gain);
             noise.connect(noiseFilter);
             noiseFilter.connect(noiseGain);
             noiseGain.connect(gain);
-            
             osc.start(t);
             osc.stop(t + 0.15);
             noise.start(t);
@@ -1149,17 +903,12 @@ const App: React.FC = () => {
     if (!audioCtxRef.current) return;
     const ctx = audioCtxRef.current;
     const t = ctx.currentTime;
-    
-    // Impact Sound
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
-    
     osc.frequency.setValueAtTime(50, t);
     osc.frequency.exponentialRampToValueAtTime(10, t + 2.0);
-    
     gain.gain.setValueAtTime(getVol(1.0), t);
     gain.gain.exponentialRampToValueAtTime(0.01, t + 2.0);
-    
     osc.connect(gain);
     gain.connect(ctx.destination);
     osc.start(t);
@@ -1172,25 +921,16 @@ const App: React.FC = () => {
       playOutroSound();
        if (mediaRef.current) mediaRef.current.pause();
        if (bgVideoRef.current) bgVideoRef.current.pause(); 
-      if (!isAutoPlay) {
-          checkUnlocks(score, maxCombo, perfectCount);
-      }
+      if (!isAutoPlay) checkUnlocks(score, maxCombo, perfectCount);
       setTimeout(() => setStatus(GameStatus.FINISHED), 3000);
-  }, [score, maxCombo, perfectCount, isAutoPlay, playerStats]);
+  }, [score, maxCombo, perfectCount, isAutoPlay, level, speedMod]);
 
-  // UPDATE RANK HELPER
   const updateRank = useCallback(() => {
-    // Weighted Calculation: Perfect=100%, Good=50%, Miss=0%
     const totalHits = perfectCount + goodCount + missCount;
-    if (totalHits === 0) {
-        setCurrentRank('SSS');
-        return;
-    }
-    
+    if (totalHits === 0) { setCurrentRank('SSS'); return; }
     const weightedScore = (perfectCount * 100) + (goodCount * 50);
     const maxPotential = totalHits * 100;
     const accuracy = (weightedScore / maxPotential) * 100;
-
     if (accuracy >= 99) setCurrentRank('SSS');
     else if (accuracy >= 98) setCurrentRank('SS');
     else if (accuracy >= 95) setCurrentRank('S');
@@ -1198,108 +938,72 @@ const App: React.FC = () => {
     else if (accuracy >= 80) setCurrentRank('B');
     else if (accuracy >= 70) setCurrentRank('C');
     else setCurrentRank('D');
-
   }, [perfectCount, goodCount, missCount]);
 
-  useEffect(() => {
-      updateRank();
-  }, [perfectCount, goodCount, missCount, updateRank]);
+  useEffect(() => { updateRank(); }, [perfectCount, goodCount, missCount, updateRank]);
 
-  // CORE GAME LOGIC
   const triggerLane = useCallback((laneIndex: number) => {
     if (status !== GameStatus.PLAYING || isAutoPlay) return; 
-    
-    // 1. Game Logic (Fast Ref)
     if (activeKeysRef.current[laneIndex]) return;
     activeKeysRef.current[laneIndex] = true;
-
-    // 2. Visual Update (Forces Re-render immediately)
     setActiveLanesState(prev => {
         const next = [...prev];
         next[laneIndex] = true;
         return next;
     });
-
     playHitSound(laneIndex);
-
-    // HAPTIC FEEDBACK FOR TOUCH (Mobile App Vibrate Fix)
-    triggerHaptic('light'); // Using new helper
-
-    // TIME SYNC FIX (UPDATED FOR START OFFSET)
-    let elapsed = 0;
-    if (mediaRef.current && !mediaRef.current.paused) {
-        elapsed = mediaRef.current.currentTime * 1000 + START_OFFSET_MS;
-    } else {
-        const now = performance.now();
-        elapsed = now - startTimeRef.current - totalPauseDurationRef.current;
-    }
-
-    const adjustedTime = elapsed - audioSettingsRef.current.audioOffset;
+    triggerHaptic('light'); 
     
+    // SYNC FIX: Consistent adjustedTime calculation
+    let elapsed = 0;
+    const now = performance.now();
+    const timeSinceStart = now - startTimeRef.current - totalPauseDurationRef.current;
+    
+    if (timeSinceStart < START_OFFSET_MS) {
+        elapsed = timeSinceStart + PRE_ROLL_MS; // Consistent with update loop
+    } else {
+        if (mediaRef.current && !mediaRef.current.paused) {
+            elapsed = (mediaRef.current.currentTime * 1000) + START_OFFSET_MS + PRE_ROLL_MS;
+        } else {
+            elapsed = timeSinceStart + PRE_ROLL_MS;
+        }
+    }
+    
+    const adjustedTime = elapsed - audioSettingsRef.current.audioOffset;
     const notesInLane = notesRef.current.filter(n => n.laneIndex === laneIndex && !n.hit && !n.missed);
     notesInLane.sort((a, b) => Math.abs(a.timestamp - adjustedTime) - Math.abs(b.timestamp - adjustedTime));
-    
     const targetNote = notesInLane[0];
-
     if (targetNote) {
         const timeDelta = Math.abs(targetNote.timestamp - adjustedTime);
         const PERFECT_WINDOW = 50;
         const GOOD_WINDOW = 120;
         const BAD_WINDOW = 200;
-
         let hitType: ScoreRating | null = null;
-
         if (timeDelta < PERFECT_WINDOW) hitType = ScoreRating.PERFECT;
         else if (timeDelta < GOOD_WINDOW) hitType = ScoreRating.GOOD;
         else if (timeDelta < BAD_WINDOW) hitType = ScoreRating.BAD;
-
         if (hitType !== null) {
             targetNote.hit = true;
-            
-            // --- HOLD NOTE LOGIC START ---
-            if (targetNote.isHold) {
-                targetNote.holding = true;
-            }
-            // --- HOLD NOTE LOGIC END ---
-            
-            const newEffect: HitEffectData = {
-                id: Date.now() + Math.random(),
-                laneIndex: laneIndex,
-                rating: hitType,
-                timestamp: performance.now()
-            };
-            setHitEffects(prev => [...prev, newEffect]);
-            
-            // OVERDRIVE MULTIPLIER
+            if (targetNote.isHold) targetNote.holding = true;
+            setHitEffects(prev => [...prev, { id: Date.now() + Math.random(), laneIndex, rating: hitType!, timestamp: performance.now() }]);
             const multiplier = isOverdrive ? 2 : 1;
-
             if (hitType === ScoreRating.PERFECT) {
                 setScore(s => s + (100 * multiplier) + (combo > 10 ? 10 : 0));
                 setPerfectCount(c => c + 1);
                 setHealth(h => Math.min(100, h + 0.5));
                 setFeedback({ text: isOverdrive ? "PERFECT x2" : "PERFECT", color: isOverdrive ? "text-amber-300" : "text-amber-100", id: Date.now() });
-                
-                // OVERDRIVE BUILD UP
-                if (!isOverdrive) {
-                    setOverdrive(o => Math.min(100, o + 2.5));
-                }
-
+                if (!isOverdrive) setOverdrive(o => Math.min(100, o + 2.5));
             } else if (hitType === ScoreRating.GOOD) {
                 setScore(s => s + (50 * multiplier));
                 setGoodCount(c => c + 1);
                 setHealth(h => Math.min(100, h + 0.1));
                 setFeedback({ text: isOverdrive ? "GOOD x2" : "GOOD", color: "text-green-400", id: Date.now() });
-                
-                if (!isOverdrive) {
-                    setOverdrive(o => Math.min(100, o + 1.0));
-                }
+                if (!isOverdrive) setOverdrive(o => Math.min(100, o + 1.0));
             } else {
                 setScore(s => s + (10 * multiplier));
                 setFeedback({ text: "BAD", color: "text-yellow-400", id: Date.now() });
-                // Penalty to overdrive
                 if (!isOverdrive) setOverdrive(o => Math.max(0, o - 5));
             }
-
             setCombo(c => {
                 const newC = c + 1;
                 setMaxCombo(prev => Math.max(prev, newC));
@@ -1307,7 +1011,6 @@ const App: React.FC = () => {
             });
         }
     } else {
-        // Misfire penalty to overdrive
         if (!isOverdrive) setOverdrive(o => Math.max(0, o - 2));
     }
   }, [status, isAutoPlay, combo, maxCombo, soundProfile, speedMod, triggerHaptic, isOverdrive]);
@@ -1319,36 +1022,31 @@ const App: React.FC = () => {
         next[laneIndex] = false;
         return next;
     });
-    
-    // --- HOLD NOTE RELEASE LOGIC ---
     if (statusRef.current === GameStatus.PLAYING && !isAutoPlay) {
-         // Find active hold note in this lane
          const holdingNote = notesRef.current.find(n => n.laneIndex === laneIndex && n.holding && !n.holdCompleted);
          if (holdingNote) {
              holdingNote.holding = false;
-             
-             // Time check
              let elapsed = 0;
-             if (mediaRef.current && !mediaRef.current.paused) {
-                elapsed = mediaRef.current.currentTime * 1000 + START_OFFSET_MS;
+             const now = performance.now();
+             const timeSinceStart = now - startTimeRef.current - totalPauseDurationRef.current;
+             if (timeSinceStart < START_OFFSET_MS) {
+                 elapsed = timeSinceStart + PRE_ROLL_MS;
              } else {
-                const now = performance.now();
-                elapsed = now - startTimeRef.current - totalPauseDurationRef.current;
+                 if (mediaRef.current && !mediaRef.current.paused) {
+                     elapsed = (mediaRef.current.currentTime * 1000) + START_OFFSET_MS + PRE_ROLL_MS;
+                 } else {
+                     elapsed = timeSinceStart + PRE_ROLL_MS;
+                 }
              }
              const adjustedTime = elapsed - audioSettingsRef.current.audioOffset;
              const endTime = holdingNote.timestamp + holdingNote.duration;
-             
-             // If released too early (more than 200ms before end)
              if (adjustedTime < endTime - 200) {
                  holdingNote.missed = true;
-                 holdingNote.holdCompleted = true; // Stop processing
-                 
+                 holdingNote.holdCompleted = true; 
                  setCombo(0);
                  setMissCount(c => c + 1);
                  setHealth(h => Math.max(0, h - 5));
-                 setFeedback({ text: "MISS", color: "text-red-500", id: Date.now() }); // Changed from DROP to MISS
-                 setIsShaking(true);
-                 setTimeout(() => setIsShaking(false), 200);
+                 setFeedback({ text: "MISS", color: "text-red-500", id: Date.now() });
              }
          }
     }
@@ -1357,36 +1055,23 @@ const App: React.FC = () => {
   const handleTouch = useCallback((e: React.TouchEvent) => {
     if (e.cancelable) e.preventDefault();
     if (!laneContainerRef.current) return;
-    
     const rect = laneContainerRef.current.getBoundingClientRect();
     const laneWidth = rect.width / keyMode;
     const currentTouchLanes = new Set<number>();
-
     for (let i = 0; i < e.touches.length; i++) {
         const touch = e.touches[i];
         const x = touch.clientX - rect.left;
         const y = touch.clientY - rect.top;
         if (x >= 0 && x <= rect.width && y >= 0 && y <= rect.height) {
             const laneIndex = Math.floor(x / laneWidth);
-            if (laneIndex >= 0 && laneIndex < keyMode) {
-                currentTouchLanes.add(laneIndex);
-            }
+            if (laneIndex >= 0 && laneIndex < keyMode) currentTouchLanes.add(laneIndex);
         }
     }
-
-    currentTouchLanes.forEach(laneIdx => {
-        if (!touchedLanesRef.current.has(laneIdx)) triggerLane(laneIdx);
-    });
-
-    touchedLanesRef.current.forEach(laneIdx => {
-        if (!currentTouchLanes.has(laneIdx)) releaseLane(laneIdx);
-    });
-
+    currentTouchLanes.forEach(laneIdx => { if (!touchedLanesRef.current.has(laneIdx)) triggerLane(laneIdx); });
+    touchedLanesRef.current.forEach(laneIdx => { if (!currentTouchLanes.has(laneIdx)) releaseLane(laneIdx); });
     touchedLanesRef.current = currentTouchLanes;
-
   }, [triggerLane, releaseLane, keyMode]);
 
-  // Game Loop
   const update = useCallback(() => {
     if (statusRef.current !== GameStatus.PLAYING) return;
 
@@ -1396,22 +1081,9 @@ const App: React.FC = () => {
          bgRef.current.style.transform = `scale(${scale})`;
     }
 
-    // OVERDRIVE LOGIC
     if (overdrive >= 100 && !isOverdrive) {
         setIsOverdrive(true);
-        if (audioCtxRef.current && overdriveBufferRef.current) {
-             const ctx = audioCtxRef.current;
-             const source = ctx.createBufferSource();
-             source.buffer = overdriveBufferRef.current;
-             const gainNode = ctx.createGain();
-             const vol = audioSettingsRef.current.masterVolume * audioSettingsRef.current.sfxVolume;
-             gainNode.gain.setValueAtTime(vol, ctx.currentTime);
-             source.connect(gainNode);
-             gainNode.connect(ctx.destination);
-             source.start(0);
-        } else {
-             playUiSound('scratch');
-        }
+        playUiSound('scratch'); 
         triggerHaptic('heavy');
         setFeedback({ text: t.LIMIT_BREAK, color: "text-amber-400", id: Date.now() });
     }
@@ -1419,54 +1091,63 @@ const App: React.FC = () => {
     if (isOverdrive) {
         setOverdrive(prev => {
             const next = prev - 0.15;
-            if (next <= 0) {
-                setIsOverdrive(false);
-                return 0;
-            }
+            if (next <= 0) { setIsOverdrive(false); return 0; }
             return next;
         });
     }
 
-    // --- TIME SYNC ---
     let elapsed = 0;
     const now = performance.now();
     const timeSinceStart = now - startTimeRef.current - totalPauseDurationRef.current;
 
+    // SYNC FIX: Master clock synchronization logic
     if (timeSinceStart < START_OFFSET_MS) {
-        elapsed = timeSinceStart;
+        // Still in the initial countdown phase - shift clock forward by PRE_ROLL to see notes
+        elapsed = timeSinceStart + PRE_ROLL_MS;
         if (mediaRef.current && !mediaRef.current.paused) mediaRef.current.pause(); 
     } else {
+        // Main playing phase
         if (mediaRef.current) {
-             // COMMAND TO PLAY BOTH VIDEO AND AUDIO AFTER OFFSET
-             if (mediaRef.current.paused && !mediaRef.current.ended) {
-                 mediaRef.current.play().catch(() => {});
-             }
-             // For sync, we rely on the media element's clock
-             elapsed = mediaRef.current.currentTime * 1000 + START_OFFSET_MS;
+             if (mediaRef.current.paused && !mediaRef.current.ended) mediaRef.current.play().catch(() => {});
+             elapsed = (mediaRef.current.currentTime * 1000) + START_OFFSET_MS + PRE_ROLL_MS;
         } else {
-             elapsed = timeSinceStart;
+            elapsed = timeSinceStart + PRE_ROLL_MS;
         }
     }
     
     const adjustedTime = elapsed - audioSettingsRef.current.audioOffset;
-    
     if (progressBarRef.current && audioDurationRef.current > 0) {
         const durationMs = audioDurationRef.current * 1000;
-        const progress = Math.min(100, ((elapsed - START_OFFSET_MS) / durationMs) * 100);
+        const progress = Math.min(100, ((elapsed - (START_OFFSET_MS + PRE_ROLL_MS)) / durationMs) * 100);
         progressBarRef.current.style.width = `${Math.max(0, progress)}%`;
     }
 
-    if (audioDurationRef.current > 0 && elapsed > audioDurationRef.current * 1000 + START_OFFSET_MS + 1000) {
-        triggerOutro();
-        return;
+    if (audioDurationRef.current > 0 && elapsed > (audioDurationRef.current * 1000) + START_OFFSET_MS + PRE_ROLL_MS + 1000) {
+        triggerOutro(); return;
     }
     
     const currentFallSpeed = BASE_FALL_SPEED_MS / speedMod;
     const hitLineY = 90;
+    const visibleWindow = currentFallSpeed * 2.5; 
 
-    // Optimized Note Processing
+    const visibleNotesList: NoteType[] = [];
     notesRef.current.forEach(note => {
       const timeDelta = adjustedTime - note.timestamp; 
+      
+      if (timeDelta < -visibleWindow || timeDelta > 600) {
+          if (!note.hit && !note.missed && timeDelta > 250) {
+              note.missed = true;
+              setMissCount(c => c + 1);
+              setCombo(0);
+              setHealth(h => Math.max(0, h - 4));
+              setFeedback({ text: "MISS", color: "text-red-500", id: Date.now() });
+              triggerHaptic('heavy'); 
+              if (isOverdrive) setIsOverdrive(false);
+              setOverdrive(o => Math.max(0, o - 20));
+          }
+          return;
+      }
+
       note.y = hitLineY + ((timeDelta / currentFallSpeed) * hitLineY);
 
       if (note.isHold && note.holding && !note.holdCompleted) {
@@ -1490,18 +1171,14 @@ const App: React.FC = () => {
             note.hit = true;
             if (note.isHold) note.holding = true;
             setActiveLanesState(prev => { const n = [...prev]; n[note.laneIndex] = true; return n; });
-            if (!note.isHold) {
-                setTimeout(() => { setActiveLanesState(prev => { const n = [...prev]; n[note.laneIndex] = false; return n; }); }, 50);
-            }
+            if (!note.isHold) setTimeout(() => { setActiveLanesState(prev => { const n = [...prev]; n[note.laneIndex] = false; return n; }); }, 50);
             playHitSound(note.laneIndex);
-            if (!note.isHold) {
-                setHitEffects(prev => [...prev, { id: Date.now() + Math.random(), laneIndex: note.laneIndex, rating: ScoreRating.PERFECT, timestamp: performance.now() }]);
-            }
+            if (!note.isHold) setHitEffects(prev => [...prev, { id: Date.now() + Math.random(), laneIndex: note.laneIndex, rating: ScoreRating.PERFECT, timestamp: performance.now() }]);
             setFeedback({ text: t.AUTO_PILOT, color: "text-fuchsia-500", id: Date.now() });
             setCombo(c => {
-                    const newC = c + 1;
-                    setMaxCombo(prev => Math.max(prev, newC));
-                    return newC;
+                const newC = c + 1;
+                setMaxCombo(prev => Math.max(prev, newC));
+                return newC;
             });
             if (!isOverdrive) setOverdrive(o => Math.min(100, o + 0.5));
       }
@@ -1519,35 +1196,37 @@ const App: React.FC = () => {
         setCombo(0);
         setHealth(h => Math.max(0, h - 4));
         setFeedback({ text: "MISS", color: "text-red-500", id: Date.now() });
-        setIsShaking(true);
         triggerHaptic('heavy'); 
-        setTimeout(() => setIsShaking(false), 200);
         if (isOverdrive) setIsOverdrive(false);
         setOverdrive(o => Math.max(0, o - 20));
       }
+
+      // ปรับเงื่อนไขการแสดงผลเพื่อให้เห็นโน้ตที่หล่นมาจากด้านบนได้ไกลขึ้น
+      if (note.y > -250 && note.y < 120 && !note.hit) {
+          if (note.isHold && !note.holdCompleted && !note.missed) {
+              const lengthPerc = (note.duration / currentFallSpeed) * 90;
+              visibleNotesList.push({ ...note, length: lengthPerc } as any);
+          } else if (!note.isHold) {
+              visibleNotesList.push({ ...note });
+          }
+      } else if (note.isHold && note.holding && !note.holdCompleted) {
+          const lengthPerc = (note.duration / currentFallSpeed) * 90;
+          visibleNotesList.push({ ...note, length: lengthPerc } as any);
+      }
     });
 
-    const visibleNotesList = notesRef.current.filter(n => {
-        if (n.isHold && !n.holdCompleted && !n.missed) return true;
-        return n.y > -50 && n.y < 120 && !n.hit;
-    }).map(n => {
-        if (n.isHold) {
-             const lengthPerc = (n.duration / currentFallSpeed) * 90;
-             return { ...n, length: lengthPerc };
-        }
-        return n;
-    });
-    
     setRenderNotes(visibleNotesList); 
-
-    if (health <= 0) {
-      triggerOutro();
-      return;
-    }
+    if (health <= 0) { triggerOutro(); return; }
     
-    setHitEffects(prev => prev.filter(e => Date.now() - e.id < 500));
+    if (hitEffects.length > 0) {
+        setHitEffects(prev => {
+            const nowTime = Date.now();
+            const next = prev.filter(e => nowTime - e.id < 500);
+            return next.length === prev.length ? prev : next;
+        });
+    }
     frameRef.current = requestAnimationFrame(update);
-  }, [health, speedMod, isAutoPlay, combo, maxCombo, triggerOutro, soundProfile, t, triggerHaptic, isOverdrive, overdrive]);
+  }, [health, speedMod, isAutoPlay, combo, maxCombo, triggerOutro, soundProfile, t, triggerHaptic, isOverdrive, overdrive, hitEffects.length]);
 
   useEffect(() => {
     if (status === GameStatus.PLAYING) {
@@ -1557,7 +1236,6 @@ const App: React.FC = () => {
     return () => cancelAnimationFrame(frameRef.current);
   }, [status, update]);
 
-  // ... (Input Handling)
   const handleExit = () => { try { window.close(); } catch (e) {} window.location.href = "about:blank"; };
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if ((showKeyConfig) && e.key === 'Escape') { setShowKeyConfig(false); return; }
@@ -1598,53 +1276,15 @@ const App: React.FC = () => {
     playUiSound('select');
     stopPreview(); 
     setShowMobileSetup(false);
-
     if (!localVideoSrc) { alert("Please select a track first."); return; }
     if (!analyzedNotes) { alert("Please wait for analysis to complete."); return; }
-
-    // Pre-buffer media to avoid lag at start
-    if (mediaRef.current) {
-        mediaRef.current.currentTime = 0;
-        mediaRef.current.pause();
-    }
-
-    setStartCountdown(3);
-    let count = 3;
-    const timer = setInterval(() => {
-        count--;
-        if (count > 0) {
-            setStartCountdown(count);
-        } else {
-            clearInterval(timer);
-            setStartCountdown(null);
-            startGame(false);
-        }
-    }, 1000);
-  }
-
-  const startGame = (useBufferPlayback: boolean, notesOverride?: NoteType[]) => {
-    let notesToUse = notesOverride || analyzedNotes;
-    if (notesToUse && modifiers.mirror) {
-        notesToUse = notesToUse.map(n => ({ ...n, laneIndex: (keyMode - 1) - Number(n.laneIndex) }));
-    }
-
-    if (notesToUse) {
-        notesRef.current = notesToUse.map(n => ({
-            id: Number(n.id),
-            laneIndex: Number(n.laneIndex),
-            timestamp: Number(n.timestamp),
-            y: Number(n.y),
-            hit: Boolean(n.hit),
-            missed: Boolean(n.missed),
-            duration: Number(n.duration) || 0,
-            isHold: Boolean(n.isHold),
-            holding: false,
-            holdCompleted: false
+    
+    if (analyzedNotes) {
+        notesRef.current = analyzedNotes.map(n => ({
+            id: Number(n.id), laneIndex: Number(n.laneIndex), timestamp: Number(n.timestamp), y: -150, hit: false, missed: false,
+            duration: Number(n.duration) || 0, isHold: Boolean(n.isHold), holding: false, holdCompleted: false
         }));
-    } else {
-        notesRef.current = [];
     }
-
     activeKeysRef.current = new Array(keyMode).fill(false);
     setActiveLanesState(new Array(keyMode).fill(false));
     setScore(0); setCombo(0); setMaxCombo(0); setHealth(100);
@@ -1652,32 +1292,68 @@ const App: React.FC = () => {
     setMissCount(0); setPerfectCount(0); setGoodCount(0);
     setHitEffects([]); setIsAutoPlay(false);
     setFeedback(null); 
-    setIsShaking(false);
     totalPauseDurationRef.current = 0;
     setCurrentRank('SSS');
     
+    if (mediaRef.current) { mediaRef.current.pause(); mediaRef.current.currentTime = 0; }
+    
+    // เริ่มโหมดเล่นทันทีเพื่อให้ Update Loop ทำงานและแสดงโน้ตหล่นในช่วงนับถอยหลัง
     setStatus(GameStatus.PLAYING);
     startTimeRef.current = performance.now();
+    
+    setStartCountdown(3);
+    let count = 3;
+    const timer = setInterval(() => {
+        count--;
+        if (count > 0) setStartCountdown(count);
+        else { clearInterval(timer); setStartCountdown(null); }
+    }, 1000);
+  }
 
-    if (mediaRef.current) {
-        mediaRef.current.pause();
-        mediaRef.current.currentTime = 0;
-    }
+  const startGame = (useBufferPlayback: boolean, notesOverride?: NoteType[]) => {
+    let notesToUse = notesOverride || analyzedNotes;
+    if (notesToUse && modifiers.mirror) notesToUse = notesToUse.map(n => ({ ...n, laneIndex: (keyMode - 1) - Number(n.laneIndex) }));
+    if (notesToUse) {
+        notesRef.current = notesToUse.map(n => ({
+            id: Number(n.id), laneIndex: Number(n.laneIndex), timestamp: Number(n.timestamp), y: -150, hit: Boolean(n.hit), missed: Boolean(n.missed),
+            duration: Number(n.duration) || 0, isHold: Boolean(n.isHold), holding: false, holdCompleted: false
+        }));
+    } else notesRef.current = [];
+    activeKeysRef.current = new Array(keyMode).fill(false);
+    setActiveLanesState(new Array(keyMode).fill(false));
+    setScore(0); setCombo(0); setMaxCombo(0); setHealth(100);
+    setOverdrive(0); setIsOverdrive(false);
+    setMissCount(0); setPerfectCount(0); setGoodCount(0);
+    setHitEffects([]); setIsAutoPlay(false);
+    setFeedback(null); 
+    totalPauseDurationRef.current = 0;
+    setCurrentRank('SSS');
+    setStatus(GameStatus.PLAYING);
+    startTimeRef.current = performance.now();
+    if (mediaRef.current) { mediaRef.current.pause(); mediaRef.current.currentTime = 0; }
   };
 
-  const quitGame = () => { playUiSound('select'); setStatus(GameStatus.MENU); setHitEffects([]); };
+  const quitGame = () => {
+    playUiSound('select');
+    setStatus(GameStatus.TITLE);
+    setHitEffects([]);
+    stopPreview();
+    if (mediaRef.current) { mediaRef.current.pause(); mediaRef.current.src = ""; }
+    if (bgVideoRef.current) bgVideoRef.current.pause();
+  };
+  
   const DIFFICULTY_OPTIONS = [ { label: t.EASY, value: 7, color: 'bg-green-500 shadow-green-500/50' }, { label: t.NORMAL, value: 8, color: 'bg-yellow-500 shadow-yellow-500/50' }, { label: t.HARD, value: 9, color: 'bg-orange-500 shadow-orange-500/50' }, { label: t.EXPERT, value: 10, color: 'bg-red-500 shadow-red-500/50' } ];
   
   const SettingsPanelContent = () => (
       <div className="flex flex-col space-y-4">
          <div className="bg-slate-900/80 border border-slate-700 p-4 rounded-lg backdrop-blur-md shadow-lg flex flex-col space-y-2">
-             <div><div className={`text-xs font-bold text-slate-500 mb-2 tracking-widest ${fontClass}`}>{t.LEVEL}</div><div className="flex gap-2 h-10">{DIFFICULTY_OPTIONS.map((diff) => { const active = level === diff.value; return ( <button key={diff.value} onClick={() => { setLevel(diff.value); playUiSound('select'); }} className={`flex-1 flex flex-col justify-end p-1 rounded transition-all relative overflow-hidden group border ${active ? 'border-white/50' : 'border-transparent'}`}><div className={`absolute inset-0 opacity-20 ${diff.color}`}></div><div className={`w-full transition-all duration-300 ${active ? 'h-full opacity-100' : 'h-1/3 opacity-40 group-hover:h-1/2'} ${diff.color}`}></div><span className={`relative z-10 text-[10px] md:text-xs font-bold text-center mt-1 truncate ${active ? 'text-white' : 'text-slate-500'} ${fontClass}`}>{diff.label}</span></button> ) })}</div></div>
-             <div><div className={`text-xs font-bold text-slate-500 mb-2 tracking-widest ${fontClass}`}>{t.KEY_MODE_LABEL || "KEY CONFIGURATION"}</div><div className="flex gap-2 h-10">{[4, 5, 7].map((k) => { const active = keyMode === k; return ( <button key={k} onClick={()=>{setKeyMode(k as any);playUiSound('select')}} className={`flex-1 relative overflow-hidden rounded border transition-all duration-200 flex items-center justify-center ${active ? 'bg-cyan-900/50 border-cyan-400 shadow-[0_0_10px_rgba(34,211,238,0.3)]' : 'bg-slate-800 border-slate-700 hover:border-cyan-600'}`}><div className={`text-xl font-black italic ${active ? 'text-white' : 'text-slate-500 group-hover:text-cyan-200'}`}>{k}Key</div><div className={`text-[10px] ml-1 font-bold ${active ? 'text-cyan-400' : 'text-slate-600'}`}>MODE</div></button> ); })}</div></div>
-             <div><div className={`text-xs font-bold text-slate-500 mb-1 ${fontClass}`}>{t.SCROLL_SPEED}</div><div className="flex items-center bg-black rounded border border-slate-700 p-1"><button onClick={()=>{setSpeedMod(Math.max(1,speedMod-0.5));playUiSound('select')}} className="w-10 h-8 bg-slate-800 text-slate-400 hover:text-white font-bold rounded">-</button><div className="flex-1 text-center font-mono text-cyan-400 font-bold text-lg">{speedMod.toFixed(1)}</div><button onClick={()=>{setSpeedMod(Math.min(10,speedMod+0.5));playUiSound('select')}} className="w-10 h-8 bg-slate-800 text-slate-400 hover:text-white font-bold rounded">+</button></div></div>
-             <div><div className={`text-xs font-bold text-slate-500 mb-1 tracking-widest ${fontClass}`}>{t.MODIFIERS}</div><div className="flex gap-2 h-8">
-                    <button onClick={() => { setModifiers(m => ({...m, mirror: !m.mirror})); playUiSound('select'); }} className={`flex-1 rounded border text-[10px] font-bold transition-all ${modifiers.mirror ? 'bg-cyan-600 border-cyan-400 text-white' : 'bg-slate-800 border-slate-600 text-slate-500 hover:border-slate-400'} ${fontClass}`}>{t.MOD_MIRROR}</button>
-                    <button onClick={() => { setModifiers(m => ({...m, sudden: !m.sudden, hidden: false})); playUiSound('select'); }} className={`flex-1 rounded border text-[10px] font-bold transition-all ${modifiers.sudden ? 'bg-fuchsia-600 border-fuchsia-400 text-white' : 'bg-slate-800 border-slate-600 text-slate-500 hover:border-slate-400'} ${fontClass}`}>{t.MOD_SUDDEN}</button>
-                    <button onClick={() => { setModifiers(m => ({...m, hidden: !m.hidden, sudden: false})); playUiSound('select'); }} className={`flex-1 rounded border text-[10px] font-bold transition-all ${modifiers.hidden ? 'bg-indigo-600 border-indigo-400 text-white' : 'bg-slate-800 border-slate-600 text-slate-500 hover:border-slate-400'} ${fontClass}`}>{t.MOD_HIDDEN}</button>
+             <div><div className={`text-[10px] font-bold text-slate-500 mb-2 tracking-widest ${fontClass}`}>{t.LEVEL}</div><div className="flex gap-2 h-10">{DIFFICULTY_OPTIONS.map((diff) => { const active = level === diff.value; return ( <button key={diff.value} onClick={() => { setLevel(diff.value); playUiSound('select'); }} className={`flex-1 flex flex-col justify-end p-1 rounded transition-all relative overflow-hidden group border ${active ? 'border-white/50' : 'border-transparent'}`}><div className={`absolute inset-0 opacity-20 ${diff.color}`}></div><div className={`w-full transition-all duration-300 ${active ? 'h-full opacity-100' : 'h-1/3 opacity-40 group-hover:h-1/2'} ${diff.color}`}></div><span className={`relative z-10 text-[9px] font-bold text-center mt-1 truncate ${active ? 'text-white' : 'text-slate-500'} ${fontClass}`}>{diff.label}</span></button> ) })}</div></div>
+             <div><div className={`text-[10px] font-bold text-slate-500 mb-2 tracking-widest ${fontClass}`}>{t.KEY_MODE_LABEL || "KEY CONFIGURATION"}</div><div className="flex gap-2 h-10">{[4, 5, 7].map((k) => { const active = keyMode === k; return ( <button key={k} onClick={()=>{setKeyMode(k as any);playUiSound('select')}} className={`flex-1 relative overflow-hidden rounded border transition-all duration-200 flex items-center justify-center ${active ? 'bg-cyan-900/50 border-cyan-400 shadow-[0_0_10px_rgba(34,211,238,0.3)]' : 'bg-slate-800 border-slate-700 hover:border-cyan-600'}`}><div className={`text-xl font-black italic ${active ? 'text-white' : 'text-slate-500 group-hover:text-cyan-200'}`}>{k}Key</div><div className={`text-[9px] ml-1 font-bold ${active ? 'text-cyan-400' : 'text-slate-600'}`}>MODE</div></button> ); })}</div></div>
+             <div><div className={`text-[10px] font-bold text-slate-500 mb-1 ${fontClass}`}>{t.SCROLL_SPEED}</div><div className="flex items-center bg-black rounded border border-slate-700 p-1"><button onClick={()=>{setSpeedMod(Math.max(1,speedMod-0.5));playUiSound('select')}} className="w-10 h-8 bg-slate-800 text-slate-400 hover:text-white font-bold rounded">-</button><div className="flex-1 text-center font-mono text-cyan-400 font-bold text-lg">{speedMod.toFixed(1)}</div><button onClick={()=>{setSpeedMod(Math.min(10,speedMod+0.5));playUiSound('select')}} className="w-10 h-8 bg-slate-800 text-slate-400 hover:text-white font-bold rounded">+</button></div></div>
+             <div><div className={`text-[10px] font-bold text-slate-500 mb-1 tracking-widest ${fontClass}`}>{t.MODIFIERS}</div><div className="flex gap-2 h-8">
+                    <button onClick={() => { setModifiers(m => ({...m, mirror: !m.mirror})); playUiSound('select'); }} className={`flex-1 rounded border text-[9px] font-bold transition-all ${modifiers.mirror ? 'bg-cyan-600 border-cyan-400 text-white' : 'bg-slate-800 border-slate-600 text-slate-500 hover:border-slate-400'} ${fontClass}`}>{t.MOD_MIRROR}</button>
+                    <button onClick={() => { setModifiers(m => ({...m, sudden: !m.sudden, hidden: false})); playUiSound('select'); }} className={`flex-1 rounded border text-[9px] font-bold transition-all ${modifiers.sudden ? 'bg-fuchsia-600 border-fuchsia-400 text-white' : 'bg-slate-800 border-slate-600 text-slate-500 hover:border-slate-400'} ${fontClass}`}>{t.MOD_SUDDEN}</button>
+                    <button onClick={() => { setModifiers(m => ({...m, hidden: !m.hidden, sudden: false})); playUiSound('select'); }} className={`flex-1 rounded border text-[9px] font-bold transition-all ${modifiers.hidden ? 'bg-indigo-600 border-indigo-400 text-white' : 'bg-slate-800 border-slate-600 text-slate-500 hover:border-slate-400'} ${fontClass}`}>{t.MOD_HIDDEN}</button>
                 </div></div>
          </div>
          <button ref={mobileSetupStartBtnRef} onClick={startCountdownSequence} disabled={isAnalyzing || !analyzedNotes} onMouseEnter={() => playUiSound('hover')} className={`group relative w-full h-14 flex flex-col items-center justify-center transform transition-all duration-200 active:scale-95 ${(isAnalyzing || !analyzedNotes) ? 'opacity-50 grayscale cursor-not-allowed' : 'cursor-pointer'}`}><div className="absolute inset-0 bg-gradient-to-r from-cyan-600 to-blue-600 transform -skew-x-2 border-2 border-white/20 shadow-[0_0_30px_rgba(6,182,212,0.5)] group-hover:shadow-[0_0_60px_rgba(6,182,212,0.8)] transition-shadow rounded"></div><div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-30 mix-blend-overlay"></div><div className="relative z-10 text-center transform -skew-x-2">{isAnalyzing ? ( <div className="flex items-center gap-4"><div className="text-xl font-black text-white animate-pulse">SYSTEM ANALYZING</div><div className="w-24 h-2 bg-black/50 rounded-full overflow-hidden"><div className="h-full bg-white animate-progress"></div></div></div> ) : ( <><div className={`text-2xl font-black italic text-white tracking-tighter drop-shadow-lg ${fontClass}`}>{t.GAME_START}</div></> )}</div></button>
@@ -1685,17 +1361,8 @@ const App: React.FC = () => {
   );
 
   const renderLanes = () => (
-    <div 
-        ref={laneContainerRef}
-        className="relative flex-1 bg-black/10 backdrop-blur-sm flex perspective-1000 outline-none overflow-hidden h-full"
-        onTouchStart={handleTouch}
-        onTouchMove={handleTouch}
-        onTouchEnd={handleTouch}
-        onTouchCancel={handleTouch}
-    >
-        <div className="absolute top-0 left-0 w-full h-1 bg-slate-800 z-40">
-             <div ref={progressBarRef} className="h-full bg-cyan-400 shadow-[0_0_10px_rgba(34,211,238,0.8)]" style={{ width: '0%' }}></div>
-        </div>
+    <div ref={laneContainerRef} className="relative flex-1 bg-black/10 backdrop-blur-sm flex perspective-1000 outline-none overflow-hidden h-full" onTouchStart={handleTouch} onTouchMove={handleTouch} onTouchEnd={handleTouch} onTouchCancel={handleTouch}>
+        <div className="absolute top-0 left-0 w-full h-1 bg-slate-800 z-40"><div ref={progressBarRef} className="h-full bg-cyan-400 shadow-[0_0_10px_rgba(34,211,238,0.8)]" style={{ width: '0%' }}></div></div>
         {activeLaneConfig.map((lane, index) => (
             <Lane key={index} config={lane} active={activeLanesState[index]} onTrigger={() => triggerLane(index)} onRelease={() => releaseLane(index)} theme={activeThemeObj} isOverdrive={isOverdrive} />
         ))}
@@ -1707,87 +1374,35 @@ const App: React.FC = () => {
         )}
         {currentThemeId === 'ignore' ? ( <div className="absolute bottom-24 left-0 w-full h-1 bg-red-500 shadow-[0_0_15px_rgba(239,68,68,0.9)] z-20 opacity-80 pointer-events-none"></div> ) : currentThemeId === 'titan' ? ( <div className="absolute bottom-20 left-0 w-full h-[2px] bg-amber-500/80 shadow-[0_0_10px_rgba(245,158,11,0.5)] z-20 pointer-events-none"></div> ) : currentThemeId === 'queen' ? ( <div className="absolute bottom-16 left-0 w-full h-[2px] bg-pink-500 shadow-[0_0_15px_rgba(236,72,153,0.8)] z-20 pointer-events-none"></div> ) : ( <div className="absolute bottom-20 left-0 w-full h-px bg-white/20 pointer-events-none z-20"></div> )}
         {hitEffects.map(effect => { const width = 100 / keyMode; const left = effect.laneIndex * width; return ( <HitEffect key={effect.id} x={`${left}%`} width={`${width}%`} rating={effect.rating} /> ); })}
-        
-        {renderNotes.map((note) => { 
-            const config = activeLaneConfig[note.laneIndex]; 
-            if (!config) return null; 
-            return ( 
-                <Note 
-                    key={note.id} 
-                    note={note} 
-                    totalLanes={keyMode} 
-                    color={config.color} 
-                    theme={activeThemeObj} 
-                    isOverdrive={isOverdrive}
-                    modifiers={modifiers}
-                /> 
-            ); 
-        })}
-        
+        {renderNotes.map((note) => { const config = activeLaneConfig[note.laneIndex]; if (!config) return null; return ( <Note key={note.id} note={note} totalLanes={keyMode} color={config.color} theme={activeThemeObj} isOverdrive={isOverdrive} modifiers={modifiers} /> ); })}
         <div className="absolute top-[25%] left-0 right-0 flex flex-col items-center pointer-events-none z-50">
-            {/* HUD Status Stack (Above Combo) */}
             <div className="flex flex-col items-center mb-1">
-                {isAutoPlay && ( <div className={`text-xl ${fontClass} font-bold text-fuchsia-500 animate-pulse mb-1 border border-fuchsia-500 px-2 bg-black/50 whitespace-nowrap`}>{t.AUTO_PILOT}</div> )}
-                {isOverdrive && (
-                    <div className="flex flex-col items-center">
-                        <div className={`text-2xl md:text-3xl ${fontClass} font-black italic text-amber-500 drop-shadow-[0_0_8px_rgba(0,0,0,1)] whitespace-nowrap animate-rainbow-text`}>{t.LIMIT_BREAK}</div>
-                        <div className={`text-3xl md:text-5xl ${fontClass} font-black italic text-amber-400 tracking-widest whitespace-nowrap`} style={{textShadow: '0 0 10px #fbbf24'}}>{t.X2_BONUS}</div>
-                    </div>
-                )}
+                {isAutoPlay && ( <div className={`text-lg ${fontClass} font-bold text-fuchsia-500 animate-pulse mb-1 border border-fuchsia-500 px-2 bg-black/50 whitespace-nowrap`}>{t.AUTO_PILOT}</div> )}
+                {isOverdrive && ( <div className="flex flex-col items-center"><div className={`text-xl md:text-2xl ${fontClass} font-black italic text-amber-500 drop-shadow-[0_0_8px_rgba(0,0,0,1)] whitespace-nowrap animate-rainbow-text`}>{t.LIMIT_BREAK}</div><div className={`text-2xl md:text-4xl ${fontClass} font-black italic text-amber-400 tracking-widest whitespace-nowrap`} style={{textShadow: '0 0 10px #fbbf24'}}>{t.X2_BONUS}</div></div> )}
             </div>
-
-            <div className="flex flex-col items-center">
-                <div className={`text-sm font-bold text-slate-500/50 tracking-[0.3em] mb-[-10px] ${fontClass}`}>{t.COMBO}</div>
-                <div 
-                    key={combo} 
-                    className={`
-                        text-9xl font-display font-black italic tracking-tighter transition-all duration-100 pr-4
-                        ${combo > 0 ? 'animate-cyber-slam' : 'opacity-20'}
-                        ${combo >= 200 ? 'combo-tier-3' : combo >= 100 ? 'combo-tier-2' : combo >= 50 ? 'combo-tier-1' : 'combo-tier-0'}
-                    `}
-                >
-                    {combo}
-                </div>
-            </div>
-            
-            {/* Feedback stack below combo */}
-            {feedback && ( <div key={feedback.id} className={`mt-4 text-5xl font-black font-display italic ${feedback.color} animate-bounce-short drop-shadow-[0_0_10px_rgba(0,0,0,1)] stroke-black whitespace-nowrap`}>{feedback.text}</div> )}
-            
-            {currentThemeId === 'ignore' && (
-                <div className="mt-4 w-48 h-6 bg-slate-900/80 border border-slate-500 rounded-full relative overflow-hidden backdrop-blur-sm">
-                     <div className={`absolute inset-0 transition-all duration-100 ${isOverdrive ? 'animate-rainbow' : 'bg-white shadow-[0_0_10px_rgba(255,255,255,0.5)]'}`} style={{ width: `${overdrive}%` }}></div>
-                     <div className="absolute inset-0 flex items-center justify-center z-10 mix-blend-difference">
-                         <span className={`text-[10px] md:text-xs font-black italic tracking-[0.2em] ${fontClass} text-white`}>OVERDRIVE</span>
-                     </div>
-                </div>
-            )}
+            <div className="flex flex-col items-center"><div className={`text-xl font-black text-slate-500/50 tracking-[0.3em] mb-[-10px] ${fontClass}`}>{t.COMBO}</div><div key={combo} className={`text-8xl font-display font-black italic tracking-tighter transition-all duration-100 pr-4 ${combo > 0 ? 'animate-cyber-slam' : 'opacity-20'} ${combo >= 200 ? 'combo-tier-3' : combo >= 100 ? 'combo-tier-2' : combo >= 50 ? 'combo-tier-1' : 'combo-tier-0'}`}>{combo}</div></div>
+            {feedback && ( <div key={feedback.id} className={`mt-4 text-4xl font-black font-display italic ${feedback.color} animate-bounce-short drop-shadow-[0_0_10px_rgba(0,0,0,1)] stroke-black whitespace-nowrap`}>{feedback.text}</div> )}
+            {currentThemeId === 'ignore' && ( <div className="mt-4 w-48 h-6 bg-slate-900/80 border border-slate-500 rounded-full relative overflow-hidden backdrop-blur-sm"><div className={`absolute inset-0 transition-all duration-100 ${isOverdrive ? 'animate-rainbow' : 'bg-white shadow-[0_0_10px_rgba(255,255,255,0.5)]'}`} style={{ width: `${overdrive}%` }}></div><div className="absolute inset-0 flex items-center justify-center z-10 mix-blend-difference"><span className={`text-[9px] md:text-[10px] font-black italic tracking-[0.2em] ${fontClass} text-white`}>OVERDRIVE</span></div></div> )}
         </div>
     </div>
   );
 
   const renderGameFrame = () => {
     const frameClass = isOverdrive ? 'border-amber-400 overdrive-border' : '';
-
     if (currentThemeId === 'ignore') {
         return (
             <div className={`relative h-full md:max-w-lg w-full flex-shrink-0 z-20 overflow-hidden border-x-[4px] border-slate-300 bg-slate-900/40 backdrop-blur-md shadow-[0_0_60px_rgba(0,0,0,0.9)] flex flex-col transition-all duration-300 ${frameClass}`}>
                 <div className="relative flex-1 flex w-full">
                     {renderLanes()}
                     <div className="w-6 bg-slate-900/80 border-l border-slate-700 relative flex flex-col justify-end p-0.5">
-                        <div className={`absolute top-2 left-0 w-full text-[10px] text-center font-bold text-slate-500 vertical-text ${fontClass}`}>{t.GROOVE}</div>
-                        <div className="w-full bg-slate-800 rounded-sm overflow-hidden h-[80%] relative border border-slate-700">
-                            <div className={`absolute bottom-0 left-0 w-full transition-all duration-200 ${isOverdrive ? 'animate-rainbow' : 'bg-gradient-to-t from-red-500 via-yellow-400 to-green-500'}`} style={{ height: `${health}%` }}></div>
-                        </div>
+                        <div className={`absolute top-2 left-0 w-full text-[9px] text-center font-bold text-slate-500 vertical-text ${fontClass}`}>{t.GROOVE}</div>
+                        <div className="w-full bg-slate-800 rounded-sm overflow-hidden h-[80%] relative border border-slate-700"><div className={`absolute bottom-0 left-0 w-full transition-all duration-200 ${isOverdrive ? 'animate-rainbow' : 'bg-gradient-to-t from-red-500 via-yellow-400 to-green-500'}`} style={{ height: `${health}%` }}></div></div>
                         <div className={`mt-1 w-full h-1 ${health > 90 ? 'bg-cyan-400 animate-pulse' : 'bg-slate-700'}`}></div>
                     </div>
                 </div>
                 <div className="h-16 bg-gradient-to-b from-slate-200 to-slate-400 relative flex items-center justify-between px-4 border-t-4 border-slate-400 shadow-inner pb-[env(safe-area-inset-bottom)]">
-                        <div className="flex flex-col items-center bg-slate-800/80 p-1 rounded border border-slate-600 shadow-inner scale-75 origin-left">
-                            <div className={`text-[8px] text-slate-400 font-bold ${fontClass}`}>{t.SCROLL_SPEED}</div><div className="text-sm font-display text-white">{speedMod.toFixed(2)}</div>
-                        </div>
-                        <div className="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 flex flex-col items-center bg-black px-6 py-1 rounded-xl border-2 border-slate-500 shadow-[inset_0_0_10px_rgba(0,0,0,0.8)] z-10">
-                            <div className={`text-[8px] text-red-900 font-bold tracking-widest w-full text-center ${fontClass}`}>{t.SCORE}</div><div className="font-mono text-3xl text-red-600 font-bold tracking-widest drop-shadow-[0_0_5px_rgba(220,38,38,0.8)]">{score.toString().padStart(7, '0')}</div>
-                        </div>
+                        <div className="flex flex-col items-center bg-slate-800/80 p-1 rounded border border-slate-600 shadow-inner scale-75 origin-left"><div className={`text-[7px] text-slate-400 font-bold ${fontClass}`}>{t.SCROLL_SPEED}</div><div className="text-xs font-display text-white">{speedMod.toFixed(2)}</div></div>
+                        <div className="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 flex flex-col items-center bg-black px-6 py-1 rounded-xl border-2 border-slate-500 shadow-[inset_0_0_10px_rgba(0,0,0,0.8)] z-10"><div className={`text-[7px] text-red-900 font-bold tracking-widest w-full text-center ${fontClass}`}>{t.SCORE}</div><div className="font-mono text-2xl text-red-600 font-bold tracking-widest drop-shadow-[0_0_5px_rgba(220,38,38,0.8)]">{score.toString().padStart(7, '0')}</div></div>
                         <div className="scale-90 origin-right"><button onClick={(e) => { e.stopPropagation(); togglePause(); playUiSound('select'); }} className="w-10 h-10 flex items-center justify-center bg-slate-300 border border-slate-400 rounded shadow-[0_2px_0_rgba(0,0,0,0.2)] hover:bg-white active:scale-95 transition-all group"><div className="flex flex-col space-y-1"><div className="w-5 h-0.5 bg-slate-500 group-hover:bg-slate-800"></div><div className="w-5 h-0.5 bg-slate-500 group-hover:bg-slate-800"></div><div className="w-5 h-0.5 bg-slate-500 group-hover:bg-slate-800"></div></div></button></div>
                 </div>
             </div>
@@ -1795,20 +1410,7 @@ const App: React.FC = () => {
     } else if (currentThemeId === 'titan') {
         return (
              <div className={`relative h-full md:max-w-lg w-full flex-shrink-0 z-20 overflow-hidden bg-slate-900/40 backdrop-blur-md shadow-[0_0_60px_rgba(245,158,11,0.1)] flex flex-col border-x-8 border-slate-800/50 transition-all ${frameClass}`}>
-                <div className="w-full h-16 bg-slate-800/80 border-b-2 border-amber-600/50 flex items-center justify-between px-4 relative pt-[env(safe-area-inset-top)]">
-                    <div className="absolute bottom-0 left-0 w-full h-1 bg-[repeating-linear-gradient(45deg,transparent,transparent_10px,#f59e0b_10px,#f59e0b_20px)] opacity-50"></div>
-                    <div className="flex flex-col">
-                        <div className={`text-[10px] text-amber-500 font-bold tracking-widest ${fontClass}`}>{t.SYSTEM_INTEGRITY}</div>
-                        <div className="w-32 h-3 bg-slate-950 border border-slate-600 mt-1 flex">
-                            <div className={`h-full transition-all duration-200 ${isOverdrive ? 'animate-rainbow' : (health < 30 ? 'bg-red-500' : 'bg-amber-500')}`} style={{width: `${health}%`}}></div>
-                             <div className={`h-full transition-all duration-200 ${isOverdrive ? 'animate-rainbow' : 'bg-transparent'}`} style={{width: `${overdrive}%`, opacity: 0.5}}></div>
-                        </div>
-                    </div>
-                    <div className="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2">
-                        <div className={`text-3xl font-black italic opacity-50 ${currentRank === 'SSS' ? 'text-amber-100' : 'text-slate-600'}`}>{currentRank}</div>
-                    </div>
-                    <div className="text-right"><div className={`text-[10px] text-amber-500 font-bold tracking-widest ${fontClass}`}>{t.SCORE_OUTPUT}</div><div className="text-2xl font-mono font-bold text-amber-100">{score.toString().padStart(7, '0')}</div></div>
-                </div>
+                <div className="w-full h-16 bg-slate-800/80 border-b-2 border-amber-600/50 flex items-center justify-between px-4 relative pt-[env(safe-area-inset-top)]"><div className="absolute bottom-0 left-0 w-full h-1 bg-[repeating-linear-gradient(45deg,transparent,transparent_10px,#f59e0b_10px,#f59e0b_20px)] opacity-50"></div><div className="flex flex-col"><div className={`text-[9px] text-amber-500 font-bold tracking-widest ${fontClass}`}>{t.SYSTEM_INTEGRITY}</div><div className="w-32 h-3 bg-slate-950 border border-slate-600 mt-1 flex"><div className={`h-full transition-all duration-200 ${isOverdrive ? 'animate-rainbow' : (health < 30 ? 'bg-red-500' : 'bg-amber-500')}`} style={{width: `${health}%`}}></div><div className={`h-full transition-all duration-200 ${isOverdrive ? 'animate-rainbow' : 'bg-transparent'}`} style={{width: `${overdrive}%`, opacity: 0.5}}></div></div></div><div className="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2"><div className={`text-2xl font-black italic opacity-50 ${currentRank === 'SSS' ? 'text-amber-100' : 'text-slate-600'}`}>{currentRank}</div></div><div className="text-right"><div className={`text-[9px] text-amber-500 font-bold tracking-widest ${fontClass}`}>{t.SCORE_OUTPUT}</div><div className="text-xl font-mono font-bold text-amber-100">{score.toString().padStart(7, '0')}</div></div></div>
                 <div className="flex-1 relative bg-slate-900/10 border-l-0 border-r-0 border-slate-800"><div className="absolute inset-0 opacity-10" style={{backgroundImage: 'radial-gradient(circle, #78716c 1px, transparent 1px)', backgroundSize: '20px 20px'}}></div>{renderLanes()}</div>
                 <div className="h-4 bg-slate-800/80 border-t-2 border-amber-600/30 flex justify-center pb-[env(safe-area-inset-bottom)]"><div className="w-1/3 h-full bg-slate-700/80 rounded-b-lg"></div></div>
             </div>
@@ -1816,7 +1418,7 @@ const App: React.FC = () => {
     } else if (currentThemeId === 'queen') {
         return (
             <div className={`relative h-full md:max-w-lg w-full flex-shrink-0 z-20 overflow-hidden bg-gradient-to-b from-black/50 via-purple-950/40 to-pink-900/40 backdrop-blur-md shadow-[0_0_60px_rgba(236,72,153,0.3)] flex flex-col border-x-4 border-pink-800/50 transition-all ${frameClass}`}>
-                <div className="w-full py-4 px-6 flex justify-between items-center bg-black/40 backdrop-blur-md border-b border-pink-800 pt-[calc(1rem+env(safe-area-inset-top))]"><div className="flex flex-col"><div className={`text-[10px] text-pink-400 font-serif tracking-widest uppercase ${fontClass}`}>{t.GRACE}</div><div className="w-32 h-2 bg-purple-950 border border-purple-700 rounded-full mt-1 overflow-hidden relative"><div className={`h-full transition-all duration-200 ${isOverdrive ? 'animate-rainbow' : 'bg-gradient-to-r from-purple-600 to-pink-500'}`} style={{width: `${health}%`}}></div><div className={`absolute top-0 left-0 h-full transition-all duration-200 ${isOverdrive ? 'animate-rainbow opacity-50' : ''}`} style={{width: `${overdrive}%`}}></div></div></div><div className="flex flex-col items-end"><div className={`text-[10px] text-pink-400 font-serif tracking-widest uppercase ${fontClass}`}>{t.POWER}</div><div className="text-3xl font-display font-bold text-pink-100 drop-shadow-[0_0_10px_rgba(236,72,153,0.8)]">{score.toString().padStart(7, '0')}</div></div></div>
+                <div className="w-full py-4 px-6 flex justify-between items-center bg-black/40 backdrop-blur-md border-b border-pink-800 pt-[calc(1rem+env(safe-area-inset-top))]"><div className="flex flex-col"><div className={`text-[9px] text-pink-400 font-serif tracking-widest uppercase ${fontClass}`}>{t.GRACE}</div><div className="w-32 h-2 bg-purple-950 border border-purple-700 rounded-full mt-1 overflow-hidden relative"><div className={`h-full transition-all duration-200 ${isOverdrive ? 'animate-rainbow' : 'bg-gradient-to-r from-purple-600 to-pink-500'}`} style={{width: `${health}%`}}></div><div className={`absolute top-0 left-0 h-full transition-all duration-200 ${isOverdrive ? 'animate-rainbow opacity-50' : ''}`} style={{width: `${overdrive}%`}}></div></div></div><div className="flex flex-col items-end"><div className={`text-[9px] text-pink-400 font-serif tracking-widest uppercase ${fontClass}`}>{t.POWER}</div><div className="text-2xl font-display font-bold text-pink-100 drop-shadow-[0_0_10px_rgba(236,72,153,0.8)]">{score.toString().padStart(7, '0')}</div></div></div>
                 <div className="flex-1 relative flex"><div className="w-2 h-full bg-gradient-to-b from-purple-900/50 via-pink-900/50 to-purple-900/50"></div><div className="flex-1 relative bg-black/10"><div className="absolute inset-0 opacity-10" style={{backgroundImage: 'linear-gradient(135deg, #be185d 25%, transparent 25%), linear-gradient(225deg, #be185d 25%, transparent 25%), linear-gradient(45deg, #be185d 25%, transparent 25%), linear-gradient(315deg, #be185d 25%, transparent 25%)', backgroundPosition: '10px 0, 10px 0, 0 0, 0 0', backgroundSize: '20px 20px', backgroundRepeat: 'repeat'}}></div>{renderLanes()}</div><div className="w-2 h-full bg-gradient-to-b from-purple-900/50 via-pink-900/50 to-purple-900/50"></div></div>
                  <div className="h-2 w-full bg-gradient-to-r from-purple-900 via-pink-600 to-purple-900 mb-[env(safe-area-inset-bottom)]"></div>
             </div>
@@ -1825,19 +1427,8 @@ const App: React.FC = () => {
         return (
             <div className={`relative h-full md:max-w-lg w-full flex-shrink-0 z-20 overflow-hidden border-x-[4px] border-slate-800/50 bg-black/30 backdrop-blur-md shadow-[0_0_60px_rgba(6,182,212,0.2)] flex flex-col transition-all ${frameClass}`}>
                 <div className="w-full flex justify-between items-start p-4 bg-gradient-to-b from-slate-900/80 to-transparent z-30 pointer-events-none border-b border-white/10 pt-[calc(1rem+env(safe-area-inset-top))]">
-                    <div className="w-1/3">
-                        <div className={`text-xs text-cyan-400 font-bold ${fontClass}`}>{t.INTEGRITY}</div>
-                        <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden border border-slate-600 mb-1">
-                            <div className={`h-full transition-all duration-200 ${isOverdrive ? 'animate-rainbow' : (health < 30 ? 'bg-red-500' : 'bg-cyan-500')}`} style={{width: `${health}%`}}></div>
-                        </div>
-                         <div className="w-full h-1 bg-slate-900 rounded-full overflow-hidden">
-                            <div className={`h-full transition-all duration-200 ${isOverdrive ? 'animate-rainbow' : 'bg-amber-600'}`} style={{width: `${overdrive}%`}}></div>
-                        </div>
-                    </div>
-                    <div className="w-1/3 text-right">
-                        <div className={`text-xs text-cyan-400 font-bold ${fontClass}`}>{t.SCORE}</div>
-                        <div className="text-4xl font-mono text-white glow-text">{score.toString().padStart(7, '0')}</div>
-                    </div>
+                    <div className="w-1/3"><div className={`text-[10px] text-cyan-400 font-bold ${fontClass}`}>{t.INTEGRITY}</div><div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden border border-slate-600 mb-1"><div className={`h-full transition-all duration-200 ${isOverdrive ? 'animate-rainbow' : (health < 30 ? 'bg-red-500' : 'bg-cyan-500')}`} style={{width: `${health}%`}}></div></div><div className="w-full h-1 bg-slate-900 rounded-full overflow-hidden"><div className={`h-full transition-all duration-200 ${isOverdrive ? 'animate-rainbow' : 'bg-amber-600'}`} style={{width: `${overdrive}%`}}></div></div></div>
+                    <div className="w-1/3 text-right"><div className={`text-[10px] text-cyan-400 font-bold ${fontClass}`}>{t.SCORE}</div><div className="text-3xl font-mono text-white glow-text">{score.toString().padStart(7, '0')}</div></div>
                 </div>
                 <div className="flex-1 relative bg-black/10 backdrop-blur-sm">{renderLanes()}</div>
                 <div className="h-2 bg-gradient-to-r from-cyan-500 to-blue-500 w-full shadow-[0_0_20px_rgba(6,182,212,0.5)] mb-[env(safe-area-inset-bottom)]"></div>
@@ -1853,79 +1444,35 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className={`fixed inset-0 w-full h-[100dvh] bg-black overflow-hidden text-slate-100 select-none touch-none ${isShaking ? 'animate-[shake_0.2s_ease-in-out]' : ''}`}>
+    <div className={`fixed inset-0 w-full h-[100dvh] bg-black overflow-hidden text-slate-100 select-none touch-none`}>
       {showMobileStart && (
          <div className="absolute inset-0 z-[100] bg-black/95 flex flex-col items-center justify-center p-8 pb-[env(safe-area-inset-bottom)] text-center cursor-pointer" onClick={handleMobileEnter}>
             <div className="relative w-24 h-24 mb-8"><div className="absolute inset-0 border-4 border-cyan-500 rounded-full animate-ping opacity-50"></div><div className="absolute inset-0 border-4 border-cyan-400 rounded-full flex items-center justify-center bg-cyan-900/20 backdrop-blur-md"><span className="text-3xl">👆</span></div></div>
             <h1 className={`text-2xl md:text-3xl font-black italic text-white mb-4 animate-pulse tracking-widest ${fontClass}`}>{t.WELCOME_TITLE}</h1>
             <div className="max-w-md bg-slate-900/50 border border-slate-700 p-4 rounded-lg mb-8 backdrop-blur-sm"><p className={`text-slate-300 text-sm md:text-base whitespace-pre-line leading-relaxed ${fontClass}`}>{t.WELCOME_DESC}</p></div>
-            <div className="text-xs text-slate-600 font-mono border border-slate-800 px-4 py-2 rounded">TAP TO INITIALIZE SYSTEM</div>
+            <div className="text-[10px] text-slate-600 font-mono border border-slate-800 px-4 py-2 rounded">TAP TO INITIALIZE SYSTEM</div>
          </div>
       )}
 
       <audio ref={bgMusicRef} src="/musicbg.mp3" loop />
-
       <div className={`absolute inset-0 z-0 pointer-events-auto overflow-hidden bg-slate-900`} ref={bgRef} style={{ transition: 'transform 0.05s, filter 0.05s' }}>
-        {status === GameStatus.PLAYING && (
-            <div className={`absolute inset-0 z-10 pointer-events-none overflow-hidden transition-opacity duration-200 ${isOverdrive ? 'opacity-100' : 'opacity-0'}`}>
-                <div className="absolute inset-0 bg-white/5 mix-blend-overlay"></div>
-            </div>
-        )}
-
-        {(status === GameStatus.TITLE || status === GameStatus.MENU) && (
-            <div className="absolute inset-0 z-10 pointer-events-none">
-                {layoutSettings.enableMenuBackground ? (
-                    <>
-                        <video src="/background.mp4" autoPlay loop muted playsInline webkit-playsinline="true" disablePictureInPicture className="absolute inset-0 w-full h-full object-cover pointer-events-none touch-none" />
-                        <div className="absolute inset-0 led-screen-filter"></div>
-                    </>
-                ) : ( <div className="absolute inset-0 bg-slate-950"></div> )}
-            </div>
-        )}
-        {(status === GameStatus.PLAYING || status === GameStatus.PAUSED || status === GameStatus.RESUMING || status === GameStatus.OUTRO) && (
-            <>
-                {mediaType === 'video' ? (
-                    <video ref={mediaRef as React.RefObject<HTMLVideoElement>} src={localVideoSrc} className={`absolute inset-0 w-full h-full object-cover z-20 pointer-events-none touch-none`} onEnded={triggerOutro} playsInline webkit-playsinline="true" disablePictureInPicture />
-                ) : (
-                    <div className="absolute inset-0 z-20 bg-black/60 backdrop-blur-sm">
-                        <audio ref={mediaRef as React.RefObject<HTMLAudioElement>} src={localVideoSrc} onEnded={triggerOutro} />
-                        {/* Visualizer/Background for Audio Mode */}
-                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                            <div className="w-[300px] h-[300px] border-4 border-cyan-500/20 rounded-full animate-[spin_10s_linear_infinite]"></div>
-                            <div className="absolute w-[200px] h-[200px] border-2 border-fuchsia-500/20 rounded-full animate-[spin-ccw_15s_linear_infinite]"></div>
-                        </div>
-                    </div>
-                )}
-                {isOverdrive && <div className="absolute inset-0 z-20 bg-amber-500/10 mix-blend-overlay pointer-events-none"></div>}
-            </>
-        )}
+        {status === GameStatus.PLAYING && <div className={`absolute inset-0 z-10 pointer-events-none overflow-hidden transition-opacity duration-200 ${isOverdrive ? 'opacity-100' : 'opacity-0'}`}><div className="absolute inset-0 bg-white/5 mix-blend-overlay"></div></div>}
+        {(status === GameStatus.TITLE || status === GameStatus.MENU) && <div className="absolute inset-0 z-10 pointer-events-none">{layoutSettings.enableMenuBackground ? (<><video src="/background.mp4" autoPlay loop muted playsInline webkit-playsinline="true" disablePictureInPicture className="absolute inset-0 w-full h-full object-cover pointer-events-none touch-none" /><div className="absolute inset-0 led-screen-filter"></div></>) : ( <div className="absolute inset-0 bg-slate-950"></div> )}</div>}
+        {(status === GameStatus.PLAYING || status === GameStatus.PAUSED || status === GameStatus.RESUMING || status === GameStatus.OUTRO) && (<>{mediaType === 'video' ? (<video ref={mediaRef as React.RefObject<HTMLVideoElement>} src={localVideoSrc} className={`absolute inset-0 w-full h-full object-cover z-20 pointer-events-none touch-none`} onEnded={triggerOutro} playsInline webkit-playsinline="true" disablePictureInPicture />) : (<div className="absolute inset-0 z-20 bg-black/60 backdrop-blur-sm"><audio ref={mediaRef as React.RefObject<HTMLAudioElement>} src={localVideoSrc} onEnded={triggerOutro} /><div className="absolute inset-0 flex items-center justify-center pointer-events-none"><div className="w-[300px] h-[300px] border-4 border-cyan-500/20 rounded-full animate-[spin_10s_linear_infinite]"></div><div className="absolute w-[200px] h-[200px] border-2 border-fuchsia-500/20 rounded-full animate-[spin-ccw_15s_linear_infinite]"></div></div></div>)}{isOverdrive && <div className="absolute inset-0 z-20 bg-amber-500/10 mix-blend-overlay pointer-events-none"></div>}</>)}
       </div>
 
       <div className="scanlines z-50 pointer-events-none opacity-40"></div>
       
       {(status === GameStatus.TITLE || status === GameStatus.MENU) && !showMobileStart && (
-        <button onClick={() => setIsBgMusicMuted(!isBgMusicMuted)} className="absolute bottom-4 right-4 z-[70] p-2 bg-black/50 hover:bg-black/80 text-cyan-400 border border-cyan-500 rounded-full transition-all active:scale-95 mb-[env(safe-area-inset-bottom)] mr-[env(safe-area-inset-right)]" title="Toggle Intro Music">
-            {isBgMusicMuted ? ( <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" clipRule="evenodd" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" /></svg> ) : ( <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" /></svg> )}
-        </button>
+        <button onClick={() => setIsBgMusicMuted(!isBgMusicMuted)} className="absolute bottom-4 right-4 z-[70] p-2 bg-black/50 hover:bg-black/80 text-cyan-400 border border-cyan-500 rounded-full transition-all active:scale-95 mb-[env(safe-area-inset-bottom)] mr-[env(safe-area-inset-right)]" title="Toggle Intro Music">{isBgMusicMuted ? ( <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" clipRule="evenodd" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" /></svg> ) : ( <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" /></svg> )}</button>
       )}
 
       {showKeyConfig && ( <KeyConfigMenu currentKeyMode={keyMode} mappings={keyMappings} audioSettings={audioSettings} onAudioSettingsChange={setAudioSettings} layoutSettings={layoutSettings} onLayoutSettingsChange={handleLayoutChange} onSave={saveKeyMappings} onClose={() => setShowKeyConfig(false)} onPlaySound={playUiSound} t={t} fontClass={fontClass} /> )}
       {startCountdown !== null && ( <div className="absolute inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm"><div className="text-[15rem] font-black font-display text-cyan-400 animate-ping">{startCountdown}</div></div> )}
-      
-      {status === GameStatus.RESUMING && resumeCountdown !== null && (
-          <div className="absolute inset-0 z-[60] flex flex-col items-center justify-center bg-black/40 backdrop-blur-sm">
-               <div className="text-4xl text-cyan-400 font-bold mb-4 animate-pulse">RESUMING</div>
-               <div className="text-[12rem] font-black font-display text-white animate-ping">{resumeCountdown > 0 ? resumeCountdown : "GO!"}</div>
-          </div>
-      )}
+      {status === GameStatus.RESUMING && resumeCountdown !== null && ( <div className="absolute inset-0 z-[60] flex flex-col items-center justify-center bg-black/40 backdrop-blur-sm"><div className="text-3xl text-cyan-400 font-bold mb-4 animate-pulse">RESUMING</div><div className="text-[10rem] font-black font-display text-white animate-ping">{resumeCountdown > 0 ? resumeCountdown : "GO!"}</div></div> )}
       
       {status === GameStatus.OUTRO && (
-          <div className="absolute inset-0 z-50 flex items-center justify-center bg-black animate-fade-in duration-1000">
-              <div className="flex flex-col items-center animate-bounce-short">
-                  <h1 className="text-5xl md:text-9xl font-display font-black text-transparent bg-clip-text bg-gradient-to-b from-white to-cyan-500 filter drop-shadow-[0_0_50px_rgba(6,182,212,0.8)]">DJ<span className="text-cyan-400">BIG</span></h1>
-                  <div className={`text-lg md:text-2xl font-mono text-cyan-200 tracking-[1em] mt-4 animate-pulse ${fontClass} text-center`}>{t.MISSION_RESULTS}</div>
-              </div>
-          </div>
+          <div className="absolute inset-0 z-50 flex items-center justify-center bg-black animate-fade-in duration-1000"><div className="flex flex-col items-center animate-bounce-short"><h1 className="text-5xl md:text-9xl font-display font-black text-transparent bg-clip-text bg-gradient-to-b from-white to-cyan-500 filter drop-shadow-[0_0_50px_rgba(6,182,212,0.8)]">DJ<span className="text-cyan-400">BIG</span></h1><div className={`text-lg md:text-2xl font-mono text-cyan-200 tracking-[1em] mt-4 animate-pulse ${fontClass} text-center`}>{t.MISSION_RESULTS}</div></div></div>
       )}
 
       {status === GameStatus.TITLE && !showMobileStart && (
@@ -1937,164 +1484,57 @@ const App: React.FC = () => {
                   <button onClick={() => { setShowKeyConfig(true); playUiSound('select'); }} onMouseEnter={() => playUiSound('hover')} className="group relative w-64 h-14 bg-gradient-to-r from-slate-800/80 via-yellow-900 to-slate-800/80 border-x-4 border-yellow-500 transform -skew-x-12 hover:scale-105 transition-all duration-200 overflow-hidden"><div className="flex flex-col items-center justify-center h-full transform skew-x-12"><span className={`text-xl font-bold text-slate-300 group-hover:text-yellow-200 ${fontClass}`}>{t.SETTING}</span></div></button>
                   <button onClick={() => window.location.reload()} onMouseEnter={() => playUiSound('hover')} className="group relative w-64 h-14 bg-gradient-to-r from-slate-800/80 via-red-900 to-slate-800/80 border-x-4 border-red-500 transform -skew-x-12 hover:scale-105 transition-all duration-200 overflow-hidden"><div className="flex flex-col items-center justify-center h-full transform skew-x-12"><span className={`text-lg font-bold text-slate-300 group-hover:text-red-200 ${fontClass}`}>{t.EXIT}</span></div></button>
                </div>
-              <div className="absolute bottom-8 w-full text-center pb-[env(safe-area-inset-bottom)]"><p className="text-xs text-slate-500 font-mono">VER 2.5.0 // CREATED BY : IGNORE</p><p className="text-xs text-slate-600 font-mono mt-1">© 2024 DJBIG PROJECT. ALL RIGHTS RESERVED.</p></div>
+              <div className="absolute bottom-8 w-full text-center pb-[env(safe-area-inset-bottom)]"><p className="text-[10px] text-slate-500 font-mono">VER 2.5.0 // CREATED BY : IGNORE</p><p className="text-[10px] text-slate-600 font-mono mt-1">© 2024 DJBIG PROJECT. ALL RIGHTS RESERVED.</p></div>
           </div>
       )}
 
       {status === GameStatus.MENU && !startCountdown && (
         <div className="relative z-30 w-full h-full flex flex-col md:flex-row animate-fade-in bg-slate-900/40 backdrop-blur-md overflow-hidden">
-          <div className="md:hidden w-full min-h-[4rem] bg-slate-900 flex items-center justify-between px-4 z-50 border-b border-slate-700 shrink-0 pt-[max(2rem,env(safe-area-inset-top))] pb-2">
-             <button onClick={() => { setStatus(GameStatus.TITLE); stopPreview(); }} className="text-white font-bold text-sm flex items-center gap-1">← {t.BACK}</button>
-             <div className="flex items-center gap-3">
-                {songList.length > 0 && (
-                     <button onClick={handleClearPlaylist} className={`text-[10px] text-red-400 font-bold border border-red-900/50 px-2 py-1 rounded bg-red-900/10 hover:bg-red-900/30 ${fontClass}`}>{t.CLEAR_PLAYLIST}</button>
-                )}
-                <div className="text-cyan-400 font-bold text-sm hidden sm:block">MUSIC SELECT</div>
-            </div>
-          </div>
-          <div className={`w-full ${isMobile ? 'flex-1 min-h-0' : 'md:w-[55%] h-full'} flex flex-col bg-slate-950/80 border-r border-slate-700/50 relative shrink-0 overflow-hidden`}>
-             <div className="hidden md:flex h-24 items-end justify-between pb-4 px-8 border-b border-cyan-500/30 bg-gradient-to-b from-slate-900 to-transparent shrink-0">
-                <h2 className={`text-4xl font-black italic text-white tracking-tighter ${fontClass} drop-shadow-md`}>SELECT <span className="text-cyan-400">MUSIC</span></h2>
-                {songList.length > 0 && (
-                    <button onClick={handleClearPlaylist} className={`text-xs font-bold text-red-500 hover:text-red-300 transition-colors tracking-widest border border-red-900/50 hover:border-red-500 px-3 py-1 rounded uppercase bg-slate-900/50 ${fontClass}`}>{t.CLEAR_PLAYLIST}</button>
-                )}
-             </div>
+          <div className="md:hidden w-full min-h-[4rem] bg-slate-900 flex items-center justify-between px-4 z-50 border-b border-slate-700 shrink-0 pt-[max(2rem,env(safe-area-inset-top))] pb-2"><button onClick={() => { setStatus(GameStatus.TITLE); stopPreview(); }} className="text-white font-bold text-sm flex items-center gap-1">← {t.BACK}</button><div className="flex items-center gap-3">{songList.length > 0 && ( <button onClick={handleClearPlaylist} className={`text-[9px] text-red-400 font-bold border border-red-900/50 px-2 py-1 rounded bg-red-900/10 hover:bg-red-900/30 ${fontClass}`}>{t.CLEAR_PLAYLIST}</button> )}<div className="text-cyan-400 font-bold text-xs hidden sm:block">MUSIC SELECT</div></div></div>
+          <div className={`w-full ${isMobile ? 'flex-1 min-h-0' : 'md:w-[55%] h-full'} flex flex-col bg-slate-950/80 border-r border-slate-700/50 relative shrink-0 overflow-hidden`}><div className="hidden md:flex h-24 items-end justify-between pb-4 px-8 border-b border-cyan-500/30 bg-gradient-to-b from-slate-900 to-transparent shrink-0"><h2 className={`text-4xl font-black italic text-white tracking-tighter ${fontClass} drop-shadow-md`}>SELECT <span className="text-cyan-400">MUSIC</span></h2>{songList.length > 0 && ( <button onClick={handleClearPlaylist} className={`text-[10px] font-bold text-red-500 hover:text-red-300 transition-colors tracking-widest border border-red-900/50 hover:border-red-500 px-3 py-1 rounded uppercase bg-slate-900/50 ${fontClass}`}>{t.CLEAR_PLAYLIST}</button> )}</div>
              <div className="w-full flex-1 overflow-y-auto custom-scrollbar p-0 space-y-1 pb-48 md:pb-0">
-                 {/* Demo Tracks */}
-                 <div onClick={(e) => { loadDemoTrack('/demoplay00.mp4', 'DEMO_TRACK_00'); e.currentTarget.scrollIntoView({ behavior: 'smooth', block: 'center' }); }} onMouseEnter={() => playUiSound('hover')} className={`group relative h-20 w-full flex items-center px-6 cursor-pointer transition-all border-l-8 overflow-hidden ${localFileName === "DEMO_TRACK_00" ? 'bg-gradient-to-r from-cyan-900/80 to-transparent border-cyan-400' : 'bg-slate-900/50 border-slate-800 hover:bg-slate-800 hover:border-cyan-600'}`} style={{ clipPath: 'polygon(0 0, 100% 0, 95% 100%, 0% 100%)' }}>
-                    <div className={`mr-4 w-12 h-12 rounded-full flex items-center justify-center border-4 ${localFileName === "DEMO_TRACK_00" ? 'border-white animate-spin-slow' : 'border-slate-600'} bg-black overflow-hidden shadow-lg shrink-0`}>
-                        <div className="w-4 h-4 bg-slate-900 rounded-full absolute z-10 border border-slate-600"></div>
-                        <div className={`w-full h-full bg-gradient-to-tr from-cyan-500 to-blue-700 opacity-80`}></div>
-                        <span className="absolute text-[8px] font-black text-black/50 z-0 rotate-45">DJBIG</span>
-                    </div>
-                    <div className="flex-1 min-w-0"><MarqueeText text={t.PLAY_DEMO_00} className={`text-lg font-bold ${fontClass} ${localFileName === "DEMO_TRACK_00" ? 'text-white' : 'text-slate-400 group-hover:text-cyan-200'}`} /><div className="text-xs font-mono text-cyan-600/70">PROTOTYPE MIX // 130 BPM</div></div>{localFileName === "DEMO_TRACK_00" && <div className="text-cyan-400 text-xl animate-pulse">◀</div>}
-                 </div>
-                 <div onClick={(e) => { loadDemoTrack('/demoplay.mp4', 'DEMO_TRACK_01'); e.currentTarget.scrollIntoView({ behavior: 'smooth', block: 'center' }); }} onMouseEnter={() => playUiSound('hover')} className={`group relative h-20 w-full flex items-center px-6 cursor-pointer transition-all border-l-8 overflow-hidden ${localFileName === "DEMO_TRACK_01" ? 'bg-gradient-to-r from-green-900/80 to-transparent border-green-400' : 'bg-slate-900/50 border-slate-800 hover:bg-slate-800 hover:border-green-600'}`} style={{ clipPath: 'polygon(0 0, 100% 0, 95% 100%, 0% 100%)' }}>
-                    <div className={`mr-4 w-12 h-12 rounded-full flex items-center justify-center border-4 ${localFileName === "DEMO_TRACK_01" ? 'border-white animate-spin-slow' : 'border-slate-600'} bg-black overflow-hidden shadow-lg shrink-0`}>
-                        <div className="w-4 h-4 bg-slate-900 rounded-full absolute z-10 border border-slate-600"></div>
-                        <div className={`w-full h-full bg-gradient-to-tr from-green-500 to-emerald-700 opacity-80`}></div>
-                        <span className="absolute text-[8px] font-black text-black/50 z-0 rotate-45">DJBIG</span>
-                    </div>
-                    <div className="flex-1 min-w-0"><MarqueeText text={t.PLAY_DEMO_01} className={`text-lg font-bold ${fontClass} ${localFileName === "DEMO_TRACK_01" ? 'text-white' : 'text-slate-400 group-hover:text-green-200'}`} /><div className="text-xs font-mono text-green-600/70">HIGH SPEED ROCK // 175 BPM</div></div>{localFileName === "DEMO_TRACK_01" && <div className="text-green-400 text-xl animate-pulse">◀</div>}
-                 </div>
-                 <div onClick={(e) => { loadDemoTrack('/demoplay02.mp4', 'DEMO_TRACK_02'); e.currentTarget.scrollIntoView({ behavior: 'smooth', block: 'center' }); }} onMouseEnter={() => playUiSound('hover')} className={`group relative h-20 w-full flex items-center px-6 cursor-pointer transition-all border-l-8 overflow-hidden ${localFileName === "DEMO_TRACK_02" ? 'bg-gradient-to-r from-amber-900/80 to-transparent border-amber-400' : 'bg-slate-900/50 border-slate-800 hover:bg-slate-800 hover:border-amber-600'}`} style={{ clipPath: 'polygon(0 0, 100% 0, 95% 100%, 0% 100%)' }}>
-                    <div className={`mr-4 w-12 h-12 rounded-full flex items-center justify-center border-4 ${localFileName === "DEMO_TRACK_02" ? 'border-white animate-spin-slow' : 'border-slate-600'} bg-black overflow-hidden shadow-lg shrink-0`}>
-                        <div className="w-4 h-4 bg-slate-900 rounded-full absolute z-10 border border-slate-600"></div>
-                        <div className={`w-full h-full bg-gradient-to-tr from-amber-500 to-orange-700 opacity-80`}></div>
-                        <span className="absolute text-[8px] font-black text-black/50 z-0 rotate-45">DJBIG</span>
-                    </div>
-                    <div className="flex-1 min-w-0"><MarqueeText text={t.PLAY_DEMO_02} className={`text-lg font-bold ${fontClass} ${localFileName === "DEMO_TRACK_02" ? 'text-white' : 'text-slate-400 group-hover:text-amber-200'}`} /><div className="text-xs font-mono text-amber-600/70">ALTERNATIVE MIX // 140 BPM</div></div>{localFileName === "DEMO_TRACK_02" && <div className="text-amber-400 text-xl animate-pulse">◀</div>}
-                 </div>
-                 <div onClick={(e) => { loadDemoTrack('/demoplay03.mp4', 'DEMO_TRACK_03'); e.currentTarget.scrollIntoView({ behavior: 'smooth', block: 'center' }); }} onMouseEnter={() => playUiSound('hover')} className={`group relative h-20 w-full flex items-center px-6 cursor-pointer transition-all border-l-8 overflow-hidden ${localFileName === "DEMO_TRACK_03" ? 'bg-gradient-to-r from-purple-900/80 to-transparent border-purple-400' : 'bg-slate-900/50 border-slate-800 hover:bg-slate-800 hover:border-purple-600'}`} style={{ clipPath: 'polygon(0 0, 100% 0, 95% 100%, 0% 100%)' }}>
-                    <div className={`mr-4 w-12 h-12 rounded-full flex items-center justify-center border-4 ${localFileName === "DEMO_TRACK_03" ? 'border-white animate-spin-slow' : 'border-slate-600'} bg-black overflow-hidden shadow-lg shrink-0`}>
-                        <div className="w-4 h-4 bg-slate-900 rounded-full absolute z-10 border border-slate-600"></div>
-                        <div className={`w-full h-full bg-gradient-to-tr from-purple-500 to-fuchsia-700 opacity-80`}></div>
-                        <span className="absolute text-[8px] font-black text-black/50 z-0 rotate-45">DJBIG</span>
-                    </div>
-                    <div className="flex-1 min-w-0"><MarqueeText text={t.PLAY_DEMO_03} className={`text-lg font-bold ${fontClass} ${localFileName === "DEMO_TRACK_03" ? 'text-white' : 'text-slate-400 group-hover:text-purple-200'}`} /><div className="text-xs font-mono text-purple-600/70">ELECTRONIC CORE // 150 BPM</div></div>{localFileName === "DEMO_TRACK_03" && <div className="text-purple-400 text-xl animate-pulse">◀</div>}
-                 </div>
-                 <div onClick={(e) => { loadDemoTrack('/demoplay04.mp4', 'DEMO_TRACK_04'); e.currentTarget.scrollIntoView({ behavior: 'smooth', block: 'center' }); }} onMouseEnter={() => playUiSound('hover')} className={`group relative h-20 w-full flex items-center px-6 cursor-pointer transition-all border-l-8 overflow-hidden ${localFileName === "DEMO_TRACK_04" ? 'bg-gradient-to-r from-rose-900/80 to-transparent border-rose-400' : 'bg-slate-900/50 border-slate-800 hover:bg-slate-800 hover:border-rose-600'}`} style={{ clipPath: 'polygon(0 0, 100% 0, 95% 100%, 0% 100%)' }}>
-                    <div className={`mr-4 w-12 h-12 rounded-full flex items-center justify-center border-4 ${localFileName === "DEMO_TRACK_04" ? 'border-white animate-spin-slow' : 'border-slate-600'} bg-black overflow-hidden shadow-lg shrink-0`}>
-                        <div className="w-4 h-4 bg-slate-900 rounded-full absolute z-10 border border-slate-600"></div>
-                        <div className={`w-full h-full bg-gradient-to-tr from-rose-500 to-pink-700 opacity-80`}></div>
-                        <span className="absolute text-[8px] font-black text-black/50 z-0 rotate-45">DJBIG</span>
-                    </div>
-                    <div className="flex-1 min-w-0"><MarqueeText text={t.PLAY_DEMO_04} className={`text-lg font-bold ${fontClass} ${localFileName === "DEMO_TRACK_04" ? 'text-white' : 'text-slate-400 group-hover:text-rose-200'}`} /><div className="text-xs font-mono text-rose-600/70">CYBER PUNK ROCK // 160 BPM</div></div>{localFileName === "DEMO_TRACK_04" && <div className="text-rose-400 text-xl animate-pulse">◀</div>}
-                 </div>
+                 <div onClick={(e) => { loadDemoTrack('/demoplay00.mp4', 'DEMO_TRACK_00'); e.currentTarget.scrollIntoView({ behavior: 'smooth', block: 'center' }); }} onMouseEnter={() => playUiSound('hover')} className={`group relative h-20 w-full flex items-center px-6 cursor-pointer transition-all border-l-8 overflow-hidden ${localFileName === "DEMO_TRACK_00" ? 'bg-gradient-to-r from-cyan-900/80 to-transparent border-cyan-400' : 'bg-slate-900/50 border-slate-800 hover:bg-slate-800 hover:border-cyan-600'}`} style={{ clipPath: 'polygon(0 0, 100% 0, 95% 100%, 0% 100%)' }}><div className={`mr-4 w-12 h-12 rounded-full flex items-center justify-center border-4 ${localFileName === "DEMO_TRACK_00" ? 'border-white animate-spin-slow' : 'border-slate-600'} bg-black overflow-hidden shadow-lg shrink-0`}><div className="w-4 h-4 bg-slate-900 rounded-full absolute z-10 border border-slate-600"></div><div className={`w-full h-full bg-gradient-to-tr from-cyan-500 to-blue-700 opacity-80`}></div><span className="absolute text-[8px] font-black text-black/50 z-0 rotate-45">DJBIG</span></div><div className="flex-1 min-w-0"><MarqueeText text={t.PLAY_DEMO_00} className={`text-lg font-bold ${fontClass} ${localFileName === "DEMO_TRACK_00" ? 'text-white' : 'text-slate-400 group-hover:text-cyan-200'}`} /><div className="text-[10px] font-mono text-cyan-600/70">PROTOTYPE MIX // 130 BPM</div></div>{localFileName === "DEMO_TRACK_00" && <div className="text-cyan-400 text-xl animate-pulse">◀</div>}</div>
+                 <div onClick={(e) => { loadDemoTrack('/demoplay.mp4', 'DEMO_TRACK_01'); e.currentTarget.scrollIntoView({ behavior: 'smooth', block: 'center' }); }} onMouseEnter={() => playUiSound('hover')} className={`group relative h-20 w-full flex items-center px-6 cursor-pointer transition-all border-l-8 overflow-hidden ${localFileName === "DEMO_TRACK_01" ? 'bg-gradient-to-r from-green-900/80 to-transparent border-green-400' : 'bg-slate-900/50 border-slate-800 hover:bg-slate-800 hover:border-green-600'}`} style={{ clipPath: 'polygon(0 0, 100% 0, 95% 100%, 0% 100%)' }}><div className={`mr-4 w-12 h-12 rounded-full flex items-center justify-center border-4 ${localFileName === "DEMO_TRACK_01" ? 'border-white animate-spin-slow' : 'border-slate-600'} bg-black overflow-hidden shadow-lg shrink-0`}><div className="w-4 h-4 bg-slate-900 rounded-full absolute z-10 border border-slate-600"></div><div className={`w-full h-full bg-gradient-to-tr from-green-500 to-emerald-700 opacity-80`}></div><span className="absolute text-[8px] font-black text-black/50 z-0 rotate-45">DJBIG</span></div><div className="flex-1 min-w-0"><MarqueeText text={t.PLAY_DEMO_01} className={`text-lg font-bold ${fontClass} ${localFileName === "DEMO_TRACK_01" ? 'text-white' : 'text-slate-400 group-hover:text-green-200'}`} /><div className="text-[10px] font-mono text-green-600/70">HIGH SPEED ROCK // 175 BPM</div></div>{localFileName === "DEMO_TRACK_01" && <div className="text-green-400 text-xl animate-pulse">◀</div>}</div>
+                 <div onClick={(e) => { loadDemoTrack('/demoplay02.mp4', 'DEMO_TRACK_02'); e.currentTarget.scrollIntoView({ behavior: 'smooth', block: 'center' }); }} onMouseEnter={() => playUiSound('hover')} className={`group relative h-20 w-full flex items-center px-6 cursor-pointer transition-all border-l-8 overflow-hidden ${localFileName === "DEMO_TRACK_02" ? 'bg-gradient-to-r from-amber-900/80 to-transparent border-amber-400' : 'bg-slate-900/50 border-slate-800 hover:bg-slate-800 hover:border-amber-600'}`} style={{ clipPath: 'polygon(0 0, 100% 0, 95% 100%, 0% 100%)' }}><div className={`mr-4 w-12 h-12 rounded-full flex items-center justify-center border-4 ${localFileName === "DEMO_TRACK_02" ? 'border-white animate-spin-slow' : 'border-slate-600'} bg-black overflow-hidden shadow-lg shrink-0`}><div className="w-4 h-4 bg-slate-900 rounded-full absolute z-10 border border-slate-600"></div><div className={`w-full h-full bg-gradient-to-tr from-amber-500 to-orange-700 opacity-80`}></div><span className="absolute text-[8px] font-black text-black/50 z-0 rotate-45">DJBIG</span></div><div className="flex-1 min-w-0"><MarqueeText text={t.PLAY_DEMO_02} className={`text-lg font-bold ${fontClass} ${localFileName === "DEMO_TRACK_02" ? 'text-white' : 'text-slate-400 group-hover:text-amber-200'}`} /><div className="text-[10px] font-mono text-amber-600/70">ALTERNATIVE MIX // 140 BPM</div></div>{localFileName === "DEMO_TRACK_02" && <div className="text-amber-400 text-xl animate-pulse">◀</div>}</div>
+                 <div onClick={(e) => { loadDemoTrack('/demoplay03.mp4', 'DEMO_TRACK_03'); e.currentTarget.scrollIntoView({ behavior: 'smooth', block: 'center' }); }} onMouseEnter={() => playUiSound('hover')} className={`group relative h-20 w-full flex items-center px-6 cursor-pointer transition-all border-l-8 overflow-hidden ${localFileName === "DEMO_TRACK_03" ? 'bg-gradient-to-r from-purple-900/80 to-transparent border-purple-400' : 'bg-slate-900/50 border-slate-800 hover:bg-slate-800 hover:border-purple-600'}`} style={{ clipPath: 'polygon(0 0, 100% 0, 95% 100%, 0% 100%)' }}><div className={`mr-4 w-12 h-12 rounded-full flex items-center justify-center border-4 ${localFileName === "DEMO_TRACK_03" ? 'border-white animate-spin-slow' : 'border-slate-600'} bg-black overflow-hidden shadow-lg shrink-0`}><div className="w-4 h-4 bg-slate-900 rounded-full absolute z-10 border border-slate-600"></div><div className={`w-full h-full bg-gradient-to-tr from-purple-500 to-fuchsia-700 opacity-80`}></div><span className="absolute text-[8px] font-black text-black/50 z-0 rotate-45">DJBIG</span></div><div className="flex-1 min-w-0"><MarqueeText text={t.PLAY_DEMO_03} className={`text-lg font-bold ${fontClass} ${localFileName === "DEMO_TRACK_03" ? 'text-white' : 'text-slate-400 group-hover:text-purple-200'}`} /><div className="text-[10px] font-mono text-purple-600/70">ELECTRONIC CORE // 150 BPM</div></div>{localFileName === "DEMO_TRACK_03" && <div className="text-purple-400 text-xl animate-pulse">◀</div>}</div>
+                 <div onClick={(e) => { loadDemoTrack('/demoplay04.mp4', 'DEMO_TRACK_04'); e.currentTarget.scrollIntoView({ behavior: 'smooth', block: 'center' }); }} onMouseEnter={() => playUiSound('hover')} className={`group relative h-20 w-full flex items-center px-6 cursor-pointer transition-all border-l-8 overflow-hidden ${localFileName === "DEMO_TRACK_04" ? 'bg-gradient-to-r from-rose-900/80 to-transparent border-rose-400' : 'bg-slate-900/50 border-slate-800 hover:bg-slate-800 hover:border-rose-600'}`} style={{ clipPath: 'polygon(0 0, 100% 0, 95% 100%, 0% 100%)' }}><div className={`mr-4 w-12 h-12 rounded-full flex items-center justify-center border-4 ${localFileName === "DEMO_TRACK_04" ? 'border-white animate-spin-slow' : 'border-slate-600'} bg-black overflow-hidden shadow-lg shrink-0`}><div className="w-4 h-4 bg-slate-900 rounded-full absolute z-10 border border-slate-600"></div><div className={`w-full h-full bg-gradient-to-tr from-rose-500 to-pink-700 opacity-80`}></div><span className="absolute text-[8px] font-black text-black/50 z-0 rotate-45">DJBIG</span></div><div className="flex-1 min-w-0"><MarqueeText text={t.PLAY_DEMO_04} className={`text-lg font-bold ${fontClass} ${localFileName === "DEMO_TRACK_04" ? 'text-white' : 'text-slate-400 group-hover:text-rose-200'}`} /><div className="text-[10px] font-mono text-rose-600/70">CYBER PUNK ROCK // 160 BPM</div></div>{localFileName === "DEMO_TRACK_04" && <div className="text-rose-400 text-xl animate-pulse">◀</div>}</div>
                  {songList.map((song, idx) => {
                      const isActive = localFileName === song.name;
                      return (
-                        <div key={song.id} onClick={(e) => { handleFileSelect(song.file, song); playUiSound('select'); e.currentTarget.scrollIntoView({ behavior: 'smooth', block: 'center' }); }} onMouseEnter={() => playUiSound('hover')} className={`group relative h-20 w-full flex items-center px-6 cursor-pointer transition-all border-l-8 overflow-hidden ${isActive ? 'bg-gradient-to-r from-cyan-900/80 to-transparent border-cyan-400' : 'bg-slate-900/50 border-slate-800 hover:bg-slate-800 hover:border-cyan-600'}`} style={{ clipPath: 'polygon(0 0, 100% 0, 95% 100%, 0% 100%)' }}>
-                            <div className={`mr-4 w-12 h-12 rounded-full flex items-center justify-center border-4 ${isActive ? 'border-white animate-spin-slow' : 'border-slate-700'} bg-black/50 overflow-hidden shrink-0 shadow-lg`}>
-                                {song.thumbnailUrl ? (
-                                    <img src={song.thumbnailUrl} className="w-full h-full object-cover" alt="Cover" />
-                                ) : (
-                                    <div className="w-full h-full bg-gradient-to-br from-gray-700 to-gray-900 flex items-center justify-center"><div className="text-[8px] font-bold text-slate-400 text-center leading-none rotate-45">DJ<br/>BIG</div></div>
-                                )}
-                                <div className="absolute w-3 h-3 bg-slate-900 rounded-full border border-slate-600 z-10"></div>
-                            </div>
-                            <div className="flex-1 min-w-0 overflow-hidden"><MarqueeText text={song.name} className={`text-lg font-bold ${fontClass} ${isActive ? 'text-white' : 'text-slate-400 group-hover:text-cyan-200'}`} /><div className="text-xs font-mono text-slate-600 group-hover:text-cyan-600/70 uppercase">{song.type.toUpperCase()} FILE</div></div>
-                            <button onClick={(e) => handleDeleteSong(e, song.id)} className="ml-2 w-8 h-8 flex items-center justify-center text-slate-500 hover:text-red-500 bg-slate-800 hover:bg-red-900/30 rounded border border-slate-700 hover:border-red-500 transition-colors z-20 group-hover:opacity-100" title="Delete">✕</button>
-                        </div>
+                        <div key={song.id} onClick={(e) => { handleFileSelect(song.file, song); playUiSound('select'); e.currentTarget.scrollIntoView({ behavior: 'smooth', block: 'center' }); }} onMouseEnter={() => playUiSound('hover')} className={`group relative h-20 w-full flex items-center px-6 cursor-pointer transition-all border-l-8 overflow-hidden ${isActive ? 'bg-gradient-to-r from-cyan-900/80 to-transparent border-cyan-400' : 'bg-slate-900/50 border-slate-800 hover:bg-slate-800 hover:border-cyan-600'}`} style={{ clipPath: 'polygon(0 0, 100% 0, 95% 100%, 0% 100%)' }}><div className={`mr-4 w-12 h-12 rounded-full flex items-center justify-center border-4 ${isActive ? 'border-white animate-spin-slow' : 'border-slate-700'} bg-black/50 overflow-hidden shrink-0 shadow-lg`}>{song.thumbnailUrl ? ( <img src={song.thumbnailUrl} className="w-full h-full object-cover" alt="Cover" /> ) : ( <div className="w-full h-full bg-gradient-to-br from-gray-700 to-gray-900 flex items-center justify-center"><div className="text-[8px] font-bold text-slate-400 text-center leading-none rotate-45">DJ<br/>BIG</div></div> )}<div className="absolute w-3 h-3 bg-slate-900 rounded-full border border-slate-600 z-10"></div></div><div className="flex-1 min-w-0 overflow-hidden"><MarqueeText text={song.name} className={`text-lg font-bold ${fontClass} ${isActive ? 'text-white' : 'text-slate-400 group-hover:text-cyan-200'}`} /><div className="text-[10px] font-mono text-slate-600 group-hover:text-cyan-600/70 uppercase">{song.type.toUpperCase()} FILE</div></div><button onClick={(e) => handleDeleteSong(e, song.id)} className="ml-2 w-8 h-8 flex items-center justify-center text-slate-500 hover:text-red-500 bg-slate-800 hover:bg-red-900/30 rounded border border-slate-700 hover:border-red-500 transition-colors z-20 group-hover:opacity-100" title="Delete">✕</button></div>
                      );
                  })}
              </div>
              {isMobile && !showMobileSetup && (
-                <div className="fixed bottom-0 left-0 w-full z-50 bg-slate-950/95 border-t border-slate-700 backdrop-blur-md pb-[env(safe-area-inset-bottom)]">
-                    {currentSongMetadata && (
-                        <div className="px-4 pt-2 pb-2">
-                            <button onClick={() => { playUiSound('select'); if (typeof navigator !== 'undefined' && navigator.vibrate) { try { navigator.vibrate(50); } catch(e) {} } setShowMobileSetup(true); }} className="w-full h-14 bg-gradient-to-r from-cyan-600 to-blue-600 rounded-xl shadow-[0_0_20px_rgba(6,182,212,0.6)] flex items-center justify-center border-2 border-white/20 animate-bounce-short hover:scale-105 transition-transform">
-                                <span className={`text-xl font-black italic text-white mr-2 ${fontClass}`}>PLAY</span>
-                                <span className="text-white/80 font-mono text-xs truncate max-w-[200px]">{currentSongMetadata.name}</span>
-                            </button>
-                        </div>
-                    )}
-                    <div className="flex gap-2 p-2 pt-0">
-                        <label className="flex-1 h-10 bg-slate-800 hover:bg-cyan-900/50 border border-slate-600 hover:border-cyan-500 rounded flex items-center justify-center cursor-pointer transition-colors group"><span className={`text-[10px] font-bold text-slate-400 group-hover:text-cyan-400 ${fontClass}`}>+ {t.LOAD_SINGLE}</span><input type="file" accept="video/*,audio/*" onChange={handleSingleFileUpload} className="hidden" /></label>
-                        <label className="flex-1 h-10 bg-slate-800 hover:bg-fuchsia-900/50 border border-slate-600 hover:border-fuchsia-500 rounded flex items-center justify-center cursor-pointer transition-colors group"><span className={`text-[10px] font-bold text-slate-400 group-hover:text-fuchsia-400 ${fontClass}`}>+ {t.ADD_MULTIPLE}</span><input type="file" multiple onChange={handleFolderSelect} className="hidden" /></label>
-                    </div>
-                </div>
+                <div className="fixed bottom-0 left-0 w-full z-50 bg-slate-950/95 border-t border-slate-700 backdrop-blur-md pb-[env(safe-area-inset-bottom)]">{currentSongMetadata && ( <div className="px-4 pt-2 pb-2"><button onClick={() => { playUiSound('select'); if (typeof navigator !== 'undefined' && (navigator as any).vibrate) { try { (navigator as any).vibrate(50); } catch(e) {} } setShowMobileSetup(true); }} className="w-full h-14 bg-gradient-to-r from-cyan-600 to-blue-600 rounded-xl shadow-[0_0_20px_rgba(6,182,212,0.6)] flex items-center justify-center border-2 border-white/20 animate-bounce-short hover:scale-105 transition-transform"><span className={`text-xl font-black italic text-white mr-2 ${fontClass}`}>PLAY</span><span className="text-white/80 font-mono text-xs truncate max-w-[200px]">{currentSongMetadata.name}</span></button></div> )}<div className="flex gap-2 p-2 pt-0"><label className="flex-1 h-10 bg-slate-800 hover:bg-cyan-900/50 border border-slate-600 hover:border-cyan-500 rounded flex items-center justify-center cursor-pointer transition-colors group"><span className={`text-[9px] font-bold text-slate-400 group-hover:text-cyan-400 ${fontClass}`}>+ {t.LOAD_SINGLE}</span><input type="file" accept="video/*,audio/*" onChange={handleSingleFileUpload} className="hidden" /></label><label className="flex-1 h-10 bg-slate-800 hover:bg-fuchsia-900/50 border border-slate-600 hover:border-fuchsia-500 rounded flex items-center justify-center cursor-pointer transition-colors group"><span className={`text-[9px] font-bold text-slate-400 group-hover:text-fuchsia-400 ${fontClass}`}>+ {t.ADD_MULTIPLE}</span><input type="file" multiple onChange={handleFolderSelect} className="hidden" /></label></div></div>
              )}
-             {!isMobile && (
-                <div className="bg-black/80 p-4 border-t border-slate-700 flex gap-2 shrink-0 z-40 relative pb-[calc(1rem+env(safe-area-inset-bottom))]">
-                    <label className="flex-1 h-12 bg-slate-800 hover:bg-cyan-900/50 border border-slate-600 hover:border-cyan-500 rounded flex items-center justify-center cursor-pointer transition-colors group"><span className={`text-xs font-bold text-slate-400 group-hover:text-cyan-400 ${fontClass}`}>+ {t.LOAD_SINGLE}</span><input type="file" accept="video/*,audio/*" onChange={handleSingleFileUpload} className="hidden" /></label>
-                    <label className="flex-1 h-12 bg-slate-800 hover:bg-fuchsia-900/50 border border-slate-600 hover:border-fuchsia-500 rounded flex items-center justify-center cursor-pointer transition-colors group"><span className={`text-xs font-bold text-slate-400 group-hover:text-fuchsia-400 ${fontClass}`}>+ {t.LOAD_FOLDER}</span><input type="file" multiple onChange={handleFolderSelect} className="hidden" {...({ webkitdirectory: "", directory: "" } as any)} /></label>
-                </div>
-             )}
+             {!isMobile && ( <div className="bg-black/80 p-4 border-t border-slate-700 flex gap-2 shrink-0 z-40 relative pb-[calc(1rem+env(safe-area-inset-bottom))]"><label className="flex-1 h-12 bg-slate-800 hover:bg-cyan-900/50 border border-slate-600 hover:border-cyan-500 rounded flex items-center justify-center cursor-pointer transition-colors group"><span className={`text-xs font-bold text-slate-400 group-hover:text-cyan-400 ${fontClass}`}>+ {t.LOAD_SINGLE}</span><input type="file" accept="video/*,audio/*" onChange={handleSingleFileUpload} className="hidden" /></label><label className="flex-1 h-12 bg-slate-800 hover:bg-fuchsia-900/50 border border-slate-600 hover:border-fuchsia-500 rounded flex items-center justify-center cursor-pointer transition-colors group"><span className={`text-xs font-bold text-slate-400 group-hover:text-fuchsia-400 ${fontClass}`}>+ {t.LOAD_FOLDER}</span><input type="file" multiple onChange={handleFolderSelect} className="hidden" {...({ webkitdirectory: "", directory: "" } as any)} /></label></div> )}
           </div>
           {!isMobile && (
             <div className="w-full md:w-[45%] h-auto md:h-full relative flex flex-col p-4 md:p-6 justify-between shrink-0 md:overflow-hidden pb-32 md:pb-6">
-                 <div className="hidden md:flex w-full justify-between items-start mb-4 z-20 shrink-0"><button onClick={() => { setStatus(GameStatus.TITLE); playUiSound('select'); stopPreview(); }} className="flex items-center space-x-2 text-slate-500 hover:text-white transition-colors group"><div className="w-8 h-8 rounded-full border border-slate-600 group-hover:border-white flex items-center justify-center">←</div><span className={`font-bold tracking-widest ${fontClass}`}>{t.BACK}</span></button><div className="flex space-x-4"><button onClick={() => { setShowKeyConfig(true); playUiSound('select'); }} className="text-slate-500 hover:text-yellow-400 font-bold text-sm tracking-widest">{t.SETTING}</button></div></div>
+                 <div className="hidden md:flex w-full justify-between items-start mb-4 z-20 shrink-0"><button onClick={() => { setStatus(GameStatus.TITLE); playUiSound('select'); stopPreview(); }} className="flex items-center space-x-2 text-slate-500 hover:text-white transition-colors group"><div className="w-8 h-8 rounded-full border border-slate-600 group-hover:border-white flex items-center justify-center">←</div><span className={`font-bold tracking-widest ${fontClass}`}>{t.BACK}</span></button><div className="flex space-x-4"><button onClick={() => { setShowKeyConfig(true); playUiSound('select'); }} className="text-slate-500 hover:text-yellow-400 font-bold text-xs tracking-widest">{t.SETTING}</button></div></div>
                  <div className="hidden md:flex absolute inset-0 items-center justify-center opacity-30 pointer-events-none z-0"><div className="w-[80vw] h-[80vw] md:w-[600px] md:h-[600px] border border-cyan-500/20 rounded-full animate-[spin_60s_linear_infinite] border-dashed"></div><div className="absolute w-[60vw] h-[60vw] md:w-[450px] md:h-[450px] border border-white/5 rounded-full animate-[spin-ccw_40s_linear_infinite]"></div></div>
-                 <div className="relative z-10 flex flex-col items-center justify-center flex-1 my-8 md:my-0 min-h-0">
-                     <div className="relative w-40 h-40 md:w-48 md:h-48 lg:w-56 lg:h-56 mb-6 group shrink-0"><div className="absolute inset-0 bg-cyan-500/20 rounded-full blur-xl animate-pulse"></div><div className="relative w-full h-full rounded-full border-4 border-slate-800 bg-black overflow-hidden shadow-[0_0_50px_rgba(0,0,0,0.5)] animate-[spin_10s_linear_infinite]">{currentSongMetadata?.thumbnailUrl ? ( <img src={currentSongMetadata.thumbnailUrl} className="w-full h-full object-cover opacity-80" alt="Cover" /> ) : ( <div className="w-full h-full bg-gradient-to-tr from-slate-800 to-slate-900 flex items-center justify-center"><div className="w-1/3 h-1/3 bg-cyan-500 rounded-full blur-md"></div></div> )}<div className="absolute inset-0 bg-gradient-to-tr from-white/10 to-transparent pointer-events-none"></div></div><div className="absolute top-1/2 left-1/2 w-8 h-8 bg-slate-900 rounded-full transform -translate-x-1/2 -translate-y-1/2 border-2 border-slate-600 z-20"></div></div>
-                     <div className="text-center w-full max-w-lg shrink-0"><h1 className={`text-3xl md:text-5xl font-black italic text-white tracking-tighter drop-shadow-[0_0_20px_rgba(6,182,212,0.8)] mb-2 ${fontClass}`}>{localFileName ? ( <MarqueeText text={localFileName} /> ) : t.SELECT_SOURCE}</h1>{localFileName && ( <div className="inline-block bg-cyan-900/30 border border-cyan-500/30 px-4 py-1 rounded-full text-cyan-400 font-mono text-sm tracking-widest">{isPlayingPreview ? 'PREVIEWING...' : 'READY TO START'}</div> )}</div>
+                 <div className="relative z-10 flex flex-col items-center justify-center flex-1 my-8 md:my-0 min-h-0"><div className="relative w-40 h-40 md:w-48 md:h-48 lg:w-56 lg:h-56 mb-6 group shrink-0"><div className="absolute inset-0 bg-cyan-500/20 rounded-full blur-xl animate-pulse"></div><div className="relative w-full h-full rounded-full border-4 border-slate-800 bg-black overflow-hidden shadow-[0_0_50px_rgba(0,0,0,0.5)] animate-[spin_10s_linear_infinite]">{currentSongMetadata?.thumbnailUrl ? ( <img src={currentSongMetadata.thumbnailUrl} className="w-full h-full object-cover opacity-80" alt="Cover" /> ) : ( <div className="w-full h-full bg-gradient-to-tr from-slate-800 to-slate-900 flex items-center justify-center"><div className="w-1/3 h-1/3 bg-cyan-500 rounded-full blur-md"></div></div> )}<div className="absolute inset-0 bg-gradient-to-tr from-white/10 to-transparent pointer-events-none"></div></div><div className="absolute top-1/2 left-1/2 w-8 h-8 bg-slate-900 rounded-full transform -translate-x-1/2 -translate-y-1/2 border-2 border-slate-600 z-20"></div></div>
+                     <div className="text-center w-full max-w-lg shrink-0"><h1 className={`text-3xl md:text-5xl font-black italic text-white tracking-tighter drop-shadow-[0_0_20px_rgba(6,182,212,0.8)] mb-2 ${fontClass}`}>{localFileName ? ( <MarqueeText text={localFileName} /> ) : t.SELECT_SOURCE}</h1>{localFileName && ( <div className="inline-block bg-cyan-900/30 border border-cyan-500/30 px-4 py-1 rounded-full text-cyan-400 font-mono text-xs tracking-widest">{isPlayingPreview ? 'PREVIEWING...' : 'READY TO START'}</div> )}</div>
                  </div>
-                 <div className="relative z-20 mt-4 md:mt-0 space-y-4 pb-8 md:pb-0 shrink-0">
-                     <SettingsPanelContent />
-                 </div>
+                 <div className="relative z-20 mt-4 md:mt-0 space-y-4 pb-8 md:pb-0 shrink-0"><SettingsPanelContent /></div>
             </div>
           )}
           {showMobileSetup && isMobile && (
-              <div className="fixed inset-0 z-[60] bg-slate-950/95 backdrop-blur-xl flex flex-col p-6 animate-fade-in overflow-y-auto pb-[env(safe-area-inset-bottom)]">
-                  <button onClick={() => setShowMobileSetup(false)} className="absolute top-4 right-4 text-white p-2 z-50 bg-black/50 rounded-full border border-slate-600 mt-[env(safe-area-inset-top)] mr-[env(safe-area-inset-right)]">✕</button>
-                  <div className="flex flex-col items-center mb-6 mt-8 pt-[env(safe-area-inset-top)]">
-                       <div className="w-32 h-32 rounded-full border-4 border-cyan-500/50 overflow-hidden shadow-[0_0_30px_rgba(6,182,212,0.4)] mb-4 animate-[spin_20s_linear_infinite]">
-                           {currentSongMetadata?.thumbnailUrl ? ( <img src={currentSongMetadata.thumbnailUrl} className="w-full h-full object-cover" alt="Cover" /> ) : ( <div className="w-full h-full bg-slate-800 flex items-center justify-center"><span className="text-cyan-500 font-bold">DJBIG</span></div> )}
-                       </div>
-                       <h2 className={`text-2xl font-black italic text-white text-center leading-none ${fontClass}`}>{currentSongMetadata?.name}</h2>
-                       <div className="text-cyan-400 text-xs font-mono mt-1">SETUP CONFIGURATION</div>
-                  </div>
-                  <div className="flex-1 w-full max-w-md mx-auto">
-                      <SettingsPanelContent />
-                  </div>
-              </div>
+              <div className="fixed inset-0 z-[60] bg-slate-950/95 backdrop-blur-xl flex flex-col p-6 animate-fade-in overflow-y-auto pb-[env(safe-area-inset-bottom)]"><button onClick={() => setShowMobileSetup(false)} className="absolute top-4 right-4 text-white p-2 z-50 bg-black/50 rounded-full border border-slate-600 mt-[env(safe-area-inset-top)] mr-[env(safe-area-inset-right)]">✕</button><div className="flex flex-col items-center mb-6 mt-8 pt-[env(safe-area-inset-top)]"><div className="w-32 h-32 rounded-full border-4 border-cyan-500/50 overflow-hidden shadow-[0_0_30px_rgba(6,182,212,0.4)] mb-4 animate-[spin_20s_linear_infinite]">{currentSongMetadata?.thumbnailUrl ? ( <img src={currentSongMetadata.thumbnailUrl} className="w-full h-full object-cover" alt="Cover" /> ) : ( <div className="w-full h-full bg-slate-800 flex items-center justify-center"><span className="text-cyan-500 font-bold">DJBIG</span></div> )}</div><h2 className={`text-2xl font-black italic text-white text-center leading-none ${fontClass}`}>{currentSongMetadata?.name}</h2><div className="text-cyan-400 text-[10px] font-mono mt-1">SETUP CONFIGURATION</div></div><div className="flex-1 w-full max-w-md mx-auto"><SettingsPanelContent /></div></div>
           )}
         </div>
       )}
 
       {(status === GameStatus.PLAYING || status === GameStatus.PAUSED || status === GameStatus.RESUMING) && ( 
           <>
-            <div className="absolute top-1 left-1/2 transform -translate-x-1/2 z-50 flex flex-col items-center pointer-events-none pt-[env(safe-area-inset-top)]">
-                 <div className="bg-black/60 backdrop-blur px-4 py-1 border-b border-cyan-500 shadow-[0_2px_8px_rgba(6,182,212,0.3)] rounded-b-md flex flex-col items-center">
-                      <div className={`text-[8px] text-cyan-400 font-bold tracking-[0.3em] mb-0.5 ${fontClass}`}>{t.SCORE}</div>
-                      <div className="text-2xl font-mono text-white font-bold leading-none tracking-widest drop-shadow-[0_0_5px_rgba(255,255,255,0.5)]">
-                          {score.toString().padStart(7, '0')}
-                      </div>
-                 </div>
-            </div>
-            <div className={`absolute bottom-8 z-30 hidden md:flex flex-col pointer-events-none transition-all duration-500 ${layoutSettings.lanePosition === 'right' ? 'left-8 items-start' : 'right-8 items-end'}`}>
-                <div className="text-[5rem] font-black font-display italic tracking-tighter leading-none select-none mb-[-1rem] transform -skew-x-12 opacity-80" style={{ backgroundImage: 'linear-gradient(to bottom, #22d3ee 0%, #3b82f6 50%, #9333ea 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', filter: 'drop-shadow(0 4px 0px rgba(0,0,0,0.5))' }}>IGNORE <span className="text-white" style={{ WebkitTextFillColor: 'white' }}>PROTOCOL</span></div>
-                <div className={`flex flex-col relative w-64 ${layoutSettings.lanePosition === 'right' ? 'items-start' : 'items-end'}`}>
-                    <MarqueeText text={currentSongMetadata?.name?.replace(/\.[^/.]+$/, "") || "UNKNOWN TRACK"} className={`text-3xl font-black italic text-white tracking-tighter drop-shadow0_2px_10px_rgba(0,0,0,0.8)] uppercase ${fontClass}`} />
-                    <div className="flex gap-2 mt-1"><span className="px-2 py-0.5 bg-black/60 border border-white/20 text-[10px] font-mono text-cyan-400 rounded">LV.{level}</span><span className="px-2 py-0.5 bg-black/60 border border-white/20 text-[10px] font-mono text-fuchsia-400 rounded">{keyMode}Key</span></div>
-                </div>
-            </div>
+            <div className="absolute top-1 left-1/2 transform -translate-x-1/2 z-50 flex flex-col items-center pointer-events-none pt-[env(safe-area-inset-top)]"><div className="bg-black/60 backdrop-blur px-4 py-1 border-b border-cyan-500 shadow-[0_2px_8px_rgba(6,182,212,0.3)] rounded-b-md flex flex-col items-center"><div className={`text-[7px] text-cyan-400 font-bold tracking-[0.3em] mb-0.5 ${fontClass}`}>{t.SCORE}</div><div className="text-xl font-mono text-white font-bold leading-none tracking-widest drop-shadow-[0_0_5px_rgba(255,255,255,0.5)]">{score.toString().padStart(7, '0')}</div></div></div>
+            <div className={`absolute bottom-8 z-30 hidden md:flex flex-col pointer-events-none transition-all duration-500 ${layoutSettings.lanePosition === 'right' ? 'left-8 items-start' : 'right-8 items-end'}`}><div className="text-[4rem] font-black font-display italic tracking-tighter leading-none select-none mb-[-0.8rem] transform -skew-x-12 opacity-80" style={{ backgroundImage: 'linear-gradient(to bottom, #22d3ee 0%, #3b82f6 50%, #9333ea 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', filter: 'drop-shadow(0 4px 0px rgba(0,0,0,0.5))' }}>IGNORE <span className="text-white" style={{ WebkitTextFillColor: 'white' }}>PROTOCOL</span></div><div className={`flex flex-col relative w-64 ${layoutSettings.lanePosition === 'right' ? 'items-start' : 'items-end'}`}><MarqueeText text={currentSongMetadata?.name?.replace(/\.[^/.]+$/, "") || "UNKNOWN TRACK"} className={`text-2xl font-black italic text-white tracking-tighter drop-shadow0_2px_10px_rgba(0,0,0,0.8)] uppercase ${fontClass}`} /><div className="flex gap-2 mt-1"><span className="px-2 py-0.5 bg-black/60 border border-white/20 text-[9px] font-mono text-cyan-400 rounded">LV.{level}</span><span className="px-2 py-0.5 bg-black/60 border border-white/20 text-[9px] font-mono text-fuchsia-400 rounded">{keyMode}Key</span></div></div></div>
             <div className={`absolute inset-0 z-40 flex items-center ${getPositionClass()}`}>{renderGameFrame()}</div>
           </> 
       )}
       {status === GameStatus.PAUSED && ( <PauseMenu onResume={togglePause} onRestart={startCountdownSequence} onSettings={() => setShowKeyConfig(true)} onQuit={quitGame} t={t} fontClass={fontClass} onTitleClick={handlePauseTitleClick} /> )}
-      {status === GameStatus.FINISHED && ( <EndScreen stats={{ perfect: perfectCount, good: goodCount, miss: missCount, maxCombo: maxCombo, score: score }} fileName={currentSongMetadata?.name || "UNKNOWN"} onRestart={startCountdownSequence} onMenu={quitGame} t={t} fontClass={fontClass} onPlaySound={playUiSound} /> )}
+      {status === GameStatus.FINISHED && ( <EndScreen stats={{ perfect: perfectCount, good: goodCount, miss: missCount, maxCombo, score }} fileName={currentSongMetadata?.name || "UNKNOWN"} onRestart={startCountdownSequence} onMenu={quitGame} t={t} fontClass={fontClass} onPlaySound={playUiSound} /> )}
     </div>
   );
 };
