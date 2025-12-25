@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { StatusBar } from '@capacitor/status-bar';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
@@ -50,7 +49,7 @@ const DEFAULT_STATS: PlayerStats = {
 };
 
 const DEFAULT_LAYOUT: LayoutSettings = {
-    lanePosition: 'left',
+    lanePosition: 'center',
     enableMenuBackground: true,
     language: 'en',
     enableVibration: true,
@@ -1393,9 +1392,21 @@ const App: React.FC = () => {
 
   const renderGameFrame = () => {
     const frameClass = isOverdrive && !isLowQuality ? 'border-amber-400 overdrive-border' : (isOverdrive ? 'border-amber-500' : '');
+    
+    // Logic: 
+    // - On Mobile: Portrait is full-width (w-full), Landscape is fixed 400px (landscape:max-w-[400px])
+    // - On Desktop: Max-width is fixed at 400px
+    const frameWidthClass = isMobile 
+        ? "w-full landscape:max-w-[400px]" 
+        : "w-full max-w-[400px]";
+    
+    const borderResponsiveClass = isMobile 
+        ? "border-x-0 landscape:border-x-[4px]" 
+        : "border-x-[4px]";
+
     if (currentThemeId === 'ignore') {
         return (
-            <div className={`relative h-full md:max-w-lg w-full flex-shrink-0 z-20 overflow-hidden border-x-[4px] border-slate-300 bg-slate-900/40 backdrop-blur-md shadow-[0_0_60px_rgba(0,0,0,0.9)] flex flex-col transition-all duration-300 ${frameClass}`}>
+            <div className={`relative h-full ${frameWidthClass} flex-shrink-0 z-20 overflow-hidden ${borderResponsiveClass} border-slate-300 bg-slate-900/40 backdrop-blur-md shadow-[0_0_60px_rgba(0,0,0,0.9)] flex flex-col transition-all duration-300 ${frameClass}`}>
                 <div className="relative flex-1 flex w-full">
                     {renderLanes()}
                     <div className="w-6 bg-slate-900/80 border-l border-slate-700 relative flex flex-col justify-end p-0.5">
@@ -1413,7 +1424,7 @@ const App: React.FC = () => {
         );
     } else if (currentThemeId === 'titan') {
         return (
-             <div className={`relative h-full md:max-w-lg w-full flex-shrink-0 z-20 overflow-hidden bg-slate-900/40 backdrop-blur-md shadow-[0_0_60px_rgba(245,158,11,0.1)] flex flex-col border-x-8 border-slate-800/50 transition-all ${frameClass}`}>
+             <div className={`relative h-full ${frameWidthClass} flex-shrink-0 z-20 overflow-hidden bg-slate-900/40 backdrop-blur-md shadow-[0_0_60px_rgba(245,158,11,0.1)] flex flex-col ${borderResponsiveClass} border-slate-800/50 transition-all ${frameClass}`}>
                 <div className="w-full h-16 bg-slate-800/80 border-b-2 border-amber-600/50 flex items-center justify-between px-4 relative pt-[env(safe-area-inset-top)]"><div className="absolute bottom-0 left-0 w-full h-1 bg-[repeating-linear-gradient(45deg,transparent,transparent_10px,#f59e0b_10px,#f59e0b_20px)] opacity-50"></div><div className="flex flex-col"><div className={`text-[9px] text-amber-500 font-bold tracking-widest ${fontClass}`}>{t.SYSTEM_INTEGRITY}</div><div className="w-32 h-3 bg-slate-950 border border-slate-600 mt-1 flex"><div className={`h-full transition-all duration-200 ${isOverdrive && !isLowQuality ? 'animate-rainbow' : (isOverdrive ? 'bg-amber-500' : (health < 30 ? 'bg-red-500' : 'bg-amber-500'))}`} style={{width: `${health}%`}}></div><div className={`h-full transition-all duration-200 ${isOverdrive && !isLowQuality ? 'animate-rainbow' : (isOverdrive ? 'bg-amber-500' : 'bg-transparent')}`} style={{width: `${overdrive}%`, opacity: 0.5}}></div></div></div><div className="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2"><div className={`text-2xl font-black italic opacity-50 ${currentRank === 'SSS' ? 'text-amber-100' : 'text-slate-600'}`}>{currentRank}</div></div><div className="text-right"><div className={`text-[9px] text-amber-500 font-bold tracking-widest ${fontClass}`}>{t.SCORE_OUTPUT}</div><div className="text-xl font-mono font-bold text-amber-100">{score.toString().padStart(7, '0')}</div></div></div>
                 <div className="flex-1 relative bg-slate-900/10 border-l-0 border-r-0 border-slate-800"><div className="absolute inset-0 opacity-10" style={{backgroundImage: 'radial-gradient(circle, #78716c 1px, transparent 1px)', backgroundSize: '20px 20px'}}></div>{renderLanes()}</div>
                 <div className="h-4 bg-slate-800/80 border-t-2 border-amber-600/30 flex justify-center pb-[env(safe-area-inset-bottom)]"><div className="w-1/3 h-full bg-slate-700/80 rounded-b-lg"></div></div>
@@ -1421,7 +1432,7 @@ const App: React.FC = () => {
         );
     } else if (currentThemeId === 'queen') {
         return (
-            <div className={`relative h-full md:max-w-lg w-full flex-shrink-0 z-20 overflow-hidden bg-gradient-to-b from-black/50 via-purple-950/40 to-pink-900/40 backdrop-blur-md shadow-[0_0_60px_rgba(236,72,153,0.3)] flex flex-col border-x-4 border-pink-800/50 transition-all ${frameClass}`}>
+            <div className={`relative h-full ${frameWidthClass} flex-shrink-0 z-20 overflow-hidden bg-gradient-to-b from-black/50 via-purple-950/40 to-pink-900/40 backdrop-blur-md shadow-[0_0_60px_rgba(236,72,153,0.3)] flex flex-col ${borderResponsiveClass} border-pink-800/50 transition-all ${frameClass}`}>
                 <div className="w-full py-4 px-6 flex justify-between items-center bg-black/40 backdrop-blur-md border-b border-pink-800 pt-[calc(1rem+env(safe-area-inset-top))]"><div className="flex flex-col"><div className={`text-[9px] text-pink-400 font-serif tracking-widest uppercase ${fontClass}`}>{t.GRACE}</div><div className="w-32 h-2 bg-purple-950 border border-purple-700 rounded-full mt-1 overflow-hidden relative"><div className={`h-full transition-all duration-200 ${isOverdrive && !isLowQuality ? 'animate-rainbow' : (isOverdrive ? 'bg-amber-500' : 'bg-gradient-to-r from-purple-600 to-pink-500')}`} style={{width: `${health}%`}}></div><div className={`absolute top-0 left-0 h-full transition-all duration-200 ${isOverdrive && !isLowQuality ? 'animate-rainbow opacity-50' : (isOverdrive ? 'bg-amber-400 opacity-30' : '')}`} style={{width: `${overdrive}%`}}></div></div></div><div className="flex flex-col items-end"><div className={`text-[9px] text-pink-400 font-serif tracking-widest uppercase ${fontClass}`}>{t.POWER}</div><div className="text-2xl font-display font-bold text-pink-100 drop-shadow-[0_0_10px_rgba(236,72,153,0.8)]">{score.toString().padStart(7, '0')}</div></div></div>
                 <div className="flex-1 relative flex"><div className="w-2 h-full bg-gradient-to-b from-purple-900/50 via-pink-900/50 to-purple-900/50"></div><div className="flex-1 relative bg-black/10"><div className="absolute inset-0 opacity-10" style={{backgroundImage: 'linear-gradient(135deg, #be185d 25%, transparent 25%), linear-gradient(225deg, #be185d 25%, transparent 25%), linear-gradient(45deg, #be185d 25%, transparent 25%), linear-gradient(315deg, #be185d 25%, transparent 25%)', backgroundPosition: '10px 0, 10px 0, 0 0, 0 0', backgroundSize: '20px 20px', backgroundRepeat: 'repeat'}}></div>{renderLanes()}</div><div className="w-2 h-full bg-gradient-to-b from-purple-900/50 via-pink-900/50 to-purple-900/50"></div></div>
                  <div className="h-2 w-full bg-gradient-to-r from-purple-900 via-pink-600 to-purple-900 mb-[env(safe-area-inset-bottom)]"></div>
@@ -1429,9 +1440,9 @@ const App: React.FC = () => {
         );
     } else {
         return (
-            <div className={`relative h-full md:max-w-lg w-full flex-shrink-0 z-20 overflow-hidden border-x-[4px] border-slate-800/50 bg-black/30 backdrop-blur-md shadow-[0_0_60px_rgba(6,182,212,0.2)] flex flex-col transition-all ${frameClass}`}>
+            <div className={`relative h-full ${frameWidthClass} flex-shrink-0 z-20 overflow-hidden ${borderResponsiveClass} border-slate-800/50 bg-black/30 backdrop-blur-md shadow-[0_0_60px_rgba(6,182,212,0.2)] flex flex-col transition-all ${frameClass}`}>
                 <div className="w-full flex justify-between items-start p-4 bg-gradient-to-b from-slate-900/80 to-transparent z-30 pointer-events-none border-b border-white/10 pt-[calc(1rem+env(safe-area-inset-top))]">
-                    <div className="w-1/3"><div className={`text-[10px] text-cyan-400 font-bold ${fontClass}`}>{t.INTEGRITY}</div><div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden border border-slate-600 mb-1"><div className={`h-full transition-all duration-200 ${isOverdrive && !isLowQuality ? 'animate-rainbow' : (isOverdrive ? 'bg-amber-500' : (health < 30 ? 'bg-red-500' : 'bg-cyan-500'))}`} style={{width: `${health}%`}}></div></div><div className="w-full h-1 bg-slate-900 rounded-full overflow-hidden"><div className={`h-full transition-all duration-200 ${isOverdrive && !isLowQuality ? 'animate-rainbow' : (isOverdrive ? 'bg-amber-600' : 'bg-amber-600/30')}`} style={{width: `${overdrive}%`}}></div></div></div>
+                    <div className="w-1/3"><div className={`text-[10px] text-cyan-400 font-bold ${fontClass}`}>{t.INTEGRITY}</div><div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden border border-slate-600 mb-1"><div className={`h-full transition-all duration-200 ${isOverdrive && !isLowQuality ? 'animate-rainbow' : (isOverdrive ? 'bg-amber-500' : (health < 30 ? 'bg-red-500' : 'bg-cyan-500'))}`} style={{width: `${health}%`}}></div></div><div className="w-full h-1 bg-slate-900 rounded-full overflow-hidden"><div className={`h-full transition-all duration-200 ${isOverdrive && !isLowQuality ? 'animate-rainbow' : (isOverdrive ? 'bg-amber-600' : 'bg-amber-600/30')}`} style={{width: `${overdrive}%` }}></div></div></div>
                     <div className="w-1/3 text-right"><div className={`text-[10px] text-cyan-400 font-bold ${fontClass}`}>{t.SCORE}</div><div className="text-3xl font-mono text-white glow-text">{score.toString().padStart(7, '0')}</div></div>
                 </div>
                 <div className="flex-1 relative bg-black/10 backdrop-blur-sm">{renderLanes()}</div>
