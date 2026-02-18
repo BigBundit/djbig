@@ -1,5 +1,5 @@
 
-import React, { memo } from 'react';
+import React, { memo, forwardRef } from 'react';
 import { Note as NoteType, LaneColor, Theme, GameModifiers } from '../types';
 
 interface NoteProps {
@@ -10,9 +10,10 @@ interface NoteProps {
     isOverdrive?: boolean;
     modifiers?: GameModifiers;
     graphicsQuality: 'low' | 'high';
+    isHolding?: boolean;
 }
 
-export const Note: React.FC<NoteProps> = memo(({ note, totalLanes, color, theme, isOverdrive, modifiers, graphicsQuality }) => {
+export const Note = memo(forwardRef<HTMLDivElement, NoteProps>(({ note, totalLanes, color, theme, isOverdrive, modifiers, graphicsQuality, isHolding }, ref) => {
     const isLow = graphicsQuality === 'low';
     const widthPerc = 100 / totalLanes;
     const leftPos = `${note.laneIndex * widthPerc}%`;
@@ -75,7 +76,7 @@ export const Note: React.FC<NoteProps> = memo(({ note, totalLanes, color, theme,
         const borderColor = `border-${color.base}-400`;
         
         return (
-            <div style={holdContainerStyle} className="pointer-events-none">
+            <div ref={ref} style={holdContainerStyle} className="pointer-events-none" data-note-id={note.id}>
                 <div className={`w-full h-full ${barColor} border-x-2 ${borderColor} rounded-sm relative overflow-hidden flex flex-col ${!isLow ? 'shadow-md' : ''}`}>
                     <div className={`w-full h-[4px] bg-${color.base}-400`}></div>
                     <div className="flex-1 w-full relative">
@@ -115,11 +116,11 @@ export const Note: React.FC<NoteProps> = memo(({ note, totalLanes, color, theme,
     };
 
     return (
-        <div className="absolute z-20 px-[2px] flex justify-center items-center pointer-events-none" style={containerStyle}>
+        <div ref={ref} className="absolute z-20 px-[2px] flex justify-center items-center pointer-events-none" style={containerStyle} data-note-id={note.id}>
             <div className={`w-full h-full relative ${shapeClass}`} style={getNoteExtraStyles()}>
                 {showHighlight && <div className="absolute inset-x-0 top-0 h-[40%] bg-white/60 w-full"></div>}
                 {innerContent}
             </div>
         </div>
     );
-});
+}));

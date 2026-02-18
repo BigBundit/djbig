@@ -199,6 +199,9 @@ const App: React.FC = () => {
   const lastPauseTitleClickRef = useRef<number>(0);
 
   const [renderNotes, setRenderNotes] = useState<NoteType[]>([]);
+  const noteRefs = useRef<Map<number, HTMLDivElement>>(new Map());
+  const visibleNoteIdsRef = useRef<Set<number>>(new Set());
+  const holdingNoteIdsRef = useRef<Set<number>>(new Set());
 
   const isLowQuality = layoutSettings.graphicsQuality === 'low';
 
@@ -1133,6 +1136,10 @@ const App: React.FC = () => {
     const visibleWindow = currentFallSpeed * 2.5; 
 
     const visibleNotesList: NoteType[] = [];
+    const currentVisibleIds = new Set<number>();
+    const currentHoldingIds = new Set<number>();
+    let shouldUpdateRender = false;
+
     notesRef.current.forEach(note => {
       const timeDelta = adjustedTime - note.timestamp; 
       
@@ -1151,6 +1158,29 @@ const App: React.FC = () => {
       }
 
       note.y = hitLineY + ((timeDelta / currentFallSpeed) * hitLineY);
+
+      // Direct DOM Update
+      const el = noteRefs.current.get(note.id);
+      if (el) {
+          if (note.isHold) {
+              const holdLength = (note.duration / currentFallSpeed) * 90;
+              el.style.top = `${note.y - holdLength}%`;
+              el.style.height = `${holdLength}%`;
+          } else {
+              el.style.top = `${note.y}%`;
+          }
+          
+          // Update Opacity for Hidden/Sudden
+          if (modifiers.hidden) {
+              if (note.y > 50) el.style.opacity = '0';
+              else el.style.opacity = String(Math.max(0, 1 - ((note.y - 40) / 10)));
+          } else if (modifiers.sudden) {
+              if (note.y < 25) el.style.opacity = '0';
+              else el.style.opacity = String(Math.min(1, (note.y - 25) / 10));
+          } else {
+              el.style.opacity = '1';
+          }
+      }
 
       if (note.isHold && note.holding && !note.holdCompleted) {
           const endTime = note.timestamp + note.duration;
@@ -1207,17 +1237,44 @@ const App: React.FC = () => {
       if (note.y > -250 && note.y < 120 && !note.hit) {
           if (note.isHold && !note.holdCompleted && !note.missed) {
               const lengthPerc = (note.duration / currentFallSpeed) * 90;
-              visibleNotesList.push({ ...note, length: lengthPerc } as any);
+              (note as any).length = lengthPerc;
+              visibleNotesList.push(note);
+              currentVisibleIds.add(note.id);
+              if (note.holding) currentHoldingIds.add(note.id);
           } else if (!note.isHold) {
-              visibleNotesList.push({ ...note });
+              visibleNotesList.push(note);
+              currentVisibleIds.add(note.id);
           }
       } else if (note.isHold && note.holding && !note.holdCompleted) {
           const lengthPerc = (note.duration / currentFallSpeed) * 90;
-          visibleNotesList.push({ ...note, length: lengthPerc } as any);
+          (note as any).length = lengthPerc;
+          visibleNotesList.push(note);
+          currentVisibleIds.add(note.id);
+          currentHoldingIds.add(note.id);
       }
     });
 
-    setRenderNotes(visibleNotesList); 
+    // Check for changes in visibility or holding state to trigger React render
+    if (currentVisibleIds.size !== visibleNoteIdsRef.current.size || 
+        currentHoldingIds.size !== holdingNoteIdsRef.current.size) {
+        shouldUpdateRender = true;
+    } else {
+        for (const id of currentVisibleIds) {
+            if (!visibleNoteIdsRef.current.has(id)) { shouldUpdateRender = true; break; }
+        }
+        if (!shouldUpdateRender) {
+            for (const id of currentHoldingIds) {
+                if (!holdingNoteIdsRef.current.has(id)) { shouldUpdateRender = true; break; }
+            }
+        }
+    }
+
+    if (shouldUpdateRender) {
+        visibleNoteIdsRef.current = currentVisibleIds;
+        holdingNoteIdsRef.current = currentHoldingIds;
+        setRenderNotes(visibleNotesList); 
+    }
+
     if (health <= 0) { triggerOutro(); return; }
     
     if (hitEffects.length > 0) {
@@ -1228,7 +1285,7 @@ const App: React.FC = () => {
         });
     }
     frameRef.current = requestAnimationFrame(update);
-  }, [health, speedMod, isAutoPlay, combo, maxCombo, triggerOutro, soundProfile, t, triggerHaptic, isOverdrive, overdrive, hitEffects.length, isLowQuality]);
+  }, [health, speedMod, isAutoPlay, combo, maxCombo, triggerOutro, soundProfile, t, triggerHaptic, isOverdrive, overdrive, hitEffects.length, isLowQuality, modifiers]);
 
   useEffect(() => {
     if (status === GameStatus.PLAYING) {
@@ -1376,7 +1433,27 @@ const App: React.FC = () => {
         )}
         {currentThemeId === 'ignore' ? ( <div className="absolute bottom-24 left-0 w-full h-1 bg-red-500 shadow-[0_0_15px_rgba(239,68,68,0.9)] z-20 opacity-80 pointer-events-none"></div> ) : currentThemeId === 'titan' ? ( <div className="absolute bottom-20 left-0 w-full h-[2px] bg-amber-500/80 shadow-[0_0_10px_rgba(245,158,11,0.5)] z-20 pointer-events-none"></div> ) : currentThemeId === 'queen' ? ( <div className="absolute bottom-16 left-0 w-full h-[2px] bg-pink-500 shadow-[0_0_15px_rgba(236,72,153,0.8)] z-20 pointer-events-none"></div> ) : ( <div className="absolute bottom-20 left-0 w-full h-px bg-white/20 pointer-events-none z-20"></div> )}
         {hitEffects.map(effect => { const width = 100 / keyMode; const left = effect.laneIndex * width; return ( <HitEffect key={effect.id} x={`${left}%`} width={`${width}%`} rating={effect.rating} graphicsQuality={layoutSettings.graphicsQuality} /> ); })}
-        {renderNotes.map((note) => { const config = activeLaneConfig[note.laneIndex]; if (!config) return null; return ( <Note key={note.id} note={note} totalLanes={keyMode} color={config.color} theme={activeThemeObj} isOverdrive={isOverdrive} modifiers={modifiers} graphicsQuality={layoutSettings.graphicsQuality} /> ); })}
+        {renderNotes.map((note) => { 
+            const config = activeLaneConfig[note.laneIndex]; 
+            if (!config) return null; 
+            return ( 
+                <Note 
+                    key={note.id} 
+                    ref={(el) => { 
+                        if (el) noteRefs.current.set(note.id, el); 
+                        else noteRefs.current.delete(note.id); 
+                    }}
+                    note={note} 
+                    totalLanes={keyMode} 
+                    color={config.color} 
+                    theme={activeThemeObj} 
+                    isOverdrive={isOverdrive} 
+                    modifiers={modifiers} 
+                    graphicsQuality={layoutSettings.graphicsQuality} 
+                    isHolding={note.holding}
+                /> 
+            ); 
+        })}
         <div className="absolute top-[25%] left-0 right-0 flex flex-col items-center pointer-events-none z-50">
             <div className="flex flex-col items-center mb-1">
                 {isAutoPlay && ( <div className={`text-lg ${fontClass} font-bold text-fuchsia-500 animate-pulse mb-1 border border-fuchsia-500 px-2 bg-black/50 whitespace-nowrap`}>{t.AUTO_PILOT}</div> )}
