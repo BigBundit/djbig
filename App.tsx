@@ -52,8 +52,8 @@ const DEFAULT_LAYOUT: LayoutSettings = {
     lanePosition: 'center',
     enableMenuBackground: true,
     language: 'en',
-    enableVibration: true,
-    graphicsQuality: 'high'
+    enableVibration: false,
+    graphicsQuality: 'low'
 };
 
 const START_OFFSET_MS = 5000; // เวลาดีเลย์รวม (นับถอยหลัง 3 วิ + เตรียมพร้อม 2 วิ)
@@ -179,6 +179,9 @@ const App: React.FC = () => {
   const [showLobbySongSelect, setShowLobbySongSelect] = useState(false);
   const [isOpponentFinished, setIsOpponentFinished] = useState(false);
   const [opponentFinalScore, setOpponentFinalScore] = useState<number | null>(null);
+
+  const [serverUrl, setServerUrl] = useState<string>(window.location.host);
+  const [connectionStatus, setConnectionStatus] = useState<'DISCONNECTED' | 'CONNECTING' | 'CONNECTED'>('DISCONNECTED');
 
   // --- WebRTC ---
   const peerRef = useRef<RTCPeerConnection | null>(null);
@@ -464,12 +467,34 @@ const App: React.FC = () => {
     }
     setShowMultiplayerMenu(true);
     
-    if (!wsRef.current) {
+    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+        setConnectionStatus('CONNECTING');
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const ws = new WebSocket(`${protocol}//${window.location.host}`);
+        let url = serverUrl;
+        // If user entered just host:port, prepend protocol
+        if (!url.includes('://')) {
+             url = `${protocol}//${url}`;
+        } else {
+             // Ensure ws/wss protocol
+             url = url.replace('http', 'ws');
+        }
+
+        const ws = new WebSocket(url);
         
         ws.onopen = () => {
             console.log('Connected to Multiplayer Server');
+            setConnectionStatus('CONNECTED');
+        };
+
+        ws.onclose = () => {
+             console.log('Disconnected from Multiplayer Server');
+             setConnectionStatus('DISCONNECTED');
+             wsRef.current = null;
+        };
+
+        ws.onerror = (e) => {
+             console.error('WebSocket Error', e);
+             setConnectionStatus('DISCONNECTED');
         };
 
         ws.onmessage = (event) => {
@@ -1943,7 +1968,7 @@ const App: React.FC = () => {
               <div className="relative z-10 text-center transform hover:scale-105 transition-transform duration-500 cursor-default mb-12 mt-[-100px]"><div className="flex items-end justify-center leading-none mb-4 animate-pulse"><span className="text-8xl md:text-[10rem] font-black font-display text-white italic drop-shadow-[5px_5px_0px_rgba(6,182,212,1)] tracking-tighter" style={{textShadow: '4px 4px 0px #0891b2'}}>DJ</span><span className="text-8xl md:text-[10rem] font-black font-display text-cyan-400 italic drop-shadow-[0_0_30px_rgba(34,211,238,0.8)] ml-2" style={{textShadow: '0 0 20px cyan'}}>BIG</span></div><div className="inline-block bg-black/80 px-4 py-1 border-x-2 border-cyan-500 backdrop-blur-sm"><p className={`text-cyan-200 font-bold tracking-[0.5em] text-sm md:text-xl font-display uppercase`}>RHYTHM MUSIC EMULATOR</p></div></div>
               <div className="flex flex-col items-center space-y-4 w-full max-w-md z-20">
                   <button onClick={() => { setStatus(GameStatus.MENU); playUiSound('select'); initAudio(); }} onMouseEnter={() => playUiSound('hover')} className="group relative w-80 h-20 bg-gradient-to-r from-cyan-900/80 via-cyan-600 to-cyan-900/80 border-x-4 border-cyan-400 transform -skew-x-12 hover:scale-105 transition-all duration-200 overflow-hidden shadow-[0_0_30px_rgba(6,182,212,0.3)]"><div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-20 transition-opacity"></div><div className="flex flex-col items-center justify-center h-full transform skew-x-12"><span className={`text-3xl font-black italic text-white group-hover:text-cyan-100 ${fontClass}`}>{t.START}</span><span className="text-[10px] font-mono text-cyan-300 tracking-[0.3em]">INITIATE SEQUENCE</span></div></button>
-                  <button onClick={initMultiplayer} onMouseEnter={() => playUiSound('hover')} className="group relative w-64 h-14 bg-gradient-to-r from-slate-800/80 via-green-900 to-slate-800/80 border-x-4 border-green-500 transform -skew-x-12 hover:scale-105 transition-all duration-200 overflow-hidden"><div className="flex flex-col items-center justify-center h-full transform skew-x-12"><span className={`text-lg font-bold text-slate-300 group-hover:text-green-200 ${fontClass}`}>ONLINE MODE</span>{user && <span className="text-[8px] font-mono text-green-400">LOGGED IN AS {user.name.toUpperCase()}</span>}</div></button>
+                  {/* <button onClick={initMultiplayer} onMouseEnter={() => playUiSound('hover')} className="group relative w-64 h-14 bg-gradient-to-r from-slate-800/80 via-green-900 to-slate-800/80 border-x-4 border-green-500 transform -skew-x-12 hover:scale-105 transition-all duration-200 overflow-hidden"><div className="flex flex-col items-center justify-center h-full transform skew-x-12"><span className={`text-lg font-bold text-slate-300 group-hover:text-green-200 ${fontClass}`}>ONLINE MODE</span>{user && <span className="text-[8px] font-mono text-green-400">LOGGED IN AS {user.name.toUpperCase()}</span>}</div></button> */}
                   <button onClick={() => { setShowKeyConfig(true); playUiSound('select'); }} onMouseEnter={() => playUiSound('hover')} className="group relative w-64 h-14 bg-gradient-to-r from-slate-800/80 via-yellow-900 to-slate-800/80 border-x-4 border-yellow-500 transform -skew-x-12 hover:scale-105 transition-all duration-200 overflow-hidden"><div className="flex flex-col items-center justify-center h-full transform skew-x-12"><span className={`text-xl font-bold text-slate-300 group-hover:text-yellow-200 ${fontClass}`}>{t.SETTING}</span></div></button>
                   <button onClick={() => window.location.reload()} onMouseEnter={() => playUiSound('hover')} className="group relative w-64 h-14 bg-gradient-to-r from-slate-800/80 via-red-900 to-slate-800/80 border-x-4 border-red-500 transform -skew-x-12 hover:scale-105 transition-all duration-200 overflow-hidden"><div className="flex flex-col items-center justify-center h-full transform skew-x-12"><span className={`text-lg font-bold text-slate-300 group-hover:text-red-200 ${fontClass}`}>{t.EXIT}</span></div></button>
                </div>
@@ -2002,7 +2027,28 @@ const App: React.FC = () => {
                       
                       {mpStatus === 'LOBBY' && (
                           <div className="flex flex-col gap-6 flex-1 justify-center z-10">
-                              <div className="group relative">
+                              <div className="bg-slate-900/50 p-4 rounded border border-slate-700">
+                                   <div className="flex justify-between items-center mb-2">
+                                       <span className="text-xs text-slate-400 font-bold">SERVER CONNECTION</span>
+                                       <span className={`text-xs font-bold ${connectionStatus === 'CONNECTED' ? 'text-green-400' : connectionStatus === 'CONNECTING' ? 'text-yellow-400' : 'text-red-400'}`}>
+                                           {connectionStatus}
+                                       </span>
+                                   </div>
+                                   <div className="flex gap-2">
+                                       <input 
+                                          type="text" 
+                                          value={serverUrl} 
+                                          onChange={(e) => setServerUrl(e.target.value)} 
+                                          className="flex-1 bg-black border border-slate-600 text-white px-2 py-1 text-xs font-mono rounded"
+                                          placeholder="host:port"
+                                       />
+                                       <button onClick={() => { if(wsRef.current) wsRef.current.close(); initMultiplayer(); }} className="bg-slate-700 hover:bg-slate-600 text-white px-3 py-1 rounded text-xs font-bold">
+                                           RECONNECT
+                                       </button>
+                                   </div>
+                              </div>
+
+                              <div className={`group relative ${connectionStatus !== 'CONNECTED' ? 'opacity-50 pointer-events-none' : ''}`}>
                                   <div className="absolute -inset-0.5 bg-gradient-to-r from-cyan-600 to-blue-600 rounded-lg blur opacity-30 group-hover:opacity-75 transition duration-200"></div>
                                   <button onClick={createRoom} className="relative w-full h-20 bg-slate-900 rounded-lg flex items-center px-6 border border-slate-700 group-hover:border-cyan-500 transition-all">
                                       <div className="w-12 h-12 rounded-full bg-cyan-900/50 flex items-center justify-center mr-4 group-hover:scale-110 transition-transform">
@@ -2015,12 +2061,12 @@ const App: React.FC = () => {
                                   </button>
                               </div>
 
-                              <div className="relative">
+                              <div className={`relative ${connectionStatus !== 'CONNECTED' ? 'opacity-50' : ''}`}>
                                   <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-800"></div></div>
                                   <div className="relative flex justify-center text-xs uppercase"><span className="bg-slate-900 px-2 text-slate-500">Or Join Existing</span></div>
                               </div>
 
-                              <div className="flex gap-2">
+                              <div className={`flex gap-2 ${connectionStatus !== 'CONNECTED' ? 'opacity-50 pointer-events-none' : ''}`}>
                                   <div className="relative flex-1">
                                       <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                                           <svg className="h-5 w-5 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
