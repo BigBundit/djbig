@@ -172,8 +172,25 @@ const App: React.FC = () => {
   const [mpStatus, setMpStatus] = useState<'LOBBY' | 'WAITING' | 'READY' | 'PLAYING' | 'FINISHED'>('LOBBY');
   const wsRef = useRef<WebSocket | null>(null);
   const [joinRoomIdInput, setJoinRoomIdInput] = useState('');
+  const [showNamePrompt, setShowNamePrompt] = useState(false);
+  const [guestNameInput, setGuestNameInput] = useState('');
+  const [isHost, setIsHost] = useState(false);
+  const [isGuestReady, setIsGuestReady] = useState(false);
+  const [showLobbySongSelect, setShowLobbySongSelect] = useState(false);
+
+  // --- WebRTC ---
+  const peerRef = useRef<RTCPeerConnection | null>(null);
+  const dataChannelRef = useRef<RTCDataChannel | null>(null);
+  const [transferProgress, setTransferProgress] = useState<number | null>(null);
+  const [transferStatus, setTransferStatus] = useState<string>('');
+  const fileChunksRef = useRef<ArrayBuffer[]>([]);
+  const receivedSizeRef = useRef<number>(0);
+  const expectedSizeRef = useRef<number>(0);
+  const currentFileNameRef = useRef<string>('');
+  const currentFileTypeRef = useRef<string>('');
 
   const mobileSetupStartBtnRef = useRef<HTMLButtonElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const t = TRANSLATIONS[layoutSettings.language];
   const fontClass = layoutSettings.language === 'th' ? 'font-thai' : 'font-display';
@@ -298,8 +315,127 @@ const App: React.FC = () => {
     return () => window.removeEventListener('message', handleMessage);
   }, []);
 
+  const initWebRTC = (isInitiator: boolean, targetId?: string) => {
+      const peer = new RTCPeerConnection({
+          iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+      });
+
+      peer.onicecandidate = (event) => {
+          if (event.candidate && wsRef.current) {
+              wsRef.current.send(JSON.stringify({
+                  type: 'SIGNAL',
+                  targetId: targetId || 'HOST', // If guest, target is host (implicit)
+                  signal: { type: 'candidate', candidate: event.candidate }
+              }));
+          }
+      };
+
+      if (isInitiator) {
+          const channel = peer.createDataChannel('fileTransfer');
+          setupDataChannel(channel);
+          dataChannelRef.current = channel;
+          
+          peer.createOffer().then(offer => {
+              peer.setLocalDescription(offer);
+              if (wsRef.current) {
+                  wsRef.current.send(JSON.stringify({
+                      type: 'SIGNAL',
+                      targetId: targetId,
+                      signal: { type: 'offer', sdp: offer }
+                  }));
+              }
+          });
+      } else {
+          peer.ondatachannel = (event) => {
+              setupDataChannel(event.channel);
+              dataChannelRef.current = event.channel;
+          };
+      }
+
+      peerRef.current = peer;
+  };
+
+  const setupDataChannel = (channel: RTCDataChannel) => {
+      channel.onopen = () => {
+          console.log('Data channel open');
+          if (peerRef.current && peerRef.current.localDescription?.type === 'offer') {
+               // Host side: Ready to send if requested
+          }
+      };
+
+      channel.onmessage = (event) => {
+          const data = event.data;
+          if (typeof data === 'string') {
+              const msg = JSON.parse(data);
+              if (msg.type === 'FILE_START') {
+                  setTransferStatus(`Receiving ${msg.name}...`);
+                  setTransferProgress(0);
+                  fileChunksRef.current = [];
+                  receivedSizeRef.current = 0;
+                  expectedSizeRef.current = msg.size;
+                  currentFileNameRef.current = msg.name;
+                  currentFileTypeRef.current = msg.fileType;
+              } else if (msg.type === 'FILE_END') {
+                  setTransferStatus('Processing file...');
+                  const blob = new Blob(fileChunksRef.current, { type: currentFileTypeRef.current });
+                  const file = new File([blob], currentFileNameRef.current, { type: currentFileTypeRef.current });
+                  handleFileSelect(file); // Load the received song!
+                  setTransferProgress(null);
+                  setTransferStatus('Download Complete!');
+                  setTimeout(() => setTransferStatus(''), 3000);
+              }
+          } else {
+              // Binary chunk
+              fileChunksRef.current.push(data);
+              receivedSizeRef.current += data.byteLength;
+              if (expectedSizeRef.current > 0) {
+                  setTransferProgress((receivedSizeRef.current / expectedSizeRef.current) * 100);
+              }
+          }
+      };
+  };
+
+  const sendFile = async () => {
+      if (!currentSongMetadata?.file || !dataChannelRef.current || dataChannelRef.current.readyState !== 'open') return;
+      
+      const file = currentSongMetadata.file;
+      const CHUNK_SIZE = 16384; // 16KB
+      
+      dataChannelRef.current.send(JSON.stringify({
+          type: 'FILE_START',
+          name: file.name,
+          size: file.size,
+          fileType: file.type
+      }));
+
+      const buffer = await file.arrayBuffer();
+      let offset = 0;
+
+      while (offset < buffer.byteLength) {
+          const chunk = buffer.slice(offset, offset + CHUNK_SIZE);
+          dataChannelRef.current.send(chunk);
+          offset += CHUNK_SIZE;
+          
+          // Yield to main thread occasionally to prevent UI freeze
+          if (offset % (CHUNK_SIZE * 100) === 0) await new Promise(r => setTimeout(r, 0));
+      }
+
+      dataChannelRef.current.send(JSON.stringify({ type: 'FILE_END' }));
+  };
+
+  const handleGuestLogin = () => {
+      if (!guestNameInput.trim()) return;
+      setUser({ name: guestNameInput.trim(), picture: '' });
+      setShowNamePrompt(false);
+      // Automatically open multiplayer menu after setting name
+      setTimeout(() => initMultiplayer(), 100);
+  };
+
   const initMultiplayer = () => {
-    if (!user) { alert('Please login first'); return; }
+    if (!user) { 
+        setShowNamePrompt(true); 
+        return; 
+    }
     setShowMultiplayerMenu(true);
     
     if (!wsRef.current) {
@@ -316,16 +452,49 @@ const App: React.FC = () => {
                 case 'ROOM_CREATED':
                     setMultiplayerRoomId(data.roomId);
                     setMpStatus('WAITING');
+                    setIsHost(true);
                     break;
                 case 'PLAYER_JOINED':
                     setMpStatus('READY');
                     const opponent = data.players.find((p: any) => p.name !== user.name);
-                    if (opponent) setOpponentState({ name: opponent.name, score: 0, health: 100, combo: 0 });
+                    if (opponent) {
+                        setOpponentState({ name: opponent.name, score: 0, health: 100, combo: 0 });
+                        // Host initiates WebRTC connection
+                        if (data.players[0].name === user.name) {
+                            initWebRTC(true, opponent.id);
+                            setIsHost(true);
+                        } else {
+                            setIsHost(false);
+                        }
+                    }
+                    break;
+                case 'PLAYER_READY':
+                    setIsGuestReady(data.ready);
+                    break;
+                case 'SIGNAL':
+                    if (!peerRef.current) initWebRTC(false, data.senderId);
+                    const signal = data.signal;
+                    if (signal.type === 'offer') {
+                        peerRef.current?.setRemoteDescription(new RTCSessionDescription(signal.sdp));
+                        peerRef.current?.createAnswer().then(answer => {
+                            peerRef.current?.setLocalDescription(answer);
+                            wsRef.current?.send(JSON.stringify({
+                                type: 'SIGNAL',
+                                targetId: data.senderId,
+                                signal: { type: 'answer', sdp: answer }
+                            }));
+                        });
+                    } else if (signal.type === 'answer') {
+                        peerRef.current?.setRemoteDescription(new RTCSessionDescription(signal.sdp));
+                    } else if (signal.type === 'candidate') {
+                        peerRef.current?.addIceCandidate(new RTCIceCandidate(signal.candidate));
+                    }
                     break;
                 case 'GAME_START':
                     setMpStatus('PLAYING');
                     setIsMultiplayer(true);
-                    startCountdownSequence(); // Reuse existing start logic
+                    setShowMultiplayerMenu(false); // Close the lobby menu
+                    startCountdownSequence(); // Start the game sequence
                     break;
                 case 'OPPONENT_UPDATE':
                     setOpponentState(prev => ({ ...prev!, score: data.score, health: data.health, combo: data.combo }));
@@ -360,6 +529,26 @@ const App: React.FC = () => {
   const startGameMultiplayer = () => {
       if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
           wsRef.current.send(JSON.stringify({ type: 'START_GAME' }));
+      }
+  };
+
+  const handleReadyToggle = () => {
+      const newReadyState = !isGuestReady;
+      setIsGuestReady(newReadyState);
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+          wsRef.current.send(JSON.stringify({ type: 'PLAYER_READY', ready: newReadyState }));
+      }
+  };
+
+  const handleLobbySongSelect = (song: Song) => {
+      handleFileSelect(song.file, song);
+      setShowLobbySongSelect(false);
+      // Notify guest about new song
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+          wsRef.current.send(JSON.stringify({
+              type: 'SONG_METADATA',
+              metadata: { name: song.name, size: song.file.size, type: song.file.type }
+          }));
       }
   };
 
@@ -1659,7 +1848,7 @@ const App: React.FC = () => {
       <div className={`absolute inset-0 z-0 pointer-events-auto overflow-hidden bg-slate-900`} ref={bgRef} style={{ transition: 'transform 0.05s, filter 0.05s' }}>
         {status === GameStatus.PLAYING && !isLowQuality && <div className={`absolute inset-0 z-10 pointer-events-none overflow-hidden transition-opacity duration-200 ${isOverdrive ? 'opacity-100' : 'opacity-0'}`}><div className="absolute inset-0 bg-white/5 mix-blend-overlay"></div></div>}
         {(status === GameStatus.TITLE || status === GameStatus.MENU) && <div className="absolute inset-0 z-10 pointer-events-none">{layoutSettings.enableMenuBackground ? (<>{!isLowQuality && <video src="/background.mp4" autoPlay loop muted playsInline webkit-playsinline="true" disablePictureInPicture className="absolute inset-0 w-full h-full object-cover pointer-events-none touch-none" />}<div className={`absolute inset-0 ${!isLowQuality ? 'led-screen-filter' : 'bg-slate-950'}`}></div></>) : ( <div className="absolute inset-0 bg-slate-950"></div> )}</div>}
-        {(status === GameStatus.PLAYING || status === GameStatus.PAUSED || status === GameStatus.RESUMING || status === GameStatus.OUTRO) && (<>{mediaType === 'video' && !isLowQuality ? (<video ref={mediaRef as React.RefObject<HTMLVideoElement>} src={localVideoSrc} className={`absolute inset-0 w-full h-full object-cover z-20 pointer-events-none touch-none`} onEnded={triggerOutro} playsInline webkit-playsinline="true" disablePictureInPicture />) : (<div className="absolute inset-0 z-20 bg-black/60 backdrop-blur-sm"><audio ref={mediaRef as React.RefObject<HTMLAudioElement>} src={localVideoSrc} onEnded={triggerOutro} />{!isLowQuality && <div className="absolute inset-0 flex items-center justify-center pointer-events-none"><div className="w-[300px] h-[300px] border-4 border-cyan-500/20 rounded-full animate-[spin_10s_linear_infinite]"></div><div className="absolute w-[200px] h-[200px] border-2 border-fuchsia-500/20 rounded-full animate-[spin-ccw_15s_linear_infinite]"></div></div>}</div>)}{isOverdrive && !isLowQuality && <div className="absolute inset-0 z-20 bg-amber-500/10 mix-blend-overlay pointer-events-none"></div>}</>)}
+        {(status === GameStatus.PLAYING || status === GameStatus.PAUSED || status === GameStatus.RESUMING || status === GameStatus.OUTRO) && (<>{mediaType === 'video' && !isLowQuality ? (<video ref={mediaRef as React.RefObject<HTMLVideoElement>} src={localVideoSrc || undefined} className={`absolute inset-0 w-full h-full object-cover z-20 pointer-events-none touch-none`} onEnded={triggerOutro} playsInline webkit-playsinline="true" disablePictureInPicture />) : (<div className="absolute inset-0 z-20 bg-black/60 backdrop-blur-sm"><audio ref={mediaRef as React.RefObject<HTMLAudioElement>} src={localVideoSrc || undefined} onEnded={triggerOutro} />{!isLowQuality && <div className="absolute inset-0 flex items-center justify-center pointer-events-none"><div className="w-[300px] h-[300px] border-4 border-cyan-500/20 rounded-full animate-[spin_10s_linear_infinite]"></div><div className="absolute w-[200px] h-[200px] border-2 border-fuchsia-500/20 rounded-full animate-[spin-ccw_15s_linear_infinite]"></div></div>}</div>)}{isOverdrive && !isLowQuality && <div className="absolute inset-0 z-20 bg-amber-500/10 mix-blend-overlay pointer-events-none"></div>}</>)}
       </div>
 
       <div className="scanlines z-50 pointer-events-none opacity-40"></div>
@@ -1683,48 +1872,249 @@ const App: React.FC = () => {
               <div className="flex flex-col items-center space-y-4 w-full max-w-md z-20">
                   <button onClick={() => { setStatus(GameStatus.MENU); playUiSound('select'); initAudio(); }} onMouseEnter={() => playUiSound('hover')} className="group relative w-80 h-20 bg-gradient-to-r from-cyan-900/80 via-cyan-600 to-cyan-900/80 border-x-4 border-cyan-400 transform -skew-x-12 hover:scale-105 transition-all duration-200 overflow-hidden shadow-[0_0_30px_rgba(6,182,212,0.3)]"><div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-20 transition-opacity"></div><div className="flex flex-col items-center justify-center h-full transform skew-x-12"><span className={`text-3xl font-black italic text-white group-hover:text-cyan-100 ${fontClass}`}>{t.START}</span><span className="text-[10px] font-mono text-cyan-300 tracking-[0.3em]">INITIATE SEQUENCE</span></div></button>
                   <button onClick={() => { setShowKeyConfig(true); playUiSound('select'); }} onMouseEnter={() => playUiSound('hover')} className="group relative w-64 h-14 bg-gradient-to-r from-slate-800/80 via-yellow-900 to-slate-800/80 border-x-4 border-yellow-500 transform -skew-x-12 hover:scale-105 transition-all duration-200 overflow-hidden"><div className="flex flex-col items-center justify-center h-full transform skew-x-12"><span className={`text-xl font-bold text-slate-300 group-hover:text-yellow-200 ${fontClass}`}>{t.SETTING}</span></div></button>
-                  {user ? (
-                      <button onClick={initMultiplayer} onMouseEnter={() => playUiSound('hover')} className="group relative w-64 h-14 bg-gradient-to-r from-slate-800/80 via-green-900 to-slate-800/80 border-x-4 border-green-500 transform -skew-x-12 hover:scale-105 transition-all duration-200 overflow-hidden"><div className="flex flex-col items-center justify-center h-full transform skew-x-12"><span className={`text-lg font-bold text-slate-300 group-hover:text-green-200 ${fontClass}`}>ONLINE MODE</span><span className="text-[8px] font-mono text-green-400">LOGGED IN AS {user.name.toUpperCase()}</span></div></button>
-                  ) : (
-                      <button onClick={handleLogin} onMouseEnter={() => playUiSound('hover')} className="group relative w-64 h-14 bg-gradient-to-r from-slate-800/80 via-blue-900 to-slate-800/80 border-x-4 border-blue-500 transform -skew-x-12 hover:scale-105 transition-all duration-200 overflow-hidden"><div className="flex flex-col items-center justify-center h-full transform skew-x-12"><span className={`text-lg font-bold text-slate-300 group-hover:text-blue-200 ${fontClass}`}>LOGIN WITH GOOGLE</span></div></button>
-                  )}
+                  <button onClick={initMultiplayer} onMouseEnter={() => playUiSound('hover')} className="group relative w-64 h-14 bg-gradient-to-r from-slate-800/80 via-green-900 to-slate-800/80 border-x-4 border-green-500 transform -skew-x-12 hover:scale-105 transition-all duration-200 overflow-hidden"><div className="flex flex-col items-center justify-center h-full transform skew-x-12"><span className={`text-lg font-bold text-slate-300 group-hover:text-green-200 ${fontClass}`}>ONLINE MODE</span>{user && <span className="text-[8px] font-mono text-green-400">LOGGED IN AS {user.name.toUpperCase()}</span>}</div></button>
                   <button onClick={() => window.location.reload()} onMouseEnter={() => playUiSound('hover')} className="group relative w-64 h-14 bg-gradient-to-r from-slate-800/80 via-red-900 to-slate-800/80 border-x-4 border-red-500 transform -skew-x-12 hover:scale-105 transition-all duration-200 overflow-hidden"><div className="flex flex-col items-center justify-center h-full transform skew-x-12"><span className={`text-lg font-bold text-slate-300 group-hover:text-red-200 ${fontClass}`}>{t.EXIT}</span></div></button>
                </div>
               <div className="absolute bottom-8 w-full text-center pb-[env(safe-area-inset-bottom)]"><p className="text-[10px] text-slate-500 font-mono">VER 2.5.0 // CREATED BY : IGNORE</p><p className="text-[10px] text-slate-600 font-mono mt-1">© 2024 DJBIG PROJECT. ALL RIGHTS RESERVED.</p></div>
           </div>
       )}
 
-      {showMultiplayerMenu && (
-          <div className="fixed inset-0 z-[80] bg-black/90 backdrop-blur-xl flex items-center justify-center animate-fade-in">
+      {showNamePrompt && (
+          <div className="fixed inset-0 z-[90] bg-black/90 backdrop-blur-xl flex items-center justify-center animate-fade-in">
               <div className="bg-slate-900 border border-cyan-500 p-8 rounded-lg shadow-[0_0_50px_rgba(6,182,212,0.5)] max-w-md w-full relative">
-                  <button onClick={() => setShowMultiplayerMenu(false)} className="absolute top-4 right-4 text-slate-500 hover:text-white">✕</button>
-                  <h2 className={`text-3xl font-black italic text-white mb-6 text-center ${fontClass}`}>MULTIPLAYER LOBBY</h2>
+                  <button onClick={() => setShowNamePrompt(false)} className="absolute top-4 right-4 text-slate-500 hover:text-white">✕</button>
+                  <h2 className={`text-2xl font-black italic text-white mb-6 text-center ${fontClass}`}>ENTER PLAYER NAME</h2>
+                  <div className="flex flex-col gap-4">
+                      <input type="text" placeholder="YOUR NAME" value={guestNameInput} onChange={(e) => setGuestNameInput(e.target.value)} className="bg-black border border-slate-600 text-white px-4 py-3 rounded font-mono text-lg text-center" autoFocus />
+                      <button onClick={handleGuestLogin} className="w-full h-12 bg-cyan-600 hover:bg-cyan-500 text-white font-bold rounded">CONTINUE</button>
+                      <div className="flex items-center gap-2 my-2">
+                          <div className="h-px bg-slate-700 flex-1"></div>
+                          <span className="text-slate-500 text-xs">OR</span>
+                          <div className="h-px bg-slate-700 flex-1"></div>
+                      </div>
+                      <button onClick={handleLogin} className="w-full h-12 bg-slate-800 hover:bg-slate-700 border border-slate-600 text-white font-bold rounded flex items-center justify-center gap-2">
+                          <svg className="w-4 h-4" viewBox="0 0 24 24"><path fill="currentColor" d="M12.545,10.239v3.821h5.445c-0.712,2.315-2.647,3.972-5.445,3.972c-3.332,0-6.033-2.701-6.033-6.032s2.701-6.032,6.033-6.032c1.498,0,2.866,0.549,3.921,1.453l2.814-2.814C17.503,2.988,15.139,2,12.545,2C7.021,2,2.543,6.477,2.543,12s4.478,10,10.002,10c8.396,0,10.249-7.85,9.426-11.748L12.545,10.239z"/></svg>
+                          LOGIN WITH GOOGLE
+                      </button>
+                  </div>
+              </div>
+          </div>
+      )}
+
+      {showMultiplayerMenu && (
+          <div className="fixed inset-0 z-[80] bg-black/95 backdrop-blur-xl flex items-center justify-center animate-fade-in p-4">
+              <div className="bg-slate-900/90 border border-cyan-500/50 p-0 rounded-2xl shadow-[0_0_100px_rgba(6,182,212,0.3)] max-w-2xl w-full relative overflow-hidden flex flex-col md:flex-row min-h-[500px]">
                   
-                  {mpStatus === 'LOBBY' && (
-                      <div className="flex flex-col gap-4">
-                          <button onClick={createRoom} className="w-full h-12 bg-cyan-600 hover:bg-cyan-500 text-white font-bold rounded">CREATE ROOM</button>
-                          <div className="flex gap-2">
-                              <input type="text" placeholder="ENTER ROOM ID" value={joinRoomIdInput} onChange={(e) => setJoinRoomIdInput(e.target.value.toUpperCase())} className="flex-1 bg-black border border-slate-600 text-white px-4 rounded font-mono uppercase" />
-                              <button onClick={joinRoom} className="px-6 bg-green-600 hover:bg-green-500 text-white font-bold rounded">JOIN</button>
+                  {/* Sidebar / User Info */}
+                  <div className="w-full md:w-1/3 bg-slate-950/50 border-b md:border-b-0 md:border-r border-slate-800 p-6 flex flex-col items-center justify-center relative overflow-hidden">
+                      <div className="absolute inset-0 bg-gradient-to-b from-cyan-900/20 to-transparent pointer-events-none"></div>
+                      <div className="relative z-10 flex flex-col items-center">
+                          <div className="w-24 h-24 rounded-full border-4 border-cyan-500 shadow-[0_0_30px_rgba(6,182,212,0.5)] overflow-hidden mb-4 bg-black">
+                              {user?.picture ? (
+                                  <img src={user.picture} alt="Avatar" className="w-full h-full object-cover" />
+                              ) : (
+                                  <div className="w-full h-full flex items-center justify-center bg-slate-800 text-cyan-400 font-bold text-3xl">{user?.name?.charAt(0).toUpperCase()}</div>
+                              )}
+                          </div>
+                          <div className="text-slate-400 text-xs font-bold tracking-widest mb-1">PLAYER PROFILE</div>
+                          <h3 className={`text-2xl font-black italic text-white text-center leading-none ${fontClass}`}>{user?.name}</h3>
+                          <div className="mt-6 w-full space-y-2">
+                              <div className="flex justify-between text-xs text-slate-500 font-mono border-b border-slate-800 pb-1"><span>STATUS</span><span className="text-green-400">ONLINE</span></div>
+                              <div className="flex justify-between text-xs text-slate-500 font-mono border-b border-slate-800 pb-1"><span>SERVER</span><span className="text-cyan-400">ASIA-1</span></div>
                           </div>
                       </div>
-                  )}
+                      <button onClick={() => { setShowMultiplayerMenu(false); if (wsRef.current) { wsRef.current.close(); wsRef.current = null; } setMpStatus('LOBBY'); setIsMultiplayer(false); }} className="mt-auto md:mt-8 text-xs text-red-400 hover:text-red-300 flex items-center gap-2 px-4 py-2 rounded border border-red-900/30 hover:bg-red-900/20 transition-colors">
+                          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
+                          DISCONNECT
+                      </button>
+                  </div>
 
-                  {mpStatus === 'WAITING' && (
-                      <div className="text-center">
-                          <div className="text-xl text-cyan-400 font-mono mb-4">ROOM ID: <span className="text-white font-bold text-3xl select-all">{multiplayerRoomId}</span></div>
-                          <div className="animate-pulse text-slate-400">WAITING FOR OPPONENT...</div>
+                  {/* Main Content Area */}
+                  <div className="flex-1 p-8 flex flex-col relative">
+                      <div className="absolute top-0 right-0 p-4 opacity-20 pointer-events-none">
+                          <div className="text-[8rem] leading-none font-black text-white italic transform -rotate-12">VS</div>
                       </div>
-                  )}
 
-                  {mpStatus === 'READY' && (
-                      <div className="text-center">
-                          <div className="text-xl text-green-400 font-bold mb-4">OPPONENT CONNECTED!</div>
-                          <div className="text-white mb-6">VS {opponentState?.name}</div>
-                          <button onClick={startGameMultiplayer} className="w-full h-12 bg-red-600 hover:bg-red-500 text-white font-bold rounded animate-pulse">START GAME</button>
-                      </div>
-                  )}
+                      <h2 className={`text-4xl font-black italic text-transparent bg-clip-text bg-gradient-to-r from-white to-slate-400 mb-8 relative z-10 ${fontClass}`}>MULTIPLAYER <span className="text-cyan-400">LOBBY</span></h2>
+                      
+                      {mpStatus === 'LOBBY' && (
+                          <div className="flex flex-col gap-6 flex-1 justify-center z-10">
+                              <div className="group relative">
+                                  <div className="absolute -inset-0.5 bg-gradient-to-r from-cyan-600 to-blue-600 rounded-lg blur opacity-30 group-hover:opacity-75 transition duration-200"></div>
+                                  <button onClick={createRoom} className="relative w-full h-20 bg-slate-900 rounded-lg flex items-center px-6 border border-slate-700 group-hover:border-cyan-500 transition-all">
+                                      <div className="w-12 h-12 rounded-full bg-cyan-900/50 flex items-center justify-center mr-4 group-hover:scale-110 transition-transform">
+                                          <svg className="w-6 h-6 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+                                      </div>
+                                      <div className="text-left">
+                                          <div className={`text-xl font-bold text-white ${fontClass}`}>CREATE ROOM</div>
+                                          <div className="text-xs text-slate-400">Host a new game and invite a friend</div>
+                                      </div>
+                                  </button>
+                              </div>
+
+                              <div className="relative">
+                                  <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-800"></div></div>
+                                  <div className="relative flex justify-center text-xs uppercase"><span className="bg-slate-900 px-2 text-slate-500">Or Join Existing</span></div>
+                              </div>
+
+                              <div className="flex gap-2">
+                                  <div className="relative flex-1">
+                                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                          <svg className="h-5 w-5 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
+                                      </div>
+                                      <input type="text" placeholder="ENTER ROOM ID" value={joinRoomIdInput} onChange={(e) => setJoinRoomIdInput(e.target.value.toUpperCase())} className="block w-full pl-10 h-14 bg-black border border-slate-700 focus:border-green-500 rounded-lg text-white font-mono text-lg uppercase tracking-widest focus:ring-1 focus:ring-green-500 outline-none transition-all" />
+                                  </div>
+                                  <button onClick={joinRoom} disabled={!joinRoomIdInput} className={`px-8 h-14 rounded-lg font-bold text-white transition-all ${joinRoomIdInput ? 'bg-green-600 hover:bg-green-500 shadow-[0_0_20px_rgba(34,197,94,0.4)]' : 'bg-slate-800 text-slate-500 cursor-not-allowed'}`}>JOIN</button>
+                              </div>
+                          </div>
+                      )}
+
+                      {mpStatus === 'WAITING' && (
+                          <div className="flex flex-col items-center justify-center flex-1 z-10">
+                              <div className="w-full bg-black/50 border border-cyan-900/50 rounded-xl p-6 text-center mb-8 relative overflow-hidden">
+                                  <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-cyan-500 to-transparent animate-scan"></div>
+                                  <div className="text-xs text-cyan-500 font-mono mb-2 tracking-widest">ROOM ID GENERATED</div>
+                                  <div className="text-5xl font-mono font-bold text-white tracking-[0.2em] mb-4 drop-shadow-[0_0_10px_rgba(6,182,212,0.8)] select-all">{multiplayerRoomId}</div>
+                                  <button onClick={() => { navigator.clipboard.writeText(multiplayerRoomId); setFeedback({ text: "COPIED!", color: "text-green-400", id: Date.now() }); }} className="text-xs bg-slate-800 hover:bg-slate-700 text-white px-3 py-1 rounded border border-slate-600 transition-colors">COPY TO CLIPBOARD</button>
+                              </div>
+                              <div className="flex items-center gap-3">
+                                  <div className="w-3 h-3 bg-cyan-400 rounded-full animate-ping"></div>
+                                  <div className="text-slate-300 font-mono animate-pulse">WAITING FOR OPPONENT...</div>
+                              </div>
+                          </div>
+                      )}
+
+                      {mpStatus === 'READY' && (
+                          <div className="flex flex-col flex-1 z-10">
+                              <div className="flex-1 flex flex-col items-center justify-center">
+                                  <div className="flex items-center gap-8 mb-8">
+                                      <div className="flex flex-col items-center">
+                                          <div className="w-20 h-20 rounded-full border-4 border-cyan-500 bg-black mb-2 overflow-hidden"><img src={user?.picture || undefined} className="w-full h-full object-cover" onError={(e) => e.currentTarget.style.display='none'} /><div className="w-full h-full flex items-center justify-center bg-slate-800 text-cyan-400 font-bold text-xl" style={{display: user?.picture ? 'none' : 'flex'}}>{user?.name?.charAt(0)}</div></div>
+                                          <div className="text-white font-bold text-sm">{user?.name}</div>
+                                      </div>
+                                      <div className="text-4xl font-black italic text-red-500">VS</div>
+                                      <div className="flex flex-col items-center">
+                                          <div className="w-20 h-20 rounded-full border-4 border-red-500 bg-black mb-2 flex items-center justify-center overflow-hidden">
+                                              <span className="text-3xl">😈</span>
+                                          </div>
+                                          <div className="text-white font-bold text-sm">{opponentState?.name}</div>
+                                      </div>
+                                  </div>
+
+                                  {transferProgress !== null && (
+                                      <div className="w-full max-w-md mb-6 bg-slate-900 p-4 rounded-lg border border-slate-700">
+                                          <div className="flex justify-between text-xs text-cyan-400 mb-2 font-mono">
+                                              <span>{transferStatus}</span>
+                                              <span>{Math.round(transferProgress)}%</span>
+                                          </div>
+                                          <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
+                                              <div className="h-full bg-gradient-to-r from-cyan-500 to-blue-500 transition-all duration-200" style={{ width: `${transferProgress}%` }}></div>
+                                          </div>
+                                      </div>
+                                  )}
+
+                                  {/* Host Controls */}
+                                  {isHost ? (
+                                      <div className="w-full max-w-md bg-slate-800/50 rounded-lg border border-slate-700 p-4 mb-6">
+                                          <div className="flex items-center justify-between mb-4">
+                                              <div className="flex items-center gap-3 overflow-hidden">
+                                                  <div className="w-10 h-10 bg-black rounded flex items-center justify-center shrink-0 text-slate-500">🎵</div>
+                                                  <div className="min-w-0">
+                                                      <div className="text-[10px] text-slate-400 font-bold tracking-wider">SELECTED TRACK</div>
+                                                      <div className="text-white font-bold truncate text-sm">{currentSongMetadata?.name || "NO TRACK SELECTED"}</div>
+                                                  </div>
+                                              </div>
+                                              <button onClick={() => setShowLobbySongSelect(true)} className="text-[10px] bg-slate-700 hover:bg-slate-600 text-white px-3 py-2 rounded font-bold transition-colors">CHANGE</button>
+                                          </div>
+                                          
+                                          {currentSongMetadata && (
+                                              <button onClick={sendFile} className="w-full text-[10px] bg-blue-600 hover:bg-blue-500 text-white px-3 py-2 rounded-md font-bold shadow-lg hover:shadow-blue-500/20 transition-all mb-2">SYNC TRACK TO GUEST</button>
+                                          )}
+
+                                          <div className="flex items-center justify-between text-xs font-mono bg-black/30 p-2 rounded">
+                                              <span className="text-slate-400">GUEST STATUS:</span>
+                                              <span className={isGuestReady ? "text-green-400 font-bold animate-pulse" : "text-red-400 font-bold"}>{isGuestReady ? "READY" : "NOT READY"}</span>
+                                          </div>
+                                      </div>
+                                  ) : (
+                                      <div className="w-full max-w-md bg-slate-800/50 rounded-lg border border-slate-700 p-4 mb-6">
+                                          <div className="flex items-center gap-3 overflow-hidden mb-4">
+                                              <div className="w-10 h-10 bg-black rounded flex items-center justify-center shrink-0 text-slate-500">🎵</div>
+                                              <div className="min-w-0">
+                                                  <div className="text-[10px] text-slate-400 font-bold tracking-wider">HOST TRACK</div>
+                                                  <div className="text-white font-bold truncate text-sm">{currentSongMetadata?.name || "WAITING FOR HOST..."}</div>
+                                              </div>
+                                          </div>
+                                          <div className="text-center text-xs text-slate-500 font-mono">WAITING FOR HOST TO START</div>
+                                      </div>
+                                  )}
+                              </div>
+
+                              {isHost ? (
+                                  <button onClick={startGameMultiplayer} disabled={!isGuestReady} className={`w-full h-16 font-black text-2xl italic tracking-widest rounded-xl transition-all flex items-center justify-center gap-2 group ${isGuestReady ? 'bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-500 hover:to-orange-500 text-white shadow-[0_0_30px_rgba(220,38,38,0.4)] hover:shadow-[0_0_50px_rgba(220,38,38,0.6)] transform hover:scale-[1.02] active:scale-[0.98] cursor-pointer' : 'bg-slate-800 text-slate-500 cursor-not-allowed grayscale'}`}>
+                                      <span>START BATTLE</span>
+                                      {isGuestReady && <svg className="w-6 h-6 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M13 5l7 7-7 7M5 5l7 7-7 7" /></svg>}
+                                  </button>
+                              ) : (
+                                  <button onClick={handleReadyToggle} className={`w-full h-16 font-black text-2xl italic tracking-widest rounded-xl transition-all flex items-center justify-center gap-2 group ${isGuestReady ? 'bg-green-600 hover:bg-green-500 text-white shadow-[0_0_30px_rgba(34,197,94,0.4)]' : 'bg-slate-700 hover:bg-slate-600 text-slate-300'}`}>
+                                      <span>{isGuestReady ? "READY!" : "CLICK TO READY"}</span>
+                                  </button>
+                              )}
+                          </div>
+                      )}
+                  </div>
               </div>
+
+              {/* Lobby Song Select Modal */}
+              {showLobbySongSelect && (
+                  <div className="absolute inset-0 z-[90] bg-black/90 backdrop-blur-xl flex flex-col p-8 animate-fade-in">
+                      <div className="flex justify-between items-center mb-6">
+                          <h2 className={`text-3xl font-black italic text-white ${fontClass}`}>SELECT TRACK</h2>
+                          <button onClick={() => setShowLobbySongSelect(false)} className="text-slate-400 hover:text-white">CLOSE</button>
+                      </div>
+                      <div className="flex-1 overflow-y-auto space-y-2">
+                          <div onClick={() => fileInputRef.current?.click()} className="p-4 border-2 border-dashed border-slate-700 hover:border-cyan-500 rounded-lg flex items-center justify-center cursor-pointer transition-colors group">
+                              <div className="text-slate-500 group-hover:text-cyan-400 font-bold flex items-center gap-2">
+                                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
+                                  UPLOAD NEW TRACK
+                              </div>
+                              <input 
+                                  type="file" 
+                                  ref={fileInputRef} 
+                                  onChange={(e) => {
+                                      if (e.target.files && e.target.files[0]) {
+                                          const file = e.target.files[0];
+                                          // Create a temporary song object
+                                          const tempSong: SongMetadata = {
+                                              id: Date.now().toString(),
+                                              name: file.name,
+                                              file: file,
+                                              type: file.type.startsWith('video') ? 'video' : 'audio',
+                                              duration: 0,
+                                              bpm: 0,
+                                              thumbnailUrl: ''
+                                          };
+                                          handleLobbySongSelect(tempSong);
+                                      }
+                                  }} 
+                                  className="hidden" 
+                                  accept="audio/*,video/*"
+                              />
+                          </div>
+                          {songList.map(song => (
+                              <div key={song.id} onClick={() => handleLobbySongSelect(song)} className="p-4 bg-slate-800/50 hover:bg-slate-700 border border-slate-700 rounded-lg cursor-pointer flex items-center gap-4 transition-colors">
+                                  <div className="w-12 h-12 bg-black rounded overflow-hidden shrink-0">
+                                      {song.thumbnailUrl ? <img src={song.thumbnailUrl} className="w-full h-full object-cover" /> : <div className="w-full h-full bg-slate-900"></div>}
+                                  </div>
+                                  <div className="min-w-0">
+                                      <div className="text-white font-bold truncate">{song.name}</div>
+                                      <div className="text-xs text-slate-500 uppercase">{song.type} FILE</div>
+                                  </div>
+                              </div>
+                          ))}
+                      </div>
+                  </div>
+              )}
           </div>
       )}
 

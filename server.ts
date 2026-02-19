@@ -17,7 +17,7 @@ async function startServer() {
 
   // --- OAuth Routes ---
   app.get('/api/auth/google/url', (req, res) => {
-    const redirectUri = `${req.protocol}://${req.get('host')}/auth/callback`;
+    const redirectUri = `${req.protocol}://${req.get('host')}/api/auth/callback`;
     const clientId = process.env.GOOGLE_CLIENT_ID;
     
     if (!clientId) {
@@ -37,7 +37,7 @@ async function startServer() {
     res.json({ url });
   });
 
-  app.get('/auth/callback', async (req, res) => {
+  app.get('/api/auth/callback', async (req, res) => {
     const { code } = req.query;
     
     if (!code) {
@@ -45,7 +45,7 @@ async function startServer() {
     }
 
     try {
-      const redirectUri = `${req.protocol}://${req.get('host')}/auth/callback`;
+      const redirectUri = `${req.protocol}://${req.get('host')}/api/auth/callback`;
       
       // Exchange code for tokens
       const tokenResponse = await axios.post('https://oauth2.googleapis.com/token', {
@@ -179,6 +179,66 @@ async function startServer() {
               }
             }
             break;
+          }
+          
+          case 'PLAYER_READY': {
+            if (currentRoomId) {
+              const room = rooms.get(currentRoomId);
+              if (room) {
+                const opponent = room.players.find(p => p.id !== playerId);
+                if (opponent) {
+                  opponent.ws.send(JSON.stringify({ type: 'PLAYER_READY', ready: data.ready }));
+                }
+              }
+            }
+            break;
+          }
+
+          case 'SIGNAL': {
+            const { targetId, signal } = data;
+            if (currentRoomId) {
+              const room = rooms.get(currentRoomId);
+              if (room) {
+                const targetPlayer = room.players.find(p => p.id === targetId);
+                if (targetPlayer) {
+                  targetPlayer.ws.send(JSON.stringify({
+                    type: 'SIGNAL',
+                    senderId: playerId,
+                    signal
+                  }));
+                }
+              }
+            }
+            break;
+          }
+
+          case 'SONG_METADATA': {
+             if (currentRoomId) {
+                 const room = rooms.get(currentRoomId);
+                 if (room) {
+                     const opponent = room.players.find(p => p.id !== playerId);
+                     if (opponent) {
+                         opponent.ws.send(JSON.stringify({
+                             type: 'SONG_METADATA',
+                             metadata: data.metadata
+                         }));
+                     }
+                 }
+             }
+             break;
+          }
+
+          case 'REQUEST_FILE': {
+             if (currentRoomId) {
+                 const room = rooms.get(currentRoomId);
+                 if (room) {
+                     const host = room.players.find(p => p.id !== playerId); // Assuming request comes from guest
+                     if (host) {
+                         host.ws.send(JSON.stringify({ type: 'REQUEST_FILE', requestorId: playerId }));
+                     }
+                 }
+             }
+             break;
           }
           
           case 'GAME_OVER': {
