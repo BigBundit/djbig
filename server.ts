@@ -194,6 +194,19 @@ async function startServer() {
             break;
           }
 
+          case 'GAME_FINISHED': {
+            if (currentRoomId) {
+              const room = rooms.get(currentRoomId);
+              if (room) {
+                const opponent = room.players.find(p => p.id !== playerId);
+                if (opponent) {
+                  opponent.ws.send(JSON.stringify({ type: 'OPPONENT_FINISHED', score: data.score }));
+                }
+              }
+            }
+            break;
+          }
+
           case 'SIGNAL': {
             const { targetId, signal } = data;
             if (currentRoomId) {

@@ -4,6 +4,14 @@ import { HighScore, GameStats } from '../types';
 
 interface EndScreenProps {
     stats: GameStats;
+    opponentStats?: {
+        name: string;
+        score: number;
+        maxCombo: number;
+        miss: number;
+        perfect: number;
+        good: number;
+    } | null;
     fileName: string;
     onRestart: () => void;
     onMenu: () => void;
@@ -12,7 +20,7 @@ interface EndScreenProps {
     onPlaySound?: (type: 'hover' | 'select' | 'back' | 'scratch') => void;
 }
 
-export const EndScreen: React.FC<EndScreenProps> = ({ stats, fileName, onRestart, onMenu, t, fontClass, onPlaySound }) => {
+export const EndScreen: React.FC<EndScreenProps> = ({ stats, opponentStats, fileName, onRestart, onMenu, t, fontClass, onPlaySound }) => {
     const [highScoreData, setHighScoreData] = useState<HighScore | null>(null);
     const [isNewRecord, setIsNewRecord] = useState(false);
     const [playerName, setPlayerName] = useState("");
@@ -21,6 +29,7 @@ export const EndScreen: React.FC<EndScreenProps> = ({ stats, fileName, onRestart
     
     // Animation States
     const [displayScore, setDisplayScore] = useState(0);
+    const [opponentDisplayScore, setOpponentDisplayScore] = useState(0);
     const [showRank, setShowRank] = useState(false);
 
     // Safe key generation
@@ -85,6 +94,10 @@ export const EndScreen: React.FC<EndScreenProps> = ({ stats, fileName, onRestart
             const ease = 1 - Math.pow(1 - progress, 4);
             
             setDisplayScore(Math.floor(start + (end - start) * ease));
+            
+            if (opponentStats) {
+                 setOpponentDisplayScore(Math.floor(0 + (opponentStats.score - 0) * ease));
+            }
 
             if (progress < 1) {
                 requestAnimationFrame(animateScore);
@@ -96,7 +109,7 @@ export const EndScreen: React.FC<EndScreenProps> = ({ stats, fileName, onRestart
 
         requestAnimationFrame(animateScore);
 
-    }, [stats, fileName]);
+    }, [stats, fileName, opponentStats]);
 
     const handleSaveName = () => {
         if (!playerName || !playerName.trim()) return;
@@ -135,6 +148,7 @@ export const EndScreen: React.FC<EndScreenProps> = ({ stats, fileName, onRestart
     };
 
     const isFullCombo = stats.miss === 0 && stats.score > 0;
+    const isWin = opponentStats ? stats.score > opponentStats.score : true;
 
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/90 backdrop-blur-sm p-2 md:p-4 overflow-y-auto">
@@ -145,14 +159,14 @@ export const EndScreen: React.FC<EndScreenProps> = ({ stats, fileName, onRestart
             </div>
 
             {/* MAIN CONTENT CONTAINER */}
-            <div className="relative w-full max-w-5xl h-auto md:h-auto lg:h-[70vh] flex flex-col md:flex-row shadow-[0_0_50px_rgba(0,0,0,0.8)] bg-slate-900/95 backdrop-blur-xl border border-slate-700 rounded-lg overflow-hidden shrink-0 my-auto min-h-0">
+            <div className="relative w-full max-w-6xl h-auto md:h-auto lg:h-[80vh] flex flex-col md:flex-row shadow-[0_0_50px_rgba(0,0,0,0.8)] bg-slate-900/95 backdrop-blur-xl border border-slate-700 rounded-lg overflow-hidden shrink-0 my-auto min-h-0">
                 
                 {/* DECORATIVE BARS */}
                 <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-cyan-500 to-transparent z-10"></div>
                 <div className="absolute bottom-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-purple-500 to-transparent z-10"></div>
 
                 {/* LEFT PANEL: RANK & TITLE */}
-                <div className="w-full md:w-[45%] relative flex flex-col justify-center items-center p-4 md:p-8 border-b md:border-b-0 md:border-r border-slate-700/50 bg-gradient-to-br from-slate-800/50 to-transparent min-h-[180px] md:min-h-0">
+                <div className="w-full md:w-[40%] relative flex flex-col justify-center items-center p-4 md:p-8 border-b md:border-b-0 md:border-r border-slate-700/50 bg-gradient-to-br from-slate-800/50 to-transparent min-h-[180px] md:min-h-0">
                     
                     {/* Song Name Badge */}
                     <div className="absolute top-2 left-2 md:top-6 md:left-6 z-10">
@@ -163,11 +177,11 @@ export const EndScreen: React.FC<EndScreenProps> = ({ stats, fileName, onRestart
                                  <div className={`text-sm md:text-lg text-white font-bold tracking-wider max-w-[200px] truncate ${fontClass}`}>{fileName || "UNKNOWN TRACK"}</div>
                              </div>
                          </div>
-                    </div>
+                     </div>
 
                     {/* THE RANK */}
                     <div className={`transform transition-all duration-500 flex flex-col items-center mt-6 md:mt-0 ${showRank ? 'scale-100 opacity-100 translate-y-0' : 'scale-150 opacity-0 translate-y-10'}`}>
-                        <h2 className={`text-lg md:text-2xl text-slate-400 font-black italic tracking-[0.5em] mb-0 md:mb-4 ${fontClass}`}>{t.MISSION_RESULTS}</h2>
+                        <h2 className={`text-lg md:text-2xl text-slate-400 font-black italic tracking-[0.5em] mb-0 md:mb-4 ${fontClass}`}>{opponentStats ? (isWin ? "VICTORY" : "DEFEAT") : t.MISSION_RESULTS}</h2>
                         <div className={`text-7xl md:text-[9rem] lg:text-[11rem] leading-[1.0] md:leading-[0.8] font-black font-display italic ${getRankColor(rank)}`}>
                             {rank}
                         </div>
@@ -184,14 +198,24 @@ export const EndScreen: React.FC<EndScreenProps> = ({ stats, fileName, onRestart
                 </div>
 
                 {/* RIGHT PANEL: STATS & DATA */}
-                <div className="flex-1 flex flex-col p-4 md:p-10 justify-center relative bg-black/20">
+                <div className="flex-1 flex flex-col p-4 md:p-10 justify-center relative bg-black/20 overflow-y-auto">
                     
                     {/* Main Score */}
-                    <div className="mb-4 md:mb-10 text-center md:text-left">
-                        <div className={`text-xs md:text-sm text-cyan-500 font-bold tracking-[0.3em] mb-1 md:mb-2 ${fontClass}`}>{t.TOTAL_SCORE}</div>
-                        <div className="text-4xl md:text-6xl font-mono font-bold text-white tracking-tight drop-shadow-md">
-                            {displayScore.toLocaleString()}
+                    <div className="mb-4 md:mb-10 text-center md:text-left flex justify-between items-end">
+                        <div>
+                            <div className={`text-xs md:text-sm text-cyan-500 font-bold tracking-[0.3em] mb-1 md:mb-2 ${fontClass}`}>{t.TOTAL_SCORE}</div>
+                            <div className="text-4xl md:text-6xl font-mono font-bold text-white tracking-tight drop-shadow-md">
+                                {displayScore.toLocaleString()}
+                            </div>
                         </div>
+                        {opponentStats && (
+                            <div className="text-right opacity-80">
+                                <div className={`text-xs md:text-sm text-red-500 font-bold tracking-[0.3em] mb-1 md:mb-2 ${fontClass}`}>{opponentStats.name}</div>
+                                <div className="text-2xl md:text-4xl font-mono font-bold text-slate-300 tracking-tight">
+                                    {opponentDisplayScore.toLocaleString()}
+                                </div>
+                            </div>
+                        )}
                     </div>
 
                     {/* Stats Grid */}
@@ -228,7 +252,7 @@ export const EndScreen: React.FC<EndScreenProps> = ({ stats, fileName, onRestart
                     </div>
 
                     {/* Record Handling */}
-                    {isNewRecord && !nameSaved ? (
+                    {!opponentStats && isNewRecord && !nameSaved ? (
                          <div className="bg-gradient-to-r from-cyan-900/40 to-transparent border-l-4 border-cyan-500 p-2 md:p-4 mb-4 md:mb-8 animate-pulse-slow rounded-r">
                             <div className={`text-cyan-400 font-bold mb-2 flex items-center gap-2 text-xs md:text-base ${fontClass}`}>
                                 <span className="text-lg">★</span> {t.NEW_RECORD}
@@ -251,7 +275,7 @@ export const EndScreen: React.FC<EndScreenProps> = ({ stats, fileName, onRestart
                                 </button>
                             </div>
                          </div>
-                    ) : highScoreData ? (
+                    ) : !opponentStats && highScoreData ? (
                         <div className="flex justify-between items-center text-xs md:text-sm font-mono text-slate-500 mb-4 md:mb-8 border border-slate-800 p-2 rounded bg-black/20">
                             <span>TOP: {highScoreData.playerName}</span>
                             <span>{highScoreData.score.toLocaleString()}</span>
@@ -260,15 +284,17 @@ export const EndScreen: React.FC<EndScreenProps> = ({ stats, fileName, onRestart
 
                     {/* Action Buttons */}
                     <div className="flex gap-3 md:gap-4 mt-auto">
-                        <button 
-                            onClick={onRestart}
-                            className={`flex-1 relative group h-12 md:h-14 bg-slate-800 border-2 border-slate-600 hover:border-cyan-400 transform hover:-translate-y-1 transition-all duration-200 overflow-hidden rounded ${fontClass}`}
-                        >
-                            <div className="absolute inset-0 bg-cyan-600 translate-y-full group-hover:translate-y-0 transition-transform duration-200"></div>
-                            <div className="relative h-full flex items-center justify-center space-x-2 group-hover:text-white text-slate-300 font-black tracking-widest text-sm md:text-lg">
-                                <span>↺</span> <span>{t.RETRY}</span>
-                            </div>
-                        </button>
+                        {!opponentStats && (
+                            <button 
+                                onClick={onRestart}
+                                className={`flex-1 relative group h-12 md:h-14 bg-slate-800 border-2 border-slate-600 hover:border-cyan-400 transform hover:-translate-y-1 transition-all duration-200 overflow-hidden rounded ${fontClass}`}
+                            >
+                                <div className="absolute inset-0 bg-cyan-600 translate-y-full group-hover:translate-y-0 transition-transform duration-200"></div>
+                                <div className="relative h-full flex items-center justify-center space-x-2 group-hover:text-white text-slate-300 font-black tracking-widest text-sm md:text-lg">
+                                    <span>↺</span> <span>{t.RETRY}</span>
+                                </div>
+                            </button>
+                        )}
                         
                         <button 
                             onClick={onMenu}
@@ -276,7 +302,7 @@ export const EndScreen: React.FC<EndScreenProps> = ({ stats, fileName, onRestart
                         >
                              <div className="absolute inset-0 bg-purple-600 translate-y-full group-hover:translate-y-0 transition-transform duration-200"></div>
                             <div className="relative h-full flex items-center justify-center space-x-2 group-hover:text-white text-slate-300 font-black tracking-widest text-sm md:text-lg">
-                                <span>≡</span> <span>{t.MENU}</span>
+                                <span>≡</span> <span>{opponentStats ? "LOBBY" : t.MENU}</span>
                             </div>
                         </button>
                     </div>

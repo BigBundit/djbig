@@ -177,6 +177,8 @@ const App: React.FC = () => {
   const [isHost, setIsHost] = useState(false);
   const [isGuestReady, setIsGuestReady] = useState(false);
   const [showLobbySongSelect, setShowLobbySongSelect] = useState(false);
+  const [isOpponentFinished, setIsOpponentFinished] = useState(false);
+  const [opponentFinalScore, setOpponentFinalScore] = useState<number | null>(null);
 
   // --- WebRTC ---
   const peerRef = useRef<RTCPeerConnection | null>(null);
@@ -304,6 +306,24 @@ const App: React.FC = () => {
     }
   };
 
+  const handleMetaMaskLogin = async () => {
+      if (typeof (window as any).ethereum !== 'undefined') {
+          try {
+              const accounts = await (window as any).ethereum.request({ method: 'eth_requestAccounts' });
+              if (accounts.length > 0) {
+                  setUser({ name: `ETH: ${accounts[0].slice(0, 6)}...`, picture: '' });
+                  playUiSound('select');
+              }
+          } catch (error) {
+              console.error("MetaMask connection failed", error);
+              setFeedback({ text: "METAMASK ERROR", color: "text-red-500", id: Date.now() });
+          }
+      } else {
+          setFeedback({ text: "METAMASK NOT FOUND", color: "text-red-500", id: Date.now() });
+          window.open('https://metamask.io/download/', '_blank');
+      }
+  };
+
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
       if (event.data.type === 'OAUTH_AUTH_SUCCESS') {
@@ -423,6 +443,12 @@ const App: React.FC = () => {
       dataChannelRef.current.send(JSON.stringify({ type: 'FILE_END' }));
   };
 
+  const startCountdownSequenceRef = useRef<() => void>(() => {});
+
+  useEffect(() => {
+      startCountdownSequenceRef.current = startCountdownSequence;
+  });
+
   const handleGuestLogin = () => {
       if (!guestNameInput.trim()) return;
       setUser({ name: guestNameInput.trim(), picture: '' });
@@ -494,13 +520,22 @@ const App: React.FC = () => {
                     setMpStatus('PLAYING');
                     setIsMultiplayer(true);
                     setShowMultiplayerMenu(false); // Close the lobby menu
-                    startCountdownSequence(); // Start the game sequence
+                    setIsOpponentFinished(false); // Reset for new game
+                    setOpponentFinalScore(null);
+                    startCountdownSequenceRef.current(); // Start the game sequence via ref to avoid stale closure
                     break;
                 case 'OPPONENT_UPDATE':
                     setOpponentState(prev => ({ ...prev!, score: data.score, health: data.health, combo: data.combo }));
                     break;
                 case 'OPPONENT_FINISHED':
+                    setIsOpponentFinished(true);
+                    setOpponentFinalScore(data.score);
                     setFeedback({ text: `${opponentState?.name} FINISHED!`, color: 'text-yellow-400', id: Date.now() });
+                    
+                    // If we are already waiting for opponent, go to finished screen now
+                    if (statusRef.current === GameStatus.WAITING_MULTI_RESULT) {
+                        setTimeout(() => setStatus(GameStatus.FINISHED), 1000);
+                    }
                     break;
                 case 'OPPONENT_DISCONNECTED':
                     alert('Opponent disconnected');
@@ -533,6 +568,10 @@ const App: React.FC = () => {
   };
 
   const handleReadyToggle = () => {
+      if (!analyzedNotes) {
+          setFeedback({ text: "ANALYZING...", color: "text-yellow-400", id: Date.now() });
+          return;
+      }
       const newReadyState = !isGuestReady;
       setIsGuestReady(newReadyState);
       if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
@@ -1023,11 +1062,14 @@ const App: React.FC = () => {
       const url = URL.createObjectURL(file);
       setLocalVideoSrc(url);
       setLocalFileName(file.name);
-      if (meta) setCurrentSongMetadata(meta);
-      else {
+      
+      let newMeta = meta;
+      if (!newMeta) {
           const isVideo = file.type.startsWith('video') || !!file.name.match(/\.(mp4|webm|ogg|mov|m4v)$/i);
-          setCurrentSongMetadata({ id: `temp-${Date.now()}`, file, name: file.name, thumbnailUrl: null, type: isVideo ? 'video' : 'audio' });
+          newMeta = { id: `temp-${Date.now()}`, file, name: file.name, thumbnailUrl: null, type: isVideo ? 'video' : 'audio' };
       }
+      setCurrentSongMetadata(newMeta);
+
       playPreview(url);
       const hash = file.name.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
       const profiles: ('electronic' | 'rock' | 'chiptune')[] = ['electronic', 'rock', 'chiptune'];
@@ -1035,15 +1077,22 @@ const App: React.FC = () => {
       const isVideo = file.type.startsWith('video') || !!file.name.match(/\.(mp4|webm|ogg|mov|m4v)$/i);
       setMediaType(isVideo ? 'video' : 'audio');
       setAnalyzedNotes(null); 
+      
       try {
         setIsAnalyzing(true);
         const arrayBuffer = await file.arrayBuffer();
-        const ctx = initAudio();
+        const ctx = initAudio(); // Ensure context is ready
         const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
         audioBufferRef.current = audioBuffer; 
         audioDurationRef.current = audioBuffer.duration;
-        await performAnalysis(audioBuffer);
+        
+        // In multiplayer, we don't want to auto-analyze immediately if we are the guest receiving a file
+        // But for simplicity, we analyze it so it's ready.
+        const notes = await analyzeAudioAndGenerateNotes(audioBuffer, level, keyMode, START_OFFSET_MS + PRE_ROLL_MS);
+        setAnalyzedNotes(notes);
+        setIsAnalyzing(false);
       } catch (error) {
+        console.error("Analysis failed", error);
         setIsAnalyzing(false);
       }
     }
@@ -1216,8 +1265,22 @@ const App: React.FC = () => {
        if (mediaRef.current) mediaRef.current.pause();
        if (bgVideoRef.current) bgVideoRef.current.pause(); 
       if (!isAutoPlay) checkUnlocks(score, maxCombo, perfectCount);
-      setTimeout(() => setStatus(GameStatus.FINISHED), 3000);
-  }, [score, maxCombo, perfectCount, isAutoPlay, level, speedMod]);
+      
+      if (isMultiplayer) {
+          if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+              wsRef.current.send(JSON.stringify({ type: 'GAME_FINISHED', score: score }));
+          }
+          // In multiplayer, wait for opponent to finish before showing results
+          if (isOpponentFinished) {
+              setTimeout(() => setStatus(GameStatus.FINISHED), 3000);
+          } else {
+              // Stay in WAITING state
+              setTimeout(() => setStatus(GameStatus.WAITING_MULTI_RESULT), 3000); 
+          }
+      } else {
+          setTimeout(() => setStatus(GameStatus.FINISHED), 3000);
+      }
+  }, [score, maxCombo, perfectCount, isAutoPlay, level, speedMod, isMultiplayer, isOpponentFinished]);
 
   const updateRank = useCallback(() => {
     const totalHits = perfectCount + goodCount + missCount;
@@ -1692,11 +1755,20 @@ const App: React.FC = () => {
 
   const quitGame = () => {
     playUiSound('select');
-    setStatus(GameStatus.TITLE);
     setHitEffects([]);
     stopPreview();
     if (mediaRef.current) { mediaRef.current.pause(); mediaRef.current.src = ""; }
     if (bgVideoRef.current) bgVideoRef.current.pause();
+
+    if (isMultiplayer) {
+        setMpStatus('READY');
+        setShowMultiplayerMenu(true);
+        setStatus(GameStatus.TITLE);
+        setIsOpponentFinished(false);
+        setOpponentFinalScore(null);
+    } else {
+        setStatus(GameStatus.TITLE);
+    }
   };
   
   const DIFFICULTY_OPTIONS = [ { label: t.EASY, value: 7, color: 'bg-green-500 shadow-green-500/50' }, { label: t.NORMAL, value: 8, color: 'bg-yellow-500 shadow-yellow-500/50' }, { label: t.HARD, value: 9, color: 'bg-orange-500 shadow-orange-500/50' }, { label: t.EXPERT, value: 10, color: 'bg-red-500 shadow-red-500/50' } ];
@@ -1871,8 +1943,8 @@ const App: React.FC = () => {
               <div className="relative z-10 text-center transform hover:scale-105 transition-transform duration-500 cursor-default mb-12 mt-[-100px]"><div className="flex items-end justify-center leading-none mb-4 animate-pulse"><span className="text-8xl md:text-[10rem] font-black font-display text-white italic drop-shadow-[5px_5px_0px_rgba(6,182,212,1)] tracking-tighter" style={{textShadow: '4px 4px 0px #0891b2'}}>DJ</span><span className="text-8xl md:text-[10rem] font-black font-display text-cyan-400 italic drop-shadow-[0_0_30px_rgba(34,211,238,0.8)] ml-2" style={{textShadow: '0 0 20px cyan'}}>BIG</span></div><div className="inline-block bg-black/80 px-4 py-1 border-x-2 border-cyan-500 backdrop-blur-sm"><p className={`text-cyan-200 font-bold tracking-[0.5em] text-sm md:text-xl font-display uppercase`}>RHYTHM MUSIC EMULATOR</p></div></div>
               <div className="flex flex-col items-center space-y-4 w-full max-w-md z-20">
                   <button onClick={() => { setStatus(GameStatus.MENU); playUiSound('select'); initAudio(); }} onMouseEnter={() => playUiSound('hover')} className="group relative w-80 h-20 bg-gradient-to-r from-cyan-900/80 via-cyan-600 to-cyan-900/80 border-x-4 border-cyan-400 transform -skew-x-12 hover:scale-105 transition-all duration-200 overflow-hidden shadow-[0_0_30px_rgba(6,182,212,0.3)]"><div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-20 transition-opacity"></div><div className="flex flex-col items-center justify-center h-full transform skew-x-12"><span className={`text-3xl font-black italic text-white group-hover:text-cyan-100 ${fontClass}`}>{t.START}</span><span className="text-[10px] font-mono text-cyan-300 tracking-[0.3em]">INITIATE SEQUENCE</span></div></button>
-                  <button onClick={() => { setShowKeyConfig(true); playUiSound('select'); }} onMouseEnter={() => playUiSound('hover')} className="group relative w-64 h-14 bg-gradient-to-r from-slate-800/80 via-yellow-900 to-slate-800/80 border-x-4 border-yellow-500 transform -skew-x-12 hover:scale-105 transition-all duration-200 overflow-hidden"><div className="flex flex-col items-center justify-center h-full transform skew-x-12"><span className={`text-xl font-bold text-slate-300 group-hover:text-yellow-200 ${fontClass}`}>{t.SETTING}</span></div></button>
                   <button onClick={initMultiplayer} onMouseEnter={() => playUiSound('hover')} className="group relative w-64 h-14 bg-gradient-to-r from-slate-800/80 via-green-900 to-slate-800/80 border-x-4 border-green-500 transform -skew-x-12 hover:scale-105 transition-all duration-200 overflow-hidden"><div className="flex flex-col items-center justify-center h-full transform skew-x-12"><span className={`text-lg font-bold text-slate-300 group-hover:text-green-200 ${fontClass}`}>ONLINE MODE</span>{user && <span className="text-[8px] font-mono text-green-400">LOGGED IN AS {user.name.toUpperCase()}</span>}</div></button>
+                  <button onClick={() => { setShowKeyConfig(true); playUiSound('select'); }} onMouseEnter={() => playUiSound('hover')} className="group relative w-64 h-14 bg-gradient-to-r from-slate-800/80 via-yellow-900 to-slate-800/80 border-x-4 border-yellow-500 transform -skew-x-12 hover:scale-105 transition-all duration-200 overflow-hidden"><div className="flex flex-col items-center justify-center h-full transform skew-x-12"><span className={`text-xl font-bold text-slate-300 group-hover:text-yellow-200 ${fontClass}`}>{t.SETTING}</span></div></button>
                   <button onClick={() => window.location.reload()} onMouseEnter={() => playUiSound('hover')} className="group relative w-64 h-14 bg-gradient-to-r from-slate-800/80 via-red-900 to-slate-800/80 border-x-4 border-red-500 transform -skew-x-12 hover:scale-105 transition-all duration-200 overflow-hidden"><div className="flex flex-col items-center justify-center h-full transform skew-x-12"><span className={`text-lg font-bold text-slate-300 group-hover:text-red-200 ${fontClass}`}>{t.EXIT}</span></div></button>
                </div>
               <div className="absolute bottom-8 w-full text-center pb-[env(safe-area-inset-bottom)]"><p className="text-[10px] text-slate-500 font-mono">VER 2.5.0 // CREATED BY : IGNORE</p><p className="text-[10px] text-slate-600 font-mono mt-1">© 2024 DJBIG PROJECT. ALL RIGHTS RESERVED.</p></div>
@@ -1887,15 +1959,6 @@ const App: React.FC = () => {
                   <div className="flex flex-col gap-4">
                       <input type="text" placeholder="YOUR NAME" value={guestNameInput} onChange={(e) => setGuestNameInput(e.target.value)} className="bg-black border border-slate-600 text-white px-4 py-3 rounded font-mono text-lg text-center" autoFocus />
                       <button onClick={handleGuestLogin} className="w-full h-12 bg-cyan-600 hover:bg-cyan-500 text-white font-bold rounded">CONTINUE</button>
-                      <div className="flex items-center gap-2 my-2">
-                          <div className="h-px bg-slate-700 flex-1"></div>
-                          <span className="text-slate-500 text-xs">OR</span>
-                          <div className="h-px bg-slate-700 flex-1"></div>
-                      </div>
-                      <button onClick={handleLogin} className="w-full h-12 bg-slate-800 hover:bg-slate-700 border border-slate-600 text-white font-bold rounded flex items-center justify-center gap-2">
-                          <svg className="w-4 h-4" viewBox="0 0 24 24"><path fill="currentColor" d="M12.545,10.239v3.821h5.445c-0.712,2.315-2.647,3.972-5.445,3.972c-3.332,0-6.033-2.701-6.033-6.032s2.701-6.032,6.033-6.032c1.498,0,2.866,0.549,3.921,1.453l2.814-2.814C17.503,2.988,15.139,2,12.545,2C7.021,2,2.543,6.477,2.543,12s4.478,10,10.002,10c8.396,0,10.249-7.85,9.426-11.748L12.545,10.239z"/></svg>
-                          LOGIN WITH GOOGLE
-                      </button>
                   </div>
               </div>
           </div>
@@ -2156,8 +2219,16 @@ const App: React.FC = () => {
         </div>
       )}
 
-      {(status === GameStatus.PLAYING || status === GameStatus.PAUSED || status === GameStatus.RESUMING) && ( 
+      {(status === GameStatus.PLAYING || status === GameStatus.PAUSED || status === GameStatus.RESUMING || status === GameStatus.OUTRO || status === GameStatus.WAITING_MULTI_RESULT) && ( 
           <>
+            {status === GameStatus.WAITING_MULTI_RESULT && (
+                <div className="absolute inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm animate-fade-in">
+                    <div className="flex flex-col items-center gap-4">
+                        <div className="w-16 h-16 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin"></div>
+                        <div className={`text-2xl font-black italic text-white tracking-widest ${fontClass}`}>WAITING FOR OPPONENT...</div>
+                    </div>
+                </div>
+            )}
             <div className="absolute top-1 left-1/2 transform -translate-x-1/2 z-50 flex flex-col items-center pointer-events-none pt-[env(safe-area-inset-top)]"><div className="bg-black/60 backdrop-blur px-4 py-1 border-b border-cyan-500 shadow-[0_2px_8px_rgba(6,182,212,0.3)] rounded-b-md flex flex-col items-center"><div className={`text-[7px] text-cyan-400 font-bold tracking-[0.3em] mb-0.5 ${fontClass}`}>{t.SCORE}</div><div className="text-xl font-mono text-white font-bold leading-none tracking-widest drop-shadow-[0_0_5px_rgba(255,255,255,0.5)]">{score.toString().padStart(7, '0')}</div></div></div>
             <div className={`absolute bottom-8 z-30 hidden md:flex flex-col pointer-events-none transition-all duration-500 ${layoutSettings.lanePosition === 'right' ? 'left-8 items-start' : 'right-8 items-end'}`}><div className="text-[4rem] font-black font-display italic tracking-tighter leading-none select-none mb-[-0.8rem] transform -skew-x-12 opacity-80" style={{ backgroundImage: 'linear-gradient(to bottom, #22d3ee 0%, #3b82f6 50%, #9333ea 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', filter: 'drop-shadow(0 4px 0px rgba(0,0,0,0.5))' }}>IGNORE <span className="text-white" style={{ WebkitTextFillColor: 'white' }}>PROTOCOL</span></div><div className={`flex flex-col relative w-64 ${layoutSettings.lanePosition === 'right' ? 'items-start' : 'items-end'}`}><MarqueeText text={currentSongMetadata?.name?.replace(/\.[^/.]+$/, "") || "UNKNOWN TRACK"} className={`text-2xl font-black italic text-white tracking-tighter drop-shadow0_2px_10px_rgba(0,0,0,0.8)] uppercase ${fontClass}`} /><div className="flex gap-2 mt-1"><span className="px-2 py-0.5 bg-black/60 border border-white/20 text-[9px] font-mono text-cyan-400 rounded">LV.{level}</span><span className="px-2 py-0.5 bg-black/60 border border-white/20 text-[9px] font-mono text-fuchsia-400 rounded">{keyMode}Key</span></div></div></div>
             
@@ -2178,7 +2249,7 @@ const App: React.FC = () => {
           </> 
       )}
       {status === GameStatus.PAUSED && ( <PauseMenu onResume={togglePause} onRestart={startCountdownSequence} onSettings={() => setShowKeyConfig(true)} onQuit={quitGame} t={t} fontClass={fontClass} onTitleClick={handlePauseTitleClick} /> )}
-      {status === GameStatus.FINISHED && ( <EndScreen stats={{ perfect: perfectCount, good: goodCount, miss: missCount, maxCombo, score }} fileName={currentSongMetadata?.name || "UNKNOWN"} onRestart={startCountdownSequence} onMenu={quitGame} t={t} fontClass={fontClass} onPlaySound={playUiSound} /> )}
+      {status === GameStatus.FINISHED && ( <EndScreen stats={{ perfect: perfectCount, good: goodCount, miss: missCount, maxCombo, score }} opponentStats={isMultiplayer && opponentState && opponentFinalScore !== null ? { ...opponentState, score: opponentFinalScore, miss: 0, perfect: 0, good: 0, maxCombo: opponentState.combo } : null} fileName={currentSongMetadata?.name || "UNKNOWN"} onRestart={startCountdownSequence} onMenu={quitGame} t={t} fontClass={fontClass} onPlaySound={playUiSound} /> )}
     </div>
   );
 };

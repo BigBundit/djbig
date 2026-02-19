@@ -6,7 +6,8 @@ export enum GameStatus {
     PAUSED,
     RESUMING, // New Status for Countdown
     OUTRO,
-    FINISHED
+    FINISHED,
+    WAITING_MULTI_RESULT
 }
 
 export enum ScoreRating {
