@@ -163,6 +163,16 @@ const App: React.FC = () => {
   const [isMobile, setIsMobile] = useState<boolean>(false);
   const [showMobileSetup, setShowMobileSetup] = useState<boolean>(false);
   
+  // --- Auth & Multiplayer State ---
+  const [user, setUser] = useState<{ name: string; picture: string } | null>(null);
+  const [showMultiplayerMenu, setShowMultiplayerMenu] = useState<boolean>(false);
+  const [multiplayerRoomId, setMultiplayerRoomId] = useState<string>('');
+  const [isMultiplayer, setIsMultiplayer] = useState<boolean>(false);
+  const [opponentState, setOpponentState] = useState<{ score: number; health: number; combo: number; name: string } | null>(null);
+  const [mpStatus, setMpStatus] = useState<'LOBBY' | 'WAITING' | 'READY' | 'PLAYING' | 'FINISHED'>('LOBBY');
+  const wsRef = useRef<WebSocket | null>(null);
+  const [joinRoomIdInput, setJoinRoomIdInput] = useState('');
+
   const mobileSetupStartBtnRef = useRef<HTMLButtonElement>(null);
 
   const t = TRANSLATIONS[layoutSettings.language];
@@ -262,6 +272,96 @@ const App: React.FC = () => {
         }, 100);
     }
   }, [showMobileSetup]);
+
+  const handleLogin = async () => {
+    try {
+      const response = await fetch('/api/auth/google/url');
+      const { url } = await response.json();
+      const width = 500;
+      const height = 600;
+      const left = window.screenX + (window.outerWidth - width) / 2;
+      const top = window.screenY + (window.outerHeight - height) / 2;
+      window.open(url, 'google_login', `width=${width},height=${height},left=${left},top=${top}`);
+    } catch (error) {
+      console.error('Login failed', error);
+    }
+  };
+
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data.type === 'OAUTH_AUTH_SUCCESS') {
+        setUser(event.data.user);
+        playUiSound('select');
+      }
+    };
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, []);
+
+  const initMultiplayer = () => {
+    if (!user) { alert('Please login first'); return; }
+    setShowMultiplayerMenu(true);
+    
+    if (!wsRef.current) {
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const ws = new WebSocket(`${protocol}//${window.location.host}`);
+        
+        ws.onopen = () => {
+            console.log('Connected to Multiplayer Server');
+        };
+
+        ws.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            switch (data.type) {
+                case 'ROOM_CREATED':
+                    setMultiplayerRoomId(data.roomId);
+                    setMpStatus('WAITING');
+                    break;
+                case 'PLAYER_JOINED':
+                    setMpStatus('READY');
+                    const opponent = data.players.find((p: any) => p.name !== user.name);
+                    if (opponent) setOpponentState({ name: opponent.name, score: 0, health: 100, combo: 0 });
+                    break;
+                case 'GAME_START':
+                    setMpStatus('PLAYING');
+                    setIsMultiplayer(true);
+                    startCountdownSequence(); // Reuse existing start logic
+                    break;
+                case 'OPPONENT_UPDATE':
+                    setOpponentState(prev => ({ ...prev!, score: data.score, health: data.health, combo: data.combo }));
+                    break;
+                case 'OPPONENT_FINISHED':
+                    setFeedback({ text: `${opponentState?.name} FINISHED!`, color: 'text-yellow-400', id: Date.now() });
+                    break;
+                case 'OPPONENT_DISCONNECTED':
+                    alert('Opponent disconnected');
+                    setIsMultiplayer(false);
+                    setShowMultiplayerMenu(false);
+                    setMpStatus('LOBBY');
+                    break;
+            }
+        };
+        wsRef.current = ws;
+    }
+  };
+
+  const createRoom = () => {
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+          wsRef.current.send(JSON.stringify({ type: 'CREATE_ROOM', name: user?.name }));
+      }
+  };
+
+  const joinRoom = () => {
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN && joinRoomIdInput) {
+          wsRef.current.send(JSON.stringify({ type: 'JOIN_ROOM', roomId: joinRoomIdInput, name: user?.name }));
+      }
+  };
+
+  const startGameMultiplayer = () => {
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+          wsRef.current.send(JSON.stringify({ type: 'START_GAME' }));
+      }
+  };
 
   const stopPreview = useCallback(() => {
     if (previewTimeoutRef.current) {
@@ -1277,6 +1377,15 @@ const App: React.FC = () => {
 
     if (health <= 0) { triggerOutro(); return; }
     
+    if (isMultiplayer && wsRef.current && wsRef.current.readyState === WebSocket.OPEN && frameRef.current % 10 === 0) {
+        wsRef.current.send(JSON.stringify({
+            type: 'UPDATE_SCORE',
+            score,
+            health,
+            combo
+        }));
+    }
+
     if (hitEffects.length > 0) {
         setHitEffects(prev => {
             const nowTime = Date.now();
@@ -1574,9 +1683,48 @@ const App: React.FC = () => {
               <div className="flex flex-col items-center space-y-4 w-full max-w-md z-20">
                   <button onClick={() => { setStatus(GameStatus.MENU); playUiSound('select'); initAudio(); }} onMouseEnter={() => playUiSound('hover')} className="group relative w-80 h-20 bg-gradient-to-r from-cyan-900/80 via-cyan-600 to-cyan-900/80 border-x-4 border-cyan-400 transform -skew-x-12 hover:scale-105 transition-all duration-200 overflow-hidden shadow-[0_0_30px_rgba(6,182,212,0.3)]"><div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-20 transition-opacity"></div><div className="flex flex-col items-center justify-center h-full transform skew-x-12"><span className={`text-3xl font-black italic text-white group-hover:text-cyan-100 ${fontClass}`}>{t.START}</span><span className="text-[10px] font-mono text-cyan-300 tracking-[0.3em]">INITIATE SEQUENCE</span></div></button>
                   <button onClick={() => { setShowKeyConfig(true); playUiSound('select'); }} onMouseEnter={() => playUiSound('hover')} className="group relative w-64 h-14 bg-gradient-to-r from-slate-800/80 via-yellow-900 to-slate-800/80 border-x-4 border-yellow-500 transform -skew-x-12 hover:scale-105 transition-all duration-200 overflow-hidden"><div className="flex flex-col items-center justify-center h-full transform skew-x-12"><span className={`text-xl font-bold text-slate-300 group-hover:text-yellow-200 ${fontClass}`}>{t.SETTING}</span></div></button>
+                  {user ? (
+                      <button onClick={initMultiplayer} onMouseEnter={() => playUiSound('hover')} className="group relative w-64 h-14 bg-gradient-to-r from-slate-800/80 via-green-900 to-slate-800/80 border-x-4 border-green-500 transform -skew-x-12 hover:scale-105 transition-all duration-200 overflow-hidden"><div className="flex flex-col items-center justify-center h-full transform skew-x-12"><span className={`text-lg font-bold text-slate-300 group-hover:text-green-200 ${fontClass}`}>ONLINE MODE</span><span className="text-[8px] font-mono text-green-400">LOGGED IN AS {user.name.toUpperCase()}</span></div></button>
+                  ) : (
+                      <button onClick={handleLogin} onMouseEnter={() => playUiSound('hover')} className="group relative w-64 h-14 bg-gradient-to-r from-slate-800/80 via-blue-900 to-slate-800/80 border-x-4 border-blue-500 transform -skew-x-12 hover:scale-105 transition-all duration-200 overflow-hidden"><div className="flex flex-col items-center justify-center h-full transform skew-x-12"><span className={`text-lg font-bold text-slate-300 group-hover:text-blue-200 ${fontClass}`}>LOGIN WITH GOOGLE</span></div></button>
+                  )}
                   <button onClick={() => window.location.reload()} onMouseEnter={() => playUiSound('hover')} className="group relative w-64 h-14 bg-gradient-to-r from-slate-800/80 via-red-900 to-slate-800/80 border-x-4 border-red-500 transform -skew-x-12 hover:scale-105 transition-all duration-200 overflow-hidden"><div className="flex flex-col items-center justify-center h-full transform skew-x-12"><span className={`text-lg font-bold text-slate-300 group-hover:text-red-200 ${fontClass}`}>{t.EXIT}</span></div></button>
                </div>
               <div className="absolute bottom-8 w-full text-center pb-[env(safe-area-inset-bottom)]"><p className="text-[10px] text-slate-500 font-mono">VER 2.5.0 // CREATED BY : IGNORE</p><p className="text-[10px] text-slate-600 font-mono mt-1">© 2024 DJBIG PROJECT. ALL RIGHTS RESERVED.</p></div>
+          </div>
+      )}
+
+      {showMultiplayerMenu && (
+          <div className="fixed inset-0 z-[80] bg-black/90 backdrop-blur-xl flex items-center justify-center animate-fade-in">
+              <div className="bg-slate-900 border border-cyan-500 p-8 rounded-lg shadow-[0_0_50px_rgba(6,182,212,0.5)] max-w-md w-full relative">
+                  <button onClick={() => setShowMultiplayerMenu(false)} className="absolute top-4 right-4 text-slate-500 hover:text-white">✕</button>
+                  <h2 className={`text-3xl font-black italic text-white mb-6 text-center ${fontClass}`}>MULTIPLAYER LOBBY</h2>
+                  
+                  {mpStatus === 'LOBBY' && (
+                      <div className="flex flex-col gap-4">
+                          <button onClick={createRoom} className="w-full h-12 bg-cyan-600 hover:bg-cyan-500 text-white font-bold rounded">CREATE ROOM</button>
+                          <div className="flex gap-2">
+                              <input type="text" placeholder="ENTER ROOM ID" value={joinRoomIdInput} onChange={(e) => setJoinRoomIdInput(e.target.value.toUpperCase())} className="flex-1 bg-black border border-slate-600 text-white px-4 rounded font-mono uppercase" />
+                              <button onClick={joinRoom} className="px-6 bg-green-600 hover:bg-green-500 text-white font-bold rounded">JOIN</button>
+                          </div>
+                      </div>
+                  )}
+
+                  {mpStatus === 'WAITING' && (
+                      <div className="text-center">
+                          <div className="text-xl text-cyan-400 font-mono mb-4">ROOM ID: <span className="text-white font-bold text-3xl select-all">{multiplayerRoomId}</span></div>
+                          <div className="animate-pulse text-slate-400">WAITING FOR OPPONENT...</div>
+                      </div>
+                  )}
+
+                  {mpStatus === 'READY' && (
+                      <div className="text-center">
+                          <div className="text-xl text-green-400 font-bold mb-4">OPPONENT CONNECTED!</div>
+                          <div className="text-white mb-6">VS {opponentState?.name}</div>
+                          <button onClick={startGameMultiplayer} className="w-full h-12 bg-red-600 hover:bg-red-500 text-white font-bold rounded animate-pulse">START GAME</button>
+                      </div>
+                  )}
+              </div>
           </div>
       )}
 
@@ -1622,6 +1770,20 @@ const App: React.FC = () => {
           <>
             <div className="absolute top-1 left-1/2 transform -translate-x-1/2 z-50 flex flex-col items-center pointer-events-none pt-[env(safe-area-inset-top)]"><div className="bg-black/60 backdrop-blur px-4 py-1 border-b border-cyan-500 shadow-[0_2px_8px_rgba(6,182,212,0.3)] rounded-b-md flex flex-col items-center"><div className={`text-[7px] text-cyan-400 font-bold tracking-[0.3em] mb-0.5 ${fontClass}`}>{t.SCORE}</div><div className="text-xl font-mono text-white font-bold leading-none tracking-widest drop-shadow-[0_0_5px_rgba(255,255,255,0.5)]">{score.toString().padStart(7, '0')}</div></div></div>
             <div className={`absolute bottom-8 z-30 hidden md:flex flex-col pointer-events-none transition-all duration-500 ${layoutSettings.lanePosition === 'right' ? 'left-8 items-start' : 'right-8 items-end'}`}><div className="text-[4rem] font-black font-display italic tracking-tighter leading-none select-none mb-[-0.8rem] transform -skew-x-12 opacity-80" style={{ backgroundImage: 'linear-gradient(to bottom, #22d3ee 0%, #3b82f6 50%, #9333ea 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', filter: 'drop-shadow(0 4px 0px rgba(0,0,0,0.5))' }}>IGNORE <span className="text-white" style={{ WebkitTextFillColor: 'white' }}>PROTOCOL</span></div><div className={`flex flex-col relative w-64 ${layoutSettings.lanePosition === 'right' ? 'items-start' : 'items-end'}`}><MarqueeText text={currentSongMetadata?.name?.replace(/\.[^/.]+$/, "") || "UNKNOWN TRACK"} className={`text-2xl font-black italic text-white tracking-tighter drop-shadow0_2px_10px_rgba(0,0,0,0.8)] uppercase ${fontClass}`} /><div className="flex gap-2 mt-1"><span className="px-2 py-0.5 bg-black/60 border border-white/20 text-[9px] font-mono text-cyan-400 rounded">LV.{level}</span><span className="px-2 py-0.5 bg-black/60 border border-white/20 text-[9px] font-mono text-fuchsia-400 rounded">{keyMode}Key</span></div></div></div>
+            
+            {isMultiplayer && opponentState && (
+                <div className="absolute top-20 left-4 z-50 bg-black/60 backdrop-blur border border-red-500/50 p-2 rounded w-48 pointer-events-none">
+                    <div className="text-[10px] text-red-400 font-bold mb-1">OPPONENT: {opponentState.name}</div>
+                    <div className="flex justify-between text-white font-mono text-sm mb-1">
+                        <span>SCORE</span>
+                        <span>{opponentState.score.toString().padStart(7, '0')}</span>
+                    </div>
+                    <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
+                        <div className="h-full bg-red-500 transition-all duration-300" style={{ width: `${opponentState.health}%` }}></div>
+                    </div>
+                </div>
+            )}
+
             <div className={`absolute inset-0 z-40 flex items-center ${getPositionClass()}`}>{renderGameFrame()}</div>
           </> 
       )}
