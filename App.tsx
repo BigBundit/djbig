@@ -83,8 +83,11 @@ const codeToLabel = (code: string) => {
     return code.toUpperCase().slice(0,3);
 };
 
+const isElectron = !!(window as Window & { electronAPI?: { isElectron: true } }).electronAPI;
+
 const App: React.FC = () => {
   const [status, setStatus] = useState<GameStatus>(GameStatus.TITLE);
+  const [isPinned, setIsPinned] = useState<boolean>(false);
   const [score, setScore] = useState<number>(0);
   const [combo, setCombo] = useState<number>(0);
   const [maxCombo, setMaxCombo] = useState<number>(0);
@@ -1930,8 +1933,14 @@ const App: React.FC = () => {
     return 'justify-center';
   };
 
+  const handlePin = async () => {
+    if (!window.electronAPI) return;
+    const result = await window.electronAPI.toggleAlwaysOnTop();
+    setIsPinned(result);
+  };
+
   return (
-    <div className={`fixed inset-0 w-full h-[100dvh] bg-black overflow-hidden text-slate-100 select-none touch-none`}>
+    <div className={`fixed inset-0 w-full h-[100dvh] ${isElectron ? 'bg-transparent' : 'bg-black'} overflow-hidden text-slate-100 select-none touch-none`}>
       {showMobileStart && (
          <div className="absolute inset-0 z-[100] bg-black/95 flex flex-col items-center justify-center p-8 pb-[env(safe-area-inset-bottom)] text-center cursor-pointer" onClick={handleMobileEnter}>
             <div className="relative w-24 h-24 mb-8"><div className="absolute inset-0 border-4 border-cyan-500 rounded-full animate-ping opacity-50"></div><div className="absolute inset-0 border-4 border-cyan-400 rounded-full flex items-center justify-center bg-cyan-900/20 backdrop-blur-md"><span className="text-3xl">👆</span></div></div>
@@ -1941,10 +1950,41 @@ const App: React.FC = () => {
          </div>
       )}
 
+      {isElectron && (
+        <div
+          className="absolute top-0 left-0 right-0 h-8 z-[300] flex items-center justify-end px-1 gap-1"
+          style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
+        >
+          <div className="flex items-center gap-1" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
+            <button
+              onClick={handlePin}
+              title={isPinned ? 'Unpin window' : 'Pin on top'}
+              className={`w-6 h-6 flex items-center justify-center rounded text-xs transition-all ${isPinned ? 'bg-cyan-500 text-black' : 'bg-black/60 text-cyan-400 hover:bg-cyan-900/60'} border border-cyan-700`}
+            >
+              📌
+            </button>
+            <button
+              onClick={() => window.electronAPI?.minimizeWindow()}
+              title="Minimize"
+              className="w-6 h-6 flex items-center justify-center rounded text-xs bg-black/60 text-slate-300 hover:bg-slate-700 border border-slate-700"
+            >
+              ─
+            </button>
+            <button
+              onClick={() => window.electronAPI?.closeWindow()}
+              title="Close"
+              className="w-6 h-6 flex items-center justify-center rounded text-xs bg-black/60 text-red-400 hover:bg-red-900/60 border border-red-800"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
+
       <audio ref={bgMusicRef} src="/musicbg.mp3" loop />
-      <div className={`absolute inset-0 z-0 pointer-events-auto overflow-hidden bg-slate-900`} ref={bgRef} style={{ transition: 'transform 0.05s, filter 0.05s' }}>
+      <div className={`absolute inset-0 z-0 pointer-events-auto overflow-hidden ${isElectron ? 'bg-transparent' : 'bg-slate-900'}`} ref={bgRef} style={{ transition: 'transform 0.05s, filter 0.05s' }}>
         {status === GameStatus.PLAYING && !isLowQuality && <div className={`absolute inset-0 z-10 pointer-events-none overflow-hidden transition-opacity duration-200 ${isOverdrive ? 'opacity-100' : 'opacity-0'}`}><div className="absolute inset-0 bg-white/5 mix-blend-overlay"></div></div>}
-        {(status === GameStatus.TITLE || status === GameStatus.MENU) && <div className="absolute inset-0 z-10 pointer-events-none">{layoutSettings.enableMenuBackground ? (<>{!isLowQuality && <video src="/background.mp4" autoPlay loop muted playsInline webkit-playsinline="true" disablePictureInPicture className="absolute inset-0 w-full h-full object-cover pointer-events-none touch-none" />}<div className={`absolute inset-0 ${!isLowQuality ? 'led-screen-filter' : 'bg-slate-950'}`}></div></>) : ( <div className="absolute inset-0 bg-slate-950"></div> )}</div>}
+        {(status === GameStatus.TITLE || status === GameStatus.MENU) && <div className="absolute inset-0 z-10 pointer-events-none">{!isElectron && layoutSettings.enableMenuBackground ? (<>{!isLowQuality && <video src="/background.mp4" autoPlay loop muted playsInline webkit-playsinline="true" disablePictureInPicture className="absolute inset-0 w-full h-full object-cover pointer-events-none touch-none" />}<div className={`absolute inset-0 ${!isLowQuality ? 'led-screen-filter' : 'bg-slate-950'}`}></div></>) : isElectron ? null : ( <div className="absolute inset-0 bg-slate-950"></div> )}</div>}
         {(status === GameStatus.PLAYING || status === GameStatus.PAUSED || status === GameStatus.RESUMING || status === GameStatus.OUTRO) && (<>{mediaType === 'video' && !isLowQuality ? (<video ref={mediaRef as React.RefObject<HTMLVideoElement>} src={localVideoSrc || undefined} className={`absolute inset-0 w-full h-full object-cover z-20 pointer-events-none touch-none`} onEnded={triggerOutro} playsInline webkit-playsinline="true" disablePictureInPicture />) : (<div className="absolute inset-0 z-20 bg-black/60 backdrop-blur-sm"><audio ref={mediaRef as React.RefObject<HTMLAudioElement>} src={localVideoSrc || undefined} onEnded={triggerOutro} />{!isLowQuality && <div className="absolute inset-0 flex items-center justify-center pointer-events-none"><div className="w-[300px] h-[300px] border-4 border-cyan-500/20 rounded-full animate-[spin_10s_linear_infinite]"></div><div className="absolute w-[200px] h-[200px] border-2 border-fuchsia-500/20 rounded-full animate-[spin-ccw_15s_linear_infinite]"></div></div>}</div>)}{isOverdrive && !isLowQuality && <div className="absolute inset-0 z-20 bg-amber-500/10 mix-blend-overlay pointer-events-none"></div>}</>)}
       </div>
 

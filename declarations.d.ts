@@ -1,3 +1,15 @@
+// Electron bridge API exposed via preload.cjs
+interface ElectronAPI {
+  isElectron: true;
+  toggleAlwaysOnTop: () => Promise<boolean>;
+  closeWindow: () => Promise<void>;
+  minimizeWindow: () => Promise<void>;
+}
+
+declare interface Window {
+  electronAPI?: ElectronAPI;
+}
+
 // Fallback declarations if node_modules resolution fails
 declare module '@capacitor/haptics' {
   export enum ImpactStyle {
