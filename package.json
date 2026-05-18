@@ -2,6 +2,8 @@
   "name": "djbig",
   "private": true,
   "version": "1.0.0",
+  "description": "DJBIG Rhythm Game",
+  "author": "BigBundit",
   "type": "module",
   "main": "electron/main.cjs",
   "scripts": {
@@ -39,7 +41,7 @@
     "productName": "DJBIG",
     "asar": false,
     "directories": {
-      "output": "C:\\DJBIG-release"
+      "output": "release"
     },
     "files": [
       "dist/**/*",
@@ -62,6 +64,14 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true
+    },
+    "mac": {
+      "target": [{ "target": "dmg", "arch": ["x64", "arm64"] }],
+      "icon": "public/logodjbig.png",
+      "category": "public.app-category.games"
+    },
+    "dmg": {
+      "title": "DJBIG"
     }
   }
 }
