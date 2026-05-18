@@ -89,7 +89,7 @@ const App: React.FC = () => {
   const [status, setStatus] = useState<GameStatus>(GameStatus.TITLE);
   const [isPinned, setIsPinned] = useState<boolean>(false);
   const [windowOpacity, setWindowOpacity] = useState<number>(1.0);
-  const [windowSize, setWindowSize] = useState<'S'|'M'|'L'>('M');
+  const [windowSize, setWindowSize] = useState<'S'|'M'|'L'>('S');
   const [gameScale, setGameScale] = useState<number>(1);
   const [gameWidth, setGameWidth] = useState<number>(400);
   const [isElectronFullscreen, setIsElectronFullscreen] = useState<boolean>(false);
@@ -103,6 +103,9 @@ const App: React.FC = () => {
     window.electronAPI?.onFullscreenChange?.((value) => {
       setIsElectronFullscreen(value);
     });
+    // Start with size S
+    const S_W = 300 + ELECTRON_LEFT_W, S_H = 632;
+    window.electronAPI?.resizeWindow(S_W, S_H);
   }, []);
 
   useEffect(() => {
@@ -1981,7 +1984,7 @@ const App: React.FC = () => {
     <>
       {isElectron && !isElectronFullscreen && (
         <div
-          className="fixed top-0 left-0 right-0 z-[9999] flex items-center justify-between px-2 gap-1 bg-black/30 backdrop-blur-sm"
+          className="fixed top-0 left-0 right-0 z-[9999] flex items-center justify-between px-2 gap-1 bg-black/50"
           style={{ height: ELECTRON_BAR_H, WebkitAppRegion: 'drag' } as React.CSSProperties}
         >
           {/* Opacity slider — left side */}
@@ -2424,7 +2427,7 @@ const App: React.FC = () => {
                   <div className="text-[9px] font-mono text-cyan-600">{isPlayingPreview ? 'PREVIEWING...' : 'READY'}</div>
                 </div>
               </div>
-              <div className="flex-1 overflow-y-auto px-4 py-4">
+              <div className="flex-1 overflow-y-auto px-4 py-4 flex flex-col justify-center">
                 <SettingsPanelContent />
               </div>
             </div>
