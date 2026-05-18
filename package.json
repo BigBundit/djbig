@@ -56,7 +56,7 @@
           ]
         }
       ],
-      "icon": "public/logodjbig.ico",
+      "icon": "public/logodjbig.png",
       "forceCodeSigning": false
     },
     "nsis": {

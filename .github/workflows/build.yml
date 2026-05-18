@@ -14,7 +14,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
 
       - name: Install dependencies
         run: npm install
@@ -22,8 +21,8 @@ jobs:
       - name: Build Vite
         run: npx vite build
 
-      - name: Build Electron (macOS)
-        run: npx cross-env CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac --x64 --arm64
+      - name: Build Electron (macOS arm64)
+        run: npx electron-builder --mac dmg --arm64
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: false
 
@@ -42,7 +41,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
 
       - name: Install dependencies
         run: npm install
@@ -50,11 +48,12 @@ jobs:
       - name: Build Vite
         run: npx vite build
 
-      - name: Build Electron (Windows)
-        run: npx cross-env CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --win --x64
+      - name: Build Electron (Windows x64)
+        run: npx electron-builder --win nsis --x64
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: false
           WIN_CSC_LINK: ""
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload EXE
         uses: actions/upload-artifact@v4
