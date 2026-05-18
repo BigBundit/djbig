@@ -21,6 +21,9 @@ jobs:
       - name: Build Vite
         run: npx vite build
 
+      - name: Resize icon to 512x512
+        run: sips -z 512 512 public/logodjbig.png
+
       - name: Build Electron (macOS arm64)
         run: npx electron-builder --mac dmg --arm64 --publish never
         env:
