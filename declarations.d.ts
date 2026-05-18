@@ -4,6 +4,10 @@ interface ElectronAPI {
   toggleAlwaysOnTop: () => Promise<boolean>;
   closeWindow: () => Promise<void>;
   minimizeWindow: () => Promise<void>;
+  setOpacity: (value: number) => Promise<number>;
+  resizeWindow: (width: number, height: number) => Promise<void>;
+  setFullscreen: (value: boolean) => Promise<boolean>;
+  onFullscreenChange: (callback: (value: boolean) => void) => void;
 }
 
 declare interface Window {

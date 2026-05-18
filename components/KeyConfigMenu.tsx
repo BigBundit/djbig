@@ -15,31 +15,36 @@ interface KeyConfigMenuProps {
     onPlaySound: (type: 'hover' | 'select' | 'back' | 'scratch') => void;
     t: any;
     fontClass: string;
+    isFullscreenOverride?: boolean;
+    onToggleFullscreen?: () => void;
 }
 
-export const KeyConfigMenu: React.FC<KeyConfigMenuProps> = ({ 
-    currentKeyMode, 
-    mappings, 
+export const KeyConfigMenu: React.FC<KeyConfigMenuProps> = ({
+    currentKeyMode,
+    mappings,
     audioSettings,
     onAudioSettingsChange,
     layoutSettings,
     onLayoutSettingsChange,
-    onSave, 
+    onSave,
     onClose,
     onPlaySound,
     t,
-    fontClass
+    fontClass,
+    isFullscreenOverride,
+    onToggleFullscreen,
 }) => {
     const [localMappings, setLocalMappings] = useState<KeyMapping>(JSON.parse(JSON.stringify(mappings)));
     const [activeMode, setActiveMode] = useState<4 | 5 | 7>(currentKeyMode);
     const [bindingIndex, setBindingIndex] = useState<number | null>(null);
-    const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
+    const [isFullscreenLocal, setIsFullscreenLocal] = useState<boolean>(!!document.fullscreenElement);
+    const isElectron = !!(window as any).electronAPI;
+
+    const isFullscreen = isElectron ? (isFullscreenOverride ?? false) : isFullscreenLocal;
 
     useEffect(() => {
-        setIsFullscreen(!!document.fullscreenElement);
-        const handleFsChange = () => {
-            setIsFullscreen(!!document.fullscreenElement);
-        };
+        if (isElectron) return;
+        const handleFsChange = () => setIsFullscreenLocal(!!document.fullscreenElement);
         document.addEventListener('fullscreenchange', handleFsChange);
         return () => document.removeEventListener('fullscreenchange', handleFsChange);
     }, []);
@@ -100,12 +105,14 @@ export const KeyConfigMenu: React.FC<KeyConfigMenuProps> = ({
 
     const toggleFullScreen = () => {
         onPlaySound('select');
-        if (!document.fullscreenElement) {
-            document.documentElement.requestFullscreen().catch(err => {
-                console.error(`Error enabling full-screen mode: ${err.message}`);
-            });
+        if (isElectron && onToggleFullscreen) {
+            onToggleFullscreen();
         } else {
-            if (document.exitFullscreen) {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen().catch(err => {
+                    console.error(`Error enabling full-screen mode: ${err.message}`);
+                });
+            } else {
                 document.exitFullscreen();
             }
         }

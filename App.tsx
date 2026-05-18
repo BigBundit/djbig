@@ -88,6 +88,42 @@ const isElectron = !!(window as Window & { electronAPI?: { isElectron: true } })
 const App: React.FC = () => {
   const [status, setStatus] = useState<GameStatus>(GameStatus.TITLE);
   const [isPinned, setIsPinned] = useState<boolean>(false);
+  const [windowOpacity, setWindowOpacity] = useState<number>(1.0);
+  const [windowSize, setWindowSize] = useState<'S'|'M'|'L'>('M');
+  const [gameScale, setGameScale] = useState<number>(1);
+  const [gameWidth, setGameWidth] = useState<number>(400);
+  const [isElectronFullscreen, setIsElectronFullscreen] = useState<boolean>(false);
+
+  const ELECTRON_BAR_H = 32;
+  const ELECTRON_LEFT_W = 28;
+  const BASE_W = 400, BASE_H = 800;
+
+  useEffect(() => {
+    if (!isElectron) return;
+    window.electronAPI?.onFullscreenChange?.((value) => {
+      setIsElectronFullscreen(value);
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!isElectron) return;
+    const update = () => {
+      const W = window.innerWidth, H = window.innerHeight;
+      if (isElectronFullscreen) {
+        const s = H / BASE_H;
+        setGameScale(s);
+        setGameWidth(W / s);
+      } else {
+        const sx = (W - ELECTRON_LEFT_W) / BASE_W;
+        const sy = (H - ELECTRON_BAR_H) / BASE_H;
+        setGameScale(Math.min(sx, sy));
+        setGameWidth(BASE_W);
+      }
+    };
+    update();
+    window.addEventListener('resize', update);
+    return () => window.removeEventListener('resize', update);
+  }, [isElectronFullscreen]);
   const [score, setScore] = useState<number>(0);
   const [combo, setCombo] = useState<number>(0);
   const [maxCombo, setMaxCombo] = useState<number>(0);
@@ -164,6 +200,7 @@ const App: React.FC = () => {
   
   const [showMobileStart, setShowMobileStart] = useState<boolean>(false);
   const [isMobile, setIsMobile] = useState<boolean>(false);
+  const [showElectronSetup, setShowElectronSetup] = useState<boolean>(false);
   const [showMobileSetup, setShowMobileSetup] = useState<boolean>(false);
   
   // --- Auth & Multiplayer State ---
@@ -1724,6 +1761,7 @@ const App: React.FC = () => {
     playUiSound('select');
     stopPreview(); 
     setShowMobileSetup(false);
+    setShowElectronSetup(false);
     if (!localVideoSrc) { alert("Please select a track first."); return; }
     if (!analyzedNotes) { alert("Please wait for analysis to complete."); return; }
     
@@ -1940,7 +1978,86 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className={`fixed inset-0 w-full h-[100dvh] ${isElectron ? 'bg-transparent' : 'bg-black'} overflow-hidden text-slate-100 select-none touch-none`}>
+    <>
+      {isElectron && !isElectronFullscreen && (
+        <div
+          className="fixed top-0 left-0 right-0 z-[9999] flex items-center justify-between px-2 gap-1"
+          style={{ height: ELECTRON_BAR_H, WebkitAppRegion: 'drag' } as React.CSSProperties}
+        >
+          {/* Opacity slider — left side */}
+          <div className="flex items-center gap-1" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
+            <span className="text-[9px] text-slate-500 font-mono select-none">☀</span>
+            <input
+              type="range" min={10} max={100} step={5}
+              value={Math.round(windowOpacity * 100)}
+              onChange={(e) => { const v = Number(e.target.value) / 100; setWindowOpacity(v); window.electronAPI?.setOpacity(v); }}
+              title={`Opacity: ${Math.round(windowOpacity * 100)}%`}
+              className="w-20 h-1 accent-cyan-400 cursor-pointer"
+              style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+            />
+            <span className="text-[9px] text-slate-500 font-mono select-none w-6">{Math.round(windowOpacity * 100)}%</span>
+          </div>
+          {/* Size presets — center */}
+          <div className="flex items-center gap-0.5" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
+            {([['S', 300 + ELECTRON_LEFT_W, 632], ['M', 400 + ELECTRON_LEFT_W, 832], ['L', 520 + ELECTRON_LEFT_W, 1032]] as [string, number, number][]).map(([label, w, h]) => (
+              <button key={label} onClick={() => { window.electronAPI?.resizeWindow(w, h); setWindowSize(label as 'S'|'M'|'L'); }}
+                title={`${w}×${h}`}
+                className={`w-6 h-6 flex items-center justify-center rounded text-[10px] font-bold transition-all border ${windowSize === label ? 'bg-cyan-500 text-black border-cyan-300' : 'bg-black/60 text-slate-400 hover:text-white border-slate-700'}`}
+              >{label}</button>
+            ))}
+          </div>
+          {/* Window controls — right side */}
+          <div className="flex items-center gap-1" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
+            <button onClick={handlePin} title={isPinned ? 'Unpin' : 'Pin on top'}
+              className={`w-6 h-6 flex items-center justify-center rounded text-xs transition-all border ${isPinned ? 'bg-cyan-500 text-black border-cyan-300' : 'bg-black/60 text-cyan-400 hover:bg-cyan-900/60 border-cyan-700'}`}>📌</button>
+            <button onClick={() => window.electronAPI?.minimizeWindow()} title="Minimize"
+              className="w-6 h-6 flex items-center justify-center rounded text-xs bg-black/60 text-slate-300 hover:bg-slate-700 border border-slate-700">─</button>
+            <button onClick={() => window.electronAPI?.closeWindow()} title="Close"
+              className="w-6 h-6 flex items-center justify-center rounded text-xs bg-black/60 text-red-400 hover:bg-red-900/60 border border-red-800">✕</button>
+          </div>
+        </div>
+      )}
+      {isElectron && isElectronFullscreen && (
+        <button
+          onClick={() => window.electronAPI?.setFullscreen(false)}
+          title="Exit fullscreen (Esc)"
+          className="fixed top-2 right-2 z-[9999] w-7 h-7 flex items-center justify-center rounded bg-black/40 text-slate-400 hover:text-white hover:bg-black/70 border border-slate-700/50 text-xs transition-all"
+          style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+        >⛶</button>
+      )}
+
+    {isElectron && !isElectronFullscreen && (
+      <div
+        className="fixed z-[9998] flex flex-col items-center py-2 gap-1"
+        style={{ left: 0, top: ELECTRON_BAR_H, width: ELECTRON_LEFT_W, bottom: 0 } as React.CSSProperties}
+      >
+        <span className="text-[9px] text-slate-500 select-none">🔊</span>
+        <div className="flex-1 flex items-center justify-center" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
+          <input
+            type="range" min={0} max={100} step={1}
+            value={Math.round(audioSettings.masterVolume * 100)}
+            onChange={(e) => setAudioSettings(s => ({ ...s, masterVolume: Number(e.target.value) / 100 }))}
+            title={`Volume: ${Math.round(audioSettings.masterVolume * 100)}%`}
+            className="accent-cyan-400 cursor-pointer"
+            style={{ writingMode: 'vertical-lr', direction: 'rtl', height: 120, width: 14 } as React.CSSProperties}
+          />
+        </div>
+        <span className="text-[8px] text-slate-600 font-mono select-none">{Math.round(audioSettings.masterVolume * 100)}</span>
+      </div>
+    )}
+
+    <div
+      className={`overflow-hidden text-slate-100 select-none touch-none ${isElectron ? '' : 'fixed inset-0 w-full h-[100dvh] bg-black'}`}
+      style={isElectron ? {
+        position: 'fixed',
+        top: isElectronFullscreen ? 0 : ELECTRON_BAR_H,
+        left: isElectronFullscreen ? 0 : ELECTRON_LEFT_W,
+        width: gameWidth,
+        height: BASE_H,
+        transform: `scale(${gameScale})`,
+        transformOrigin: 'top left',
+      } : {}}
+    >
       {showMobileStart && (
          <div className="absolute inset-0 z-[100] bg-black/95 flex flex-col items-center justify-center p-8 pb-[env(safe-area-inset-bottom)] text-center cursor-pointer" onClick={handleMobileEnter}>
             <div className="relative w-24 h-24 mb-8"><div className="absolute inset-0 border-4 border-cyan-500 rounded-full animate-ping opacity-50"></div><div className="absolute inset-0 border-4 border-cyan-400 rounded-full flex items-center justify-center bg-cyan-900/20 backdrop-blur-md"><span className="text-3xl">👆</span></div></div>
@@ -1948,37 +2065,6 @@ const App: React.FC = () => {
             <div className="max-w-md bg-slate-900/50 border border-slate-700 p-4 rounded-lg mb-8 backdrop-blur-sm"><p className={`text-slate-300 text-sm md:text-base whitespace-pre-line leading-relaxed ${fontClass}`}>{t.WELCOME_DESC}</p></div>
             <div className="text-[10px] text-slate-600 font-mono border border-slate-800 px-4 py-2 rounded">TAP TO INITIALIZE SYSTEM</div>
          </div>
-      )}
-
-      {isElectron && (
-        <div
-          className="absolute top-0 left-0 right-0 h-8 z-[300] flex items-center justify-end px-1 gap-1"
-          style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
-        >
-          <div className="flex items-center gap-1" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
-            <button
-              onClick={handlePin}
-              title={isPinned ? 'Unpin window' : 'Pin on top'}
-              className={`w-6 h-6 flex items-center justify-center rounded text-xs transition-all ${isPinned ? 'bg-cyan-500 text-black' : 'bg-black/60 text-cyan-400 hover:bg-cyan-900/60'} border border-cyan-700`}
-            >
-              📌
-            </button>
-            <button
-              onClick={() => window.electronAPI?.minimizeWindow()}
-              title="Minimize"
-              className="w-6 h-6 flex items-center justify-center rounded text-xs bg-black/60 text-slate-300 hover:bg-slate-700 border border-slate-700"
-            >
-              ─
-            </button>
-            <button
-              onClick={() => window.electronAPI?.closeWindow()}
-              title="Close"
-              className="w-6 h-6 flex items-center justify-center rounded text-xs bg-black/60 text-red-400 hover:bg-red-900/60 border border-red-800"
-            >
-              ✕
-            </button>
-          </div>
-        </div>
       )}
 
       <audio ref={bgMusicRef} src="/musicbg.mp3" loop />
@@ -1994,7 +2080,7 @@ const App: React.FC = () => {
         <button onClick={() => setIsBgMusicMuted(!isBgMusicMuted)} className="absolute bottom-4 right-4 z-[70] p-2 bg-black/50 hover:bg-black/80 text-cyan-400 border border-cyan-500 rounded-full transition-all active:scale-95 mb-[env(safe-area-inset-bottom)] mr-[env(safe-area-inset-right)]" title="Toggle Intro Music">{isBgMusicMuted ? ( <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" clipRule="evenodd" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" /></svg> ) : ( <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" /></svg> )}</button>
       )}
 
-      {showKeyConfig && ( <KeyConfigMenu currentKeyMode={keyMode} mappings={keyMappings} audioSettings={audioSettings} onAudioSettingsChange={setAudioSettings} layoutSettings={layoutSettings} onLayoutSettingsChange={handleLayoutChange} onSave={saveKeyMappings} onClose={() => setShowKeyConfig(false)} onPlaySound={playUiSound} t={t} fontClass={fontClass} /> )}
+      {showKeyConfig && ( <KeyConfigMenu currentKeyMode={keyMode} mappings={keyMappings} audioSettings={audioSettings} onAudioSettingsChange={setAudioSettings} layoutSettings={layoutSettings} onLayoutSettingsChange={handleLayoutChange} onSave={saveKeyMappings} onClose={() => setShowKeyConfig(false)} onPlaySound={playUiSound} t={t} fontClass={fontClass} isFullscreenOverride={isElectronFullscreen} onToggleFullscreen={() => window.electronAPI?.setFullscreen(!isElectronFullscreen)} /> )}
       {startCountdown !== null && ( <div className="absolute inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm"><div className="text-[15rem] font-black font-display text-cyan-400 animate-ping">{startCountdown}</div></div> )}
       {status === GameStatus.RESUMING && resumeCountdown !== null && ( <div className="absolute inset-0 z-[60] flex flex-col items-center justify-center bg-black/40 backdrop-blur-sm"><div className="text-3xl text-cyan-400 font-bold mb-4 animate-pulse">RESUMING</div><div className="text-[10rem] font-black font-display text-white animate-ping">{resumeCountdown > 0 ? resumeCountdown : "GO!"}</div></div> )}
       
@@ -2003,14 +2089,13 @@ const App: React.FC = () => {
       )}
 
       {status === GameStatus.TITLE && !showMobileStart && (
-          <div className="relative z-30 h-full w-full flex flex-col items-center justify-center overflow-hidden">
-              {!isLowQuality && <div className="absolute top-1/3 left-1/2 transform -translate-x-1/2 -translate-y-1/2 pointer-events-none flex items-center justify-center"><div className="absolute w-[600px] h-[600px] border-[2px] border-dashed border-cyan-500/20 rounded-full animate-[spin_20s_linear_infinite]"></div><div className="absolute w-[500px] h-[500px] border border-cyan-500/10 rounded-full animate-[spin-ccw_30s_linear_infinite]"></div></div>}
-              <div className="relative z-10 text-center transform hover:scale-105 transition-transform duration-500 cursor-default mb-12 mt-[-100px]"><div className="flex items-end justify-center leading-none mb-4 animate-pulse"><span className="text-8xl md:text-[10rem] font-black font-display text-white italic drop-shadow-[5px_5px_0px_rgba(6,182,212,1)] tracking-tighter" style={{textShadow: '4px 4px 0px #0891b2'}}>DJ</span><span className="text-8xl md:text-[10rem] font-black font-display text-cyan-400 italic drop-shadow-[0_0_30px_rgba(34,211,238,0.8)] ml-2" style={{textShadow: '0 0 20px cyan'}}>BIG</span></div><div className="inline-block bg-black/80 px-4 py-1 border-x-2 border-cyan-500 backdrop-blur-sm"><p className={`text-cyan-200 font-bold tracking-[0.5em] text-sm md:text-xl font-display uppercase`}>RHYTHM MUSIC EMULATOR</p></div></div>
-              <div className="flex flex-col items-center space-y-4 w-full max-w-md z-20">
-                  <button onClick={() => { setStatus(GameStatus.MENU); playUiSound('select'); initAudio(); }} onMouseEnter={() => playUiSound('hover')} className="group relative w-80 h-20 bg-gradient-to-r from-cyan-900/80 via-cyan-600 to-cyan-900/80 border-x-4 border-cyan-400 transform -skew-x-12 hover:scale-105 transition-all duration-200 overflow-hidden shadow-[0_0_30px_rgba(6,182,212,0.3)]"><div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-20 transition-opacity"></div><div className="flex flex-col items-center justify-center h-full transform skew-x-12"><span className={`text-3xl font-black italic text-white group-hover:text-cyan-100 ${fontClass}`}>{t.START}</span><span className="text-[10px] font-mono text-cyan-300 tracking-[0.3em]">INITIATE SEQUENCE</span></div></button>
-                  {/* <button onClick={initMultiplayer} onMouseEnter={() => playUiSound('hover')} className="group relative w-64 h-14 bg-gradient-to-r from-slate-800/80 via-green-900 to-slate-800/80 border-x-4 border-green-500 transform -skew-x-12 hover:scale-105 transition-all duration-200 overflow-hidden"><div className="flex flex-col items-center justify-center h-full transform skew-x-12"><span className={`text-lg font-bold text-slate-300 group-hover:text-green-200 ${fontClass}`}>ONLINE MODE</span>{user && <span className="text-[8px] font-mono text-green-400">LOGGED IN AS {user.name.toUpperCase()}</span>}</div></button> */}
-                  <button onClick={() => { setShowKeyConfig(true); playUiSound('select'); }} onMouseEnter={() => playUiSound('hover')} className="group relative w-64 h-14 bg-gradient-to-r from-slate-800/80 via-yellow-900 to-slate-800/80 border-x-4 border-yellow-500 transform -skew-x-12 hover:scale-105 transition-all duration-200 overflow-hidden"><div className="flex flex-col items-center justify-center h-full transform skew-x-12"><span className={`text-xl font-bold text-slate-300 group-hover:text-yellow-200 ${fontClass}`}>{t.SETTING}</span></div></button>
-                  <button onClick={() => window.location.reload()} onMouseEnter={() => playUiSound('hover')} className="group relative w-64 h-14 bg-gradient-to-r from-slate-800/80 via-red-900 to-slate-800/80 border-x-4 border-red-500 transform -skew-x-12 hover:scale-105 transition-all duration-200 overflow-hidden"><div className="flex flex-col items-center justify-center h-full transform skew-x-12"><span className={`text-lg font-bold text-slate-300 group-hover:text-red-200 ${fontClass}`}>{t.EXIT}</span></div></button>
+          <div className={`relative z-30 h-full w-full flex flex-col items-center overflow-hidden ${isElectron ? 'justify-center pt-8' : 'justify-center'}`}>
+              {!isLowQuality && !isElectron && <div className="absolute top-1/3 left-1/2 transform -translate-x-1/2 -translate-y-1/2 pointer-events-none flex items-center justify-center"><div className="absolute w-[600px] h-[600px] border-[2px] border-dashed border-cyan-500/20 rounded-full animate-[spin_20s_linear_infinite]"></div><div className="absolute w-[500px] h-[500px] border border-cyan-500/10 rounded-full animate-[spin-ccw_30s_linear_infinite]"></div></div>}
+              <div className={`relative z-10 text-center transform hover:scale-105 transition-transform duration-500 cursor-default ${isElectron ? 'mb-6 mt-0' : 'mb-12 mt-[-100px]'}`}><div className="flex items-end justify-center leading-none mb-4 animate-pulse"><span className={`${isElectron ? 'text-6xl' : 'text-8xl md:text-[10rem]'} font-black font-display text-white italic drop-shadow-[5px_5px_0px_rgba(6,182,212,1)] tracking-tighter`} style={{textShadow: '4px 4px 0px #0891b2'}}>DJ</span><span className={`${isElectron ? 'text-6xl' : 'text-8xl md:text-[10rem]'} font-black font-display text-cyan-400 italic drop-shadow-[0_0_30px_rgba(34,211,238,0.8)] ml-2`} style={{textShadow: '0 0 20px cyan'}}>BIG</span></div><div className="inline-block bg-black/80 px-4 py-1 border-x-2 border-cyan-500 backdrop-blur-sm"><p className={`text-cyan-200 font-bold tracking-[0.5em] ${isElectron ? 'text-xs' : 'text-sm md:text-xl'} font-display uppercase`}>RHYTHM MUSIC EMULATOR</p></div></div>
+              <div className={`flex flex-col items-center w-full max-w-md z-20 ${isElectron ? 'space-y-3' : 'space-y-4'}`}>
+                  <button onClick={() => { setStatus(GameStatus.MENU); playUiSound('select'); initAudio(); }} onMouseEnter={() => playUiSound('hover')} className={`group relative ${isElectron ? 'w-72 h-14' : 'w-80 h-20'} bg-gradient-to-r from-cyan-900/80 via-cyan-600 to-cyan-900/80 border-x-4 border-cyan-400 transform -skew-x-12 hover:scale-105 transition-all duration-200 overflow-hidden shadow-[0_0_30px_rgba(6,182,212,0.3)]`}><div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-20 transition-opacity"></div><div className="flex flex-col items-center justify-center h-full transform skew-x-12"><span className={`${isElectron ? 'text-2xl' : 'text-3xl'} font-black italic text-white group-hover:text-cyan-100 ${fontClass}`}>{t.START}</span>{!isElectron && <span className="text-[10px] font-mono text-cyan-300 tracking-[0.3em]">INITIATE SEQUENCE</span>}</div></button>
+                  <button onClick={() => { setShowKeyConfig(true); playUiSound('select'); }} onMouseEnter={() => playUiSound('hover')} className={`group relative ${isElectron ? 'w-64 h-12' : 'w-64 h-14'} bg-gradient-to-r from-slate-800/80 via-yellow-900 to-slate-800/80 border-x-4 border-yellow-500 transform -skew-x-12 hover:scale-105 transition-all duration-200 overflow-hidden`}><div className="flex flex-col items-center justify-center h-full transform skew-x-12"><span className={`text-xl font-bold text-slate-300 group-hover:text-yellow-200 ${fontClass}`}>{t.SETTING}</span></div></button>
+                  <button onClick={() => window.location.reload()} onMouseEnter={() => playUiSound('hover')} className={`group relative ${isElectron ? 'w-64 h-12' : 'w-64 h-14'} bg-gradient-to-r from-slate-800/80 via-red-900 to-slate-800/80 border-x-4 border-red-500 transform -skew-x-12 hover:scale-105 transition-all duration-200 overflow-hidden`}><div className="flex flex-col items-center justify-center h-full transform skew-x-12"><span className={`text-lg font-bold text-slate-300 group-hover:text-red-200 ${fontClass}`}>{t.EXIT}</span></div></button>
                </div>
               <div className="absolute bottom-8 w-full text-center pb-[env(safe-area-inset-bottom)]"><p className="text-[10px] text-slate-500 font-mono">VER 2.5.0 // CREATED BY : IGNORE</p><p className="text-[10px] text-slate-600 font-mono mt-1">© 2024 DJBIG PROJECT. ALL RIGHTS RESERVED.</p></div>
           </div>
@@ -2287,6 +2372,25 @@ const App: React.FC = () => {
              {isMobile && !showMobileSetup && (
                 <div className="fixed bottom-0 left-0 w-full z-50 bg-slate-950/95 border-t border-slate-700 backdrop-blur-md pb-[env(safe-area-inset-bottom)]">{currentSongMetadata && ( <div className="px-4 pt-2 pb-2"><button onClick={() => { playUiSound('select'); if (typeof navigator !== 'undefined' && (navigator as any).vibrate) { try { (navigator as any).vibrate(50); } catch(e) {} } setShowMobileSetup(true); }} className="w-full h-14 bg-gradient-to-r from-cyan-600 to-blue-600 rounded-xl shadow-[0_0_20px_rgba(6,182,212,0.6)] flex items-center justify-center border-2 border-white/20 animate-bounce-short hover:scale-105 transition-transform"><span className={`text-xl font-black italic text-white mr-2 ${fontClass}`}>PLAY</span><span className="text-white/80 font-mono text-xs truncate max-w-[200px]">{currentSongMetadata.name}</span></button></div> )}<div className="flex gap-2 p-2 pt-0"><label className="flex-1 h-10 bg-slate-800 hover:bg-cyan-900/50 border border-slate-600 hover:border-cyan-500 rounded flex items-center justify-center cursor-pointer transition-colors group"><span className={`text-[9px] font-bold text-slate-400 group-hover:text-cyan-400 ${fontClass}`}>+ {t.LOAD_SINGLE}</span><input type="file" accept="video/*,audio/*" onChange={handleSingleFileUpload} className="hidden" /></label><label className="flex-1 h-10 bg-slate-800 hover:bg-fuchsia-900/50 border border-slate-600 hover:border-fuchsia-500 rounded flex items-center justify-center cursor-pointer transition-colors group"><span className={`text-[9px] font-bold text-slate-400 group-hover:text-fuchsia-400 ${fontClass}`}>+ {t.ADD_MULTIPLE}</span><input type="file" multiple onChange={handleFolderSelect} className="hidden" /></label></div></div>
              )}
+             {isElectron && !showElectronSetup && (
+               <div className="fixed bottom-0 left-0 w-full z-50 bg-slate-950/95 border-t border-cyan-800/50 backdrop-blur-md">
+                 {currentSongMetadata ? (
+                   <div className="px-3 py-2">
+                     <button onClick={() => { playUiSound('select'); setShowElectronSetup(true); }} className="w-full h-12 bg-gradient-to-r from-cyan-600 to-blue-600 rounded-lg shadow-[0_0_20px_rgba(6,182,212,0.5)] flex items-center justify-center gap-2 border border-white/20 hover:scale-[1.02] transition-transform active:scale-95">
+                       <span className={`text-lg font-black italic text-white ${fontClass}`}>▶ PLAY</span>
+                       <span className="text-white/70 font-mono text-[10px] truncate max-w-[180px]">{currentSongMetadata.name}</span>
+                     </button>
+                   </div>
+                 ) : (
+                   <div className="px-3 py-2 flex gap-2">
+                     <label className="flex-1 h-10 bg-slate-800 hover:bg-cyan-900/50 border border-slate-600 hover:border-cyan-500 rounded flex items-center justify-center cursor-pointer transition-colors">
+                       <span className={`text-[9px] font-bold text-slate-400 hover:text-cyan-400 ${fontClass}`}>+ {t.LOAD_SINGLE}</span>
+                       <input type="file" accept="video/*,audio/*" onChange={handleSingleFileUpload} className="hidden" />
+                     </label>
+                   </div>
+                 )}
+               </div>
+             )}
              {!isMobile && ( <div className="bg-black/80 p-4 border-t border-slate-700 flex gap-2 shrink-0 z-40 relative pb-[calc(1rem+env(safe-area-inset-bottom))]"><label className="flex-1 h-12 bg-slate-800 hover:bg-cyan-900/50 border border-slate-600 hover:border-cyan-500 rounded flex items-center justify-center cursor-pointer transition-colors group"><span className={`text-xs font-bold text-slate-400 group-hover:text-cyan-400 ${fontClass}`}>+ {t.LOAD_SINGLE}</span><input type="file" accept="video/*,audio/*" onChange={handleSingleFileUpload} className="hidden" /></label><label className="flex-1 h-12 bg-slate-800 hover:bg-fuchsia-900/50 border border-slate-600 hover:border-fuchsia-500 rounded flex items-center justify-center cursor-pointer transition-colors group"><span className={`text-xs font-bold text-slate-400 group-hover:text-fuchsia-400 ${fontClass}`}>+ {t.LOAD_FOLDER}</span><input type="file" multiple onChange={handleFolderSelect} className="hidden" {...({ webkitdirectory: "", directory: "" } as any)} /></label></div> )}
           </div>
           {!isMobile && (
@@ -2301,6 +2405,26 @@ const App: React.FC = () => {
           )}
           {showMobileSetup && isMobile && (
               <div className="fixed inset-0 z-[60] bg-slate-950/95 backdrop-blur-xl flex flex-col p-6 animate-fade-in overflow-y-auto pb-[env(safe-area-inset-bottom)]"><button onClick={() => setShowMobileSetup(false)} className="absolute top-4 right-4 text-white p-2 z-50 bg-black/50 rounded-full border border-slate-600 mt-[env(safe-area-inset-top)] mr-[env(safe-area-inset-right)]">✕</button><div className="flex flex-col items-center mb-6 mt-8 pt-[env(safe-area-inset-top)]"><div className={`w-32 h-32 rounded-full border-4 border-cyan-500/50 overflow-hidden shadow-[0_0_30px_rgba(6,182,212,0.4)] mb-4 ${!isLowQuality ? 'animate-[spin_20s_linear_infinite]' : ''}`}>{currentSongMetadata?.thumbnailUrl ? ( <img src={currentSongMetadata.thumbnailUrl} className="w-full h-full object-cover" alt="Cover" /> ) : ( <div className="w-full h-full bg-slate-800 flex items-center justify-center"><span className="text-cyan-500 font-bold">DJBIG</span></div> )}</div><h2 className={`text-2xl font-black italic text-white text-center leading-none ${fontClass}`}>{currentSongMetadata?.name}</h2><div className="text-cyan-400 text-[10px] font-mono mt-1">SETUP CONFIGURATION</div></div><div className="flex-1 w-full max-w-md mx-auto"><SettingsPanelContent /></div></div>
+          )}
+          {showElectronSetup && isElectron && (
+            <div className="fixed inset-0 z-[60] bg-black/90 backdrop-blur-xl flex flex-col animate-fade-in overflow-hidden">
+              <div className="flex items-center justify-between px-4 py-3 border-b border-slate-700 shrink-0">
+                <button onClick={() => setShowElectronSetup(false)} className="flex items-center gap-1 text-slate-400 hover:text-white text-sm font-bold">← {t.BACK}</button>
+                <div className="text-cyan-400 text-[10px] font-mono tracking-widest">SETUP</div>
+              </div>
+              <div className="flex items-center gap-3 px-4 py-3 border-b border-slate-800 shrink-0">
+                <div className={`w-10 h-10 rounded-full border-2 border-cyan-500/50 overflow-hidden shrink-0 ${!isLowQuality ? 'animate-[spin_10s_linear_infinite]' : ''}`}>
+                  {currentSongMetadata?.thumbnailUrl ? <img src={currentSongMetadata.thumbnailUrl} className="w-full h-full object-cover" alt="" /> : <div className="w-full h-full bg-slate-800 flex items-center justify-center text-[8px] text-cyan-500 font-bold">DJ</div>}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className={`text-sm font-black italic text-white truncate ${fontClass}`}>{currentSongMetadata?.name}</div>
+                  <div className="text-[9px] font-mono text-cyan-600">{isPlayingPreview ? 'PREVIEWING...' : 'READY'}</div>
+                </div>
+              </div>
+              <div className="flex-1 overflow-y-auto px-4 py-4">
+                <SettingsPanelContent />
+              </div>
+            </div>
           )}
         </div>
       )}
@@ -2337,6 +2461,7 @@ const App: React.FC = () => {
       {status === GameStatus.PAUSED && ( <PauseMenu onResume={togglePause} onRestart={startCountdownSequence} onSettings={() => setShowKeyConfig(true)} onQuit={quitGame} t={t} fontClass={fontClass} onTitleClick={handlePauseTitleClick} /> )}
       {status === GameStatus.FINISHED && ( <EndScreen stats={{ perfect: perfectCount, good: goodCount, miss: missCount, maxCombo, score }} opponentStats={isMultiplayer && opponentState && opponentFinalScore !== null ? { ...opponentState, score: opponentFinalScore, miss: 0, perfect: 0, good: 0, maxCombo: opponentState.combo } : null} fileName={currentSongMetadata?.name || "UNKNOWN"} onRestart={startCountdownSequence} onMenu={quitGame} t={t} fontClass={fontClass} onPlaySound={playUiSound} /> )}
     </div>
+  </>
   );
 };
 
