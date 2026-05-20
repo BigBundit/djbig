@@ -24,6 +24,7 @@ function createWindow() {
     y: height - winHeight,
     frame: false,
     transparent: true,
+    backgroundColor: '#00000000',
     resizable: true,
     alwaysOnTop: false,
     skipTaskbar: false,
