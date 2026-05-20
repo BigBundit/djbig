@@ -1984,7 +1984,7 @@ const App: React.FC = () => {
     <>
       {isElectron && !isElectronFullscreen && (
         <div
-          className="fixed top-0 left-0 right-0 z-[9999] flex items-center justify-between px-2 gap-1 bg-black/50"
+          className="fixed top-0 left-0 right-0 z-[9999] flex items-center justify-between px-2 gap-1"
           style={{ height: ELECTRON_BAR_H, WebkitAppRegion: 'drag' } as React.CSSProperties}
         >
           {/* Opacity slider — left side */}
