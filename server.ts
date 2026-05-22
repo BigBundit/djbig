@@ -1,19 +1,32 @@
+import 'dotenv/config';
 import express from 'express';
+import cors from 'cors';
 import { createServer as createViteServer } from 'vite';
 import { WebSocketServer, WebSocket } from 'ws';
 import axios from 'axios';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { initDb } from './server/db.js';
+import authRoutes from './server/authRoutes.js';
+import userRoutes from './server/userRoutes.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 async function startServer() {
+  // Init Turso DB
+  await initDb();
+
   const app = express();
   const PORT = 3000;
 
-  // Middleware to parse JSON
+  // Middleware
+  app.use(cors());
   app.use(express.json());
+
+  // Auth & User routes (v2.0.0)
+  app.use('/api/auth', authRoutes);
+  app.use('/api/user', userRoutes);
 
   // --- OAuth Routes ---
   app.get('/api/auth/google/url', (req, res) => {
