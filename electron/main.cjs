@@ -1,8 +1,10 @@
 'use strict';
 
-const { app, BrowserWindow, ipcMain, screen, net, protocol } = require('electron');
+const { app, BrowserWindow, ipcMain, screen, net, protocol, shell } = require('electron');
 const path = require('path');
 const { pathToFileURL } = require('url');
+const crypto = require('crypto');
+const os = require('os');
 
 let mainWindow = null;
 let isAlwaysOnTop = false;
@@ -73,10 +75,23 @@ ipcMain.handle('resize-window', (_, { width, height }) => {
   mainWindow.setPosition(sw - width, sh - height);
 });
 
+ipcMain.handle('open-external', (_, url) => {
+  shell.openExternal(url);
+});
+
 ipcMain.handle('set-fullscreen', (_, value) => {
   if (!mainWindow) return;
   mainWindow.setFullScreen(value);
   return value;
+});
+
+ipcMain.handle('get-machine-id', () => {
+  try {
+    const raw = [os.hostname(), os.homedir(), os.platform(), os.arch(), os.cpus()?.[0]?.model || ''].join('|');
+    return crypto.createHash('sha256').update(raw).digest('hex').slice(0, 32);
+  } catch {
+    return crypto.createHash('sha256').update(os.hostname()).digest('hex').slice(0, 32);
+  }
 });
 
 app.whenReady().then(() => {

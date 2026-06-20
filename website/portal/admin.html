@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>DJBIG Admin Panel</title>
+<link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;600;700;800;900&display=swap" rel="stylesheet"/>
+<style>
+:root{--c:#06b6d4;--f:#d946ef;--a:#f59e0b;--g:#22c55e;--r:#ef4444;--bg:#000;--bg2:#080808;--text:#e2e8f0;--muted:#52525b;--border:rgba(255,255,255,.07)}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Prompt',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+/* Login */
+#login-screen{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:1rem}
+.login-box{background:var(--bg2);border:1px solid var(--border);border-radius:20px;padding:2.5rem 2rem;width:100%;max-width:380px;text-align:center}
+.login-logo{font-size:1.4rem;font-weight:900;font-style:italic;background:linear-gradient(120deg,var(--c),var(--f));-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:.25rem}
+.login-sub{font-size:.75rem;color:var(--muted);margin-bottom:2rem}
+.inp{width:100%;padding:.75rem 1rem;background:#111;border:1px solid rgba(255,255,255,.1);border-radius:10px;color:var(--text);font-family:'Prompt',sans-serif;font-size:.88rem;outline:none;transition:border-color .2s}
+.inp:focus{border-color:var(--c)}
+.btn{width:100%;padding:.8rem;background:linear-gradient(135deg,var(--c),#3b82f6);color:#000;border:none;border-radius:10px;font-size:.9rem;font-weight:800;cursor:pointer;font-family:'Prompt',sans-serif;margin-top:.75rem;transition:transform .2s,opacity .2s}
+.btn:hover{transform:translateY(-1px)}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.err-msg{color:var(--r);font-size:.78rem;margin-top:.5rem}
+/* App */
+#app{display:none;min-height:100vh}
+nav{background:rgba(0,0,0,.95);border-bottom:1px solid var(--border);padding:.85rem 1.5rem;display:flex;align-items:center;gap:.75rem;position:sticky;top:0;z-index:50}
+.logo{font-size:1.1rem;font-weight:900;font-style:italic;background:linear-gradient(120deg,var(--c),var(--f));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.badge{font-size:.62rem;background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.3);color:var(--r);padding:.15rem .45rem;border-radius:4px;font-weight:700;letter-spacing:.05em}
+.btn-logout-nav{margin-left:auto;padding:.4rem .85rem;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);border-radius:8px;color:var(--r);font-size:.75rem;cursor:pointer;font-family:'Prompt',sans-serif;font-weight:700}
+/* Tabs */
+.tabs{display:flex;gap:.35rem;padding:1.25rem 1.5rem .5rem;border-bottom:1px solid var(--border)}
+.tab{padding:.5rem 1rem;border-radius:8px;border:1px solid transparent;font-size:.8rem;font-weight:700;cursor:pointer;font-family:'Prompt',sans-serif;color:var(--muted);background:none;transition:all .2s}
+.tab.active{background:rgba(6,182,212,.1);border-color:rgba(6,182,212,.25);color:var(--c)}
+.tab:hover:not(.active){color:var(--text)}
+.tab .cnt{display:inline-block;margin-left:.35rem;padding:.05rem .35rem;background:rgba(245,158,11,.15);color:var(--a);border-radius:4px;font-size:.65rem}
+/* Content */
+.content{padding:1.25rem 1.5rem}
+/* Filters */
+.filter-row{display:flex;gap:.5rem;margin-bottom:1rem;flex-wrap:wrap;align-items:center}
+.filter-btn{padding:.38rem .85rem;border-radius:8px;border:1px solid var(--border);font-size:.75rem;font-weight:700;cursor:pointer;font-family:'Prompt',sans-serif;background:none;color:var(--muted);transition:all .15s}
+.filter-btn.active{background:rgba(6,182,212,.1);border-color:rgba(6,182,212,.25);color:var(--c)}
+.refresh-btn{margin-left:auto;padding:.38rem .85rem;border-radius:8px;border:1px solid var(--border);font-size:.75rem;color:var(--muted);cursor:pointer;font-family:'Prompt',sans-serif;background:none}
+.refresh-btn:hover{color:var(--text)}
+/* Slip cards */
+.slip-grid{display:grid;gap:.85rem}
+.slip-card{background:var(--bg2);border:1px solid var(--border);border-radius:14px;overflow:hidden}
+.slip-card.s-pending{border-color:rgba(245,158,11,.2)}
+.slip-card.s-approved{border-color:rgba(34,197,94,.2)}
+.slip-card.s-rejected{border-color:rgba(239,68,68,.15)}
+.slip-header{display:flex;align-items:center;gap:.75rem;padding:.9rem 1rem;border-bottom:1px solid var(--border)}
+.slip-avatar{width:36px;height:36px;border-radius:50%;background:rgba(6,182,212,.1);display:flex;align-items:center;justify-content:center;font-size:.9rem;flex-shrink:0}
+.slip-name{font-size:.88rem;font-weight:700}
+.slip-email{font-size:.72rem;color:var(--muted)}
+.slip-meta{font-size:.7rem;color:var(--muted);margin-left:auto;text-align:right}
+.status-badge{display:inline-flex;align-items:center;gap:.25rem;padding:.18rem .55rem;border-radius:6px;font-size:.65rem;font-weight:700;letter-spacing:.05em}
+.sb-pending{background:rgba(245,158,11,.1);color:var(--a);border:1px solid rgba(245,158,11,.2)}
+.sb-approved{background:rgba(34,197,94,.1);color:var(--g);border:1px solid rgba(34,197,94,.2)}
+.sb-rejected{background:rgba(239,68,68,.1);color:var(--r);border:1px solid rgba(239,68,68,.2)}
+.slip-body{display:grid;grid-template-columns:1fr 1fr;gap:0}
+.slip-img-wrap{border-right:1px solid var(--border);padding:.85rem;display:flex;align-items:center;justify-content:center;background:#050505;cursor:pointer}
+.slip-img-wrap img{max-width:100%;max-height:200px;border-radius:8px;object-fit:contain}
+.slip-img-wrap:hover img{opacity:.85}
+.slip-actions{padding:.85rem}
+.slip-actions p{font-size:.75rem;color:var(--muted);margin-bottom:.65rem}
+.action-row{display:flex;flex-direction:column;gap:.5rem}
+.btn-approve{padding:.65rem;background:linear-gradient(135deg,var(--g),#16a34a);color:#000;border:none;border-radius:9px;font-size:.82rem;font-weight:800;cursor:pointer;font-family:'Prompt',sans-serif;width:100%;transition:transform .15s,opacity .15s}
+.btn-approve:hover{transform:translateY(-1px)}
+.btn-approve:disabled{opacity:.35;cursor:not-allowed}
+.btn-reject{padding:.55rem;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);border-radius:9px;font-size:.78rem;font-weight:700;cursor:pointer;font-family:'Prompt',sans-serif;width:100%;color:var(--r);transition:background .15s}
+.btn-reject:hover{background:rgba(239,68,68,.15)}
+.key-result{background:#0d0d0d;border:1px solid rgba(6,182,212,.25);border-radius:8px;padding:.55rem .75rem;font-family:monospace;font-size:.78rem;color:var(--c);margin-top:.5rem;word-break:break-all}
+.reject-input{width:100%;padding:.5rem .65rem;background:#0d0d0d;border:1px solid rgba(239,68,68,.2);border-radius:8px;color:var(--text);font-family:'Prompt',sans-serif;font-size:.78rem;margin-top:.35rem;outline:none}
+.reject-input:focus{border-color:var(--r)}
+/* Keys table */
+.keys-table{width:100%;border-collapse:collapse;font-size:.78rem}
+.keys-table th{text-align:left;padding:.6rem .85rem;border-bottom:1px solid var(--border);color:var(--muted);font-size:.65rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
+.keys-table td{padding:.65rem .85rem;border-bottom:1px solid rgba(255,255,255,.04);vertical-align:middle}
+.keys-table tr:hover td{background:rgba(255,255,255,.02)}
+.key-mono{font-family:monospace;color:var(--c);font-size:.75rem;letter-spacing:.05em}
+.btn-revoke{padding:.22rem .6rem;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.18);border-radius:6px;color:var(--r);font-size:.67rem;cursor:pointer;font-family:'Prompt',sans-serif;font-weight:700}
+/* Lightbox */
+#lightbox{display:none;position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:200;align-items:center;justify-content:center;cursor:zoom-out}
+#lightbox.open{display:flex}
+#lightbox img{max-width:90vw;max-height:90vh;border-radius:12px;object-fit:contain}
+/* Empty */
+.empty{text-align:center;padding:3rem 1rem;color:var(--muted);font-size:.85rem}
+.loading{text-align:center;padding:2rem;color:var(--muted);font-size:.82rem}
+</style>
+</head>
+<body>
+
+<!-- Login Screen -->
+<div id="login-screen">
+  <div class="login-box">
+    <div class="login-logo">DJBIG</div>
+    <div class="login-sub">Admin Panel</div>
+    <input class="inp" id="pass-input" type="password" placeholder="Admin Password" onkeydown="if(event.key==='Enter')login()"/>
+    <button class="btn" onclick="login()">เข้าสู่ระบบ</button>
+    <div class="err-msg" id="login-err"></div>
+  </div>
+</div>
+
+<!-- Main App -->
+<div id="app">
+  <nav>
+    <div class="logo">DJBIG</div>
+    <span class="badge">ADMIN</span>
+    <button class="btn-logout-nav" onclick="adminLogout()">ออกจากระบบ</button>
+  </nav>
+
+  <div class="tabs">
+    <button class="tab active" data-tab="slips" onclick="switchTab('slips')">สลิปรอตรวจ <span class="cnt" id="pending-cnt">0</span></button>
+    <button class="tab" data-tab="all-slips" onclick="switchTab('all-slips')">สลิปทั้งหมด</button>
+    <button class="tab" data-tab="keys" onclick="switchTab('keys')">License Keys</button>
+  </div>
+
+  <!-- Slips Tab -->
+  <div id="tab-slips" class="content">
+    <div class="filter-row">
+      <span style="font-size:.8rem;color:var(--muted)">กรองสถานะ:</span>
+      <button class="filter-btn active" data-f="pending" onclick="setFilter('pending',this)">รอตรวจ</button>
+      <button class="filter-btn" data-f="approved" onclick="setFilter('approved',this)">อนุมัติแล้ว</button>
+      <button class="filter-btn" data-f="rejected" onclick="setFilter('rejected',this)">ปฏิเสธแล้ว</button>
+      <button class="filter-btn" data-f="all" onclick="setFilter('all',this)">ทั้งหมด</button>
+      <button class="refresh-btn" onclick="loadSlips()">↻ รีเฟรช</button>
+    </div>
+    <div class="slip-grid" id="slips-grid"></div>
+  </div>
+
+  <!-- All Slips Tab (same as slips but showing all by default) -->
+  <div id="tab-all-slips" class="content" style="display:none">
+    <p style="font-size:.8rem;color:var(--muted);margin-bottom:1rem">สลิปทั้งหมดในระบบ</p>
+    <div class="slip-grid" id="all-slips-grid"></div>
+  </div>
+
+  <!-- Keys Tab -->
+  <div id="tab-keys" class="content" style="display:none">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+      <span style="font-size:.8rem;color:var(--muted)">License Keys ทั้งหมด</span>
+      <button class="refresh-btn" onclick="loadKeys()">↻ รีเฟรช</button>
+    </div>
+    <div style="overflow-x:auto">
+      <table class="keys-table">
+        <thead><tr><th>#</th><th>License Key</th><th>Email</th><th>สถานะ</th><th>สร้างเมื่อ</th><th>ใช้งานเมื่อ</th><th>เครื่อง (Machine ID)</th><th>จัดการ</th></tr></thead>
+        <tbody id="keys-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Lightbox -->
+<div id="lightbox" onclick="document.getElementById('lightbox').classList.remove('open')">
+  <img id="lb-img" src="" alt="slip"/>
+</div>
+
+<script>
+const API_BASE = window.location.hostname === 'localhost' ? '' : 'https://djbig.last-prize.com';
+let adminToken = null;
+let currentFilter = 'pending';
+const API = '';
+
+async function login() {
+  const pass = document.getElementById('pass-input').value;
+  if (!pass) return;
+  const btn = document.querySelector('#login-screen .btn');
+  btn.disabled = true;
+  try {
+    const r = await fetch(API_BASE+'/api/admin/login', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({password:pass}) });
+    const d = await r.json();
+    if (d.token) {
+      adminToken = d.token;
+      localStorage.setItem('adminToken', d.token);
+      showApp();
+    } else {
+      document.getElementById('login-err').textContent = 'รหัสผ่านไม่ถูกต้อง';
+      btn.disabled = false;
+    }
+  } catch(e) {
+    document.getElementById('login-err').textContent = 'ไม่สามารถเชื่อมต่อได้';
+    btn.disabled = false;
+  }
+}
+
+function adminLogout() {
+  adminToken = null;
+  localStorage.removeItem('adminToken');
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('login-screen').style.display = 'flex';
+}
+
+function showApp() {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  loadSlips();
+}
+
+function switchTab(tab) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+  ['slips','all-slips','keys'].forEach(id => {
+    document.getElementById('tab-' + id).style.display = id === tab ? 'block' : 'none';
+  });
+  if (tab === 'all-slips') loadAllSlips();
+  if (tab === 'keys') loadKeys();
+}
+
+function setFilter(f, btn) {
+  currentFilter = f;
+  document.querySelectorAll('[data-f]').forEach(b => b.classList.toggle('active', b === btn));
+  loadSlips();
+}
+
+function authHdr() { return { 'Authorization': 'Bearer ' + adminToken, 'Content-Type': 'application/json' }; }
+
+async function loadSlips() {
+  const grid = document.getElementById('slips-grid');
+  grid.innerHTML = '<div class="loading">กำลังโหลด...</div>';
+  try {
+    const r = await fetch(API_BASE+'/api/admin/slips?status=' + currentFilter, { headers: authHdr() });
+    const { slips } = await r.json();
+    const pendingCount = slips.filter(s => s.status === 'pending').length;
+    document.getElementById('pending-cnt').textContent = currentFilter === 'pending' ? pendingCount : '';
+    renderSlips(slips, grid);
+  } catch(e) {
+    grid.innerHTML = '<div class="empty">ไม่สามารถโหลดข้อมูลได้</div>';
+  }
+}
+
+async function loadAllSlips() {
+  const grid = document.getElementById('all-slips-grid');
+  grid.innerHTML = '<div class="loading">กำลังโหลด...</div>';
+  try {
+    const r = await fetch(API_BASE+'/api/admin/slips?status=all', { headers: authHdr() });
+    const { slips } = await r.json();
+    renderSlips(slips, grid);
+  } catch(e) {
+    grid.innerHTML = '<div class="empty">ไม่สามารถโหลดข้อมูลได้</div>';
+  }
+}
+
+function renderSlips(slips, container) {
+  if (!slips.length) { container.innerHTML = '<div class="empty">ไม่มีสลิปในหมวดนี้</div>'; return; }
+  container.innerHTML = slips.map(s => `
+    <div class="slip-card s-${s.status}" id="slip-${s.id}">
+      <div class="slip-header">
+        <div class="slip-avatar">👤</div>
+        <div>
+          <div class="slip-name">${esc(s.name || '-')}</div>
+          <div class="slip-email">${esc(s.email)}</div>
+        </div>
+        <div class="slip-meta">
+          <div><span class="status-badge sb-${s.status}">${statusTh(s.status)}</span></div>
+          <div style="margin-top:.3rem">${fmtDate(s.submitted_at)}</div>
+        </div>
+      </div>
+      <div class="slip-body">
+        <div class="slip-img-wrap" onclick="openLightbox(API_BASE+'/uploads/slips/${esc(s.slip_filename)}')">
+          <img src="${API_BASE}/uploads/slips/${esc(s.slip_filename)}" alt="slip" onerror="this.src='';this.parentElement.innerHTML='<div style=color:var(--muted);font-size:.78rem;text-align:center>ไม่พบรูปภาพ</div>'"/>
+        </div>
+        <div class="slip-actions">
+          ${s.status === 'pending' ? `
+            <p>ตรวจสอบสลิปและดำเนินการ:</p>
+            <div class="action-row">
+              <button class="btn-approve" onclick="approve(${s.id})">✅ อนุมัติ + Gen Key</button>
+              <div>
+                <input class="reject-input" id="note-${s.id}" placeholder="หมายเหตุ (ถ้ามี)"/>
+                <button class="btn-reject" style="margin-top:.35rem" onclick="reject(${s.id})">❌ ปฏิเสธ</button>
+              </div>
+            </div>
+          ` : s.status === 'approved' ? `
+            <p style="color:var(--g)">✅ อนุมัติแล้ว</p>
+            ${s.license_key ? `<div class="key-result">${esc(s.license_key)}</div>` : ''}
+            <p style="margin-top:.5rem;font-size:.7rem;color:var(--muted)">อนุมัติเมื่อ: ${fmtDate(s.reviewed_at)}</p>
+          ` : `
+            <p style="color:var(--r)">❌ ปฏิเสธแล้ว</p>
+            ${s.notes ? `<p style="font-size:.72rem;color:var(--muted);margin-top:.25rem">หมายเหตุ: ${esc(s.notes)}</p>` : ''}
+          `}
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+async function approve(slipId) {
+  const btn = document.querySelector(`#slip-${slipId} .btn-approve`);
+  if (btn) { btn.textContent = 'กำลังดำเนินการ...'; btn.disabled = true; }
+  try {
+    const r = await fetch(API_BASE+'/api/admin/approve', { method:'POST', headers:authHdr(), body:JSON.stringify({slipId:slipId}) });
+    const d = await r.json();
+    if (d.ok) {
+      const card = document.getElementById('slip-' + slipId);
+      if (card) {
+        const actions = card.querySelector('.slip-actions');
+        actions.innerHTML = `<p style="color:var(--g)">✅ อนุมัติแล้ว!</p><div class="key-result">${esc(d.key)}</div>`;
+        card.className = 'slip-card s-approved';
+      }
+    } else {
+      alert(d.error || 'เกิดข้อผิดพลาด');
+      if (btn) { btn.textContent = '✅ อนุมัติ + Gen Key'; btn.disabled = false; }
+    }
+  } catch(e) {
+    alert('เกิดข้อผิดพลาด');
+    if (btn) { btn.textContent = '✅ อนุมัติ + Gen Key'; btn.disabled = false; }
+  }
+}
+
+async function reject(slipId) {
+  const notes = document.getElementById('note-' + slipId)?.value || '';
+  if (!confirm('ยืนยันการปฏิเสธสลิปนี้?')) return;
+  try {
+    const r = await fetch(API_BASE+'/api/admin/reject', { method:'POST', headers:authHdr(), body:JSON.stringify({slipId:slipId, notes}) });
+    const d = await r.json();
+    if (d.ok) {
+      const card = document.getElementById('slip-' + slipId);
+      if (card) {
+        const actions = card.querySelector('.slip-actions');
+        actions.innerHTML = `<p style="color:var(--r)">❌ ปฏิเสธแล้ว</p>${notes?`<p style="font-size:.72rem;color:var(--muted);margin-top:.25rem">หมายเหตุ: ${esc(notes)}</p>`:''}`;
+        card.className = 'slip-card s-rejected';
+      }
+    }
+  } catch(e) {
+    alert('เกิดข้อผิดพลาด');
+  }
+}
+
+async function loadKeys() {
+  const tbody = document.getElementById('keys-tbody');
+  tbody.innerHTML = '<tr><td colspan="8" class="loading">กำลังโหลด...</td></tr>';
+  try {
+    const r = await fetch(API_BASE+'/api/admin/keys', { headers: authHdr() });
+    const { keys } = await r.json();
+    if (!keys.length) { tbody.innerHTML = '<tr><td colspan="8" class="empty">ยังไม่มี Key</td></tr>'; return; }
+    tbody.innerHTML = keys.map(k => `
+      <tr id="key-row-${k.id}">
+        <td style="color:var(--muted)">#${k.id}</td>
+        <td class="key-mono">${esc(k.license_key)}</td>
+        <td style="font-size:.75rem">${esc(k.email)}</td>
+        <td><span class="status-badge sb-${k.status === 'active' ? 'approved' : k.status === 'revoked' ? 'rejected' : 'pending'}">${k.status === 'active' ? '● ใช้งานแล้ว' : k.status === 'revoked' ? '✕ ถูกยกเลิก' : '○ ยังไม่ใช้'}</span></td>
+        <td style="color:var(--muted)">${fmtDate(k.created_at)}</td>
+        <td style="color:var(--muted)">${k.activated_at ? fmtDate(k.activated_at) : '—'}</td>
+        <td style="font-size:.68rem;color:var(--muted);font-family:monospace">${k.machine_id ? `<span title="${esc(k.machine_id)}" style="cursor:help">${esc(k.machine_id.slice(0,12))}…</span>` : '<span style="color:#2a2a2a">ยังไม่ผูก</span>'}</td>
+        <td style="display:flex;gap:.35rem;flex-wrap:wrap">
+          ${k.status !== 'revoked' ? `<button class="btn-revoke" onclick="revokeKey(${k.id})">ยกเลิก Key</button>` : ''}
+          ${k.machine_id && k.status !== 'revoked' ? `<button class="btn-revoke" style="background:rgba(245,158,11,.1);border-color:rgba(245,158,11,.3);color:#f59e0b" onclick="unlinkMachine(${k.id})">ยกเลิกเครื่อง</button>` : ''}
+          ${!k.machine_id && !k.status !== 'revoked' ? '' : ''}
+          ${k.status === 'revoked' && !k.machine_id ? '—' : ''}
+        </td>
+      </tr>
+    `).join('');
+  } catch(e) {
+    tbody.innerHTML = '<tr><td colspan="7" class="empty">ไม่สามารถโหลดได้</td></tr>';
+  }
+}
+
+async function revokeKey(keyId) {
+  if (!confirm('ยืนยันการยกเลิก License Key นี้?')) return;
+  try {
+    await fetch(API_BASE+'/api/admin/revoke', { method:'POST', headers:authHdr(), body:JSON.stringify({keyId:keyId}) });
+    loadKeys();
+  } catch(e) { alert('เกิดข้อผิดพลาด'); }
+}
+
+async function unlinkMachine(keyId) {
+  if (!confirm('ยืนยันการยกเลิกการผูกเครื่อง? Key จะสามารถใช้งานบนเครื่องใหม่ได้')) return;
+  try {
+    const r = await fetch(API_BASE+'/api/admin/unlink-machine', {
+      method: 'POST', headers: authHdr(),
+      body: JSON.stringify({ keyId: keyId })
+    });
+    const d = await r.json();
+    if (d.ok) loadKeys();
+    else alert(d.error || 'เกิดข้อผิดพลาด');
+  } catch(e) { alert('เกิดข้อผิดพลาด'); }
+}
+
+function openLightbox(src) {
+  document.getElementById('lb-img').src = src;
+  document.getElementById('lightbox').classList.add('open');
+}
+
+function fmtDate(dt) {
+  if (!dt) return '—';
+  const d = new Date(dt);
+  return d.toLocaleDateString('th-TH', {day:'2-digit',month:'2-digit',year:'2-digit'}) + ' ' + d.toLocaleTimeString('th-TH', {hour:'2-digit',minute:'2-digit'});
+}
+
+function statusTh(s) { return s === 'pending' ? '⏳ รอตรวจ' : s === 'approved' ? '✅ อนุมัติ' : '❌ ปฏิเสธ'; }
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+// Check saved token
+const saved = localStorage.getItem('adminToken');
+if (saved) { adminToken = saved; showApp(); }
+</script>
+</body>
+</html>

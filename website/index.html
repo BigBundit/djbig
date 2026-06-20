@@ -1,0 +1,1158 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>DJBIG — Cyber Rhythm Action</title>
+  <meta name="description" content="เกมดนตรี Rhythm Game สไตล์ DJMAX สำหรับ PC และ Android ดาวน์โหลดฟรี"/>
+  <link rel="icon" href="logodjbig.png"/>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Prompt:ital,wght@0,300;0,400;0,600;0,700;0,800;0,900;1,700;1,800;1,900&display=swap" rel="stylesheet"/>
+  <style>
+  :root{
+    --c:#06b6d4;--cg:rgba(6,182,212,.3);
+    --f:#d946ef;--fg:rgba(217,70,239,.3);
+    --a:#f59e0b;--g:#22c55e;
+    --bg:#000000;--bg2:#0a0a0a;
+    --text:#e2e8f0;--muted:#52525b;--subtle:#71717a;
+  }
+  *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+  html,body{height:100%;overflow:hidden;font-family:'Prompt',sans-serif;background:var(--bg);color:var(--text)}
+
+  /* SCROLL SNAP */
+  #wrap{height:100vh;overflow-y:scroll;overflow-x:hidden;scroll-snap-type:y mandatory;scroll-behavior:smooth}
+  #wrap::-webkit-scrollbar{display:none}
+  .pg{scroll-snap-align:start;scroll-snap-stop:always;height:100vh;overflow:hidden;display:flex;align-items:center;justify-content:center;position:relative;padding-right:calc(3.5vw + 260px)}
+
+  /* NAV */
+  nav{position:fixed;top:0;left:0;right:0;z-index:999;height:52px;padding:0 2.5rem;display:flex;align-items:center;justify-content:space-between;background:rgba(0,0,0,.92);backdrop-filter:blur(20px);border-bottom:1px solid rgba(255,255,255,.06)}
+  .nl{display:flex;align-items:center;gap:.5rem;text-decoration:none}
+  .nl img{width:26px;height:26px;border-radius:5px}
+  .nl b{font-size:1.05rem;font-weight:900;font-style:italic;background:linear-gradient(120deg,var(--c),var(--f));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+  .nm{display:flex;gap:1.25rem;align-items:center}
+  .nm a{color:var(--muted);text-decoration:none;font-size:.78rem;font-weight:600;letter-spacing:.04em;transition:color .2s;cursor:pointer}
+  .nm a:hover{color:var(--c)}
+  .nm .cta{padding:.35rem .9rem;background:var(--c);color:#000;border-radius:6px;font-weight:700;font-size:.78rem;transition:opacity .2s}
+  .nm .cta:hover{opacity:.85;color:#000}
+
+  /* DOTS */
+  #dots{position:fixed;bottom:1.25rem;left:50%;transform:translateX(-50%);z-index:999;display:flex;gap:.4rem;align-items:center;background:rgba(0,0,0,.7);backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.08);border-radius:999px;padding:.4rem .7rem}
+  .dot{width:5px;height:5px;border-radius:999px;background:rgba(255,255,255,.2);border:none;cursor:pointer;transition:all .3s}
+  .dot.on{width:18px;background:var(--c);box-shadow:0 0 6px var(--cg)}
+
+  /* ══════════════ PAGE 0 · HERO ══════════════ */
+  .hero-bg{position:absolute;inset:0;overflow:hidden}
+  .hero-bg-img{
+    position:absolute;inset:0;
+    background-size:cover;background-position:center;
+    opacity:.2;filter:saturate(1.5) blur(2px);
+  }
+  .hero-bg::after{
+    content:'';position:absolute;inset:0;
+    background:
+      radial-gradient(ellipse 55% 80% at 20% 50%,rgba(6,182,212,.06),transparent),
+      radial-gradient(ellipse 50% 70% at 85% 50%,rgba(217,70,239,.05),transparent),
+      linear-gradient(to right,rgba(0,0,0,.97) 0%,rgba(0,0,0,.72) 45%,rgba(0,0,0,.93) 100%);
+  }
+  .hero-inner{
+    position:relative;z-index:1;
+    width:100%;max-width:1200px;padding:52px 4rem 1.5rem;
+    display:flex;align-items:center;gap:3rem;
+  }
+  .hero-left{flex:1;display:flex;flex-direction:column;gap:.7rem}
+  .badge{
+    display:inline-flex;align-items:center;gap:.4rem;width:fit-content;
+    padding:.25rem .85rem;border-radius:999px;
+    border:1px solid rgba(6,182,212,.25);background:rgba(6,182,212,.07);
+    font-size:.67rem;font-weight:700;letter-spacing:.12em;color:var(--c);text-transform:uppercase;
+  }
+  .badge i{width:5px;height:5px;border-radius:50%;background:var(--c);animation:blink 2s infinite;flex-shrink:0}
+  @keyframes blink{0%,100%{opacity:1}50%{opacity:.2}}
+  .hero-left h1{
+    font-size:clamp(4rem,8vw,6.8rem);font-weight:900;font-style:italic;
+    line-height:.88;letter-spacing:-.04em;
+    background:linear-gradient(160deg,#ffffff 15%,#d4d4d4 50%,#737373);
+    -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+    filter:drop-shadow(0 0 50px rgba(6,182,212,.55));
+  }
+  .hero-sub{
+    font-size:clamp(.82rem,1.6vw,1rem);font-weight:800;font-style:italic;
+    letter-spacing:.22em;
+    background:linear-gradient(90deg,var(--c),var(--f));
+    -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  }
+  .hero-desc{color:var(--muted);font-size:.87rem;line-height:1.7;max-width:380px}
+  .btns{display:flex;gap:.7rem;flex-wrap:wrap;margin-top:.25rem}
+  .bp{
+    display:inline-flex;align-items:center;gap:.45rem;padding:.65rem 1.5rem;border-radius:8px;
+    background:linear-gradient(135deg,var(--c),#3b82f6);color:#000;
+    font-weight:800;font-size:.85rem;text-decoration:none;
+    box-shadow:0 0 24px rgba(6,182,212,.35);transition:transform .2s,box-shadow .2s;
+  }
+  .bp:hover{transform:translateY(-2px);box-shadow:0 0 38px rgba(6,182,212,.6)}
+  .bs{
+    display:inline-flex;align-items:center;gap:.45rem;padding:.65rem 1.5rem;border-radius:8px;
+    border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.04);
+    color:var(--text);font-weight:700;font-size:.85rem;text-decoration:none;
+    backdrop-filter:blur(8px);transition:transform .2s,border-color .2s;
+  }
+  .bs:hover{transform:translateY(-2px);border-color:var(--f)}
+  .scroll-hint{display:flex;align-items:center;gap:.4rem;color:#2a2a2a;font-size:.62rem;letter-spacing:.1em;text-transform:uppercase;margin-top:.3rem}
+  .sh-line{width:28px;height:1px;background:linear-gradient(to right,var(--c),transparent);animation:sh 2s ease-in-out infinite}
+  @keyframes sh{0%,100%{opacity:.3}50%{opacity:1}}
+
+  .hero-right{
+    flex:0 0 auto;width:min(46%,500px);
+    display:flex;align-items:center;justify-content:center;
+    position:relative;height:calc(100vh - 60px);
+  }
+  .hero-glow{
+    position:absolute;inset:0;pointer-events:none;
+    background:radial-gradient(ellipse 80% 70% at 55% 50%,rgba(6,182,212,.12),rgba(217,70,239,.07) 55%,transparent 75%);
+    animation:g1 10s ease-in-out infinite;z-index:0;
+  }
+  @keyframes g1{0%,100%{transform:scale(1)}50%{transform:scale(1.08)}}
+  @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-12px)}}
+  @keyframes float-back{0%,100%{transform:rotate(-12deg) translateY(0)}50%{transform:rotate(-12deg) translateY(-8px)}}
+
+  /* Phone mockup */
+  .phones-wrap{
+    position:relative;z-index:1;
+    display:flex;align-items:center;justify-content:center;
+    height:min(calc(100vh - 120px),520px);
+  }
+  .phone{
+    background:linear-gradient(175deg,#141414 0%,#080808 100%);
+    border-radius:38px;
+    overflow:hidden;
+    flex-shrink:0;
+  }
+  .phone-front{
+    height:100%;aspect-ratio:9/19.5;
+    border:2px solid rgba(6,182,212,.35);
+    box-shadow:0 0 45px rgba(6,182,212,.22),0 0 90px rgba(217,70,239,.1),0 40px 100px rgba(0,0,0,.9);
+    position:relative;z-index:2;
+    animation:float 6s ease-in-out infinite;
+  }
+  .phone-back{
+    height:84%;aspect-ratio:9/19.5;
+    border:2px solid rgba(217,70,239,.2);
+    box-shadow:0 20px 60px rgba(0,0,0,.8);
+    margin-right:-55px;
+    transform:rotate(-12deg) translateY(5%);
+    opacity:.52;
+    z-index:1;
+    animation:float-back 7.5s ease-in-out infinite;
+  }
+  .phone-screen{width:100%;height:100%;overflow:hidden;border-radius:36px}
+  .phone-screen img{width:100%;height:100%;object-fit:cover;display:block}
+  .phone-dot{
+    position:absolute;top:10px;left:50%;transform:translateX(-50%);
+    width:9px;height:9px;border-radius:50%;background:#030303;
+    border:1px solid rgba(255,255,255,.08);z-index:10;
+  }
+  .phone-bar{
+    position:absolute;bottom:9px;left:50%;transform:translateX(-50%);
+    width:70px;height:4px;border-radius:2px;
+    background:rgba(255,255,255,.18);z-index:10;
+  }
+
+  /* ══════════════ SHARED SECTION HEADER ══════════════ */
+  .sh-hd{margin-bottom:.75rem}
+  .sl{font-size:.62rem;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:var(--c);margin-bottom:.3rem}
+  .st{font-size:clamp(1.35rem,2.8vw,1.9rem);font-weight:900;font-style:italic;letter-spacing:-.03em;line-height:1.05}
+  .sd{color:var(--muted);font-size:.82rem;line-height:1.6;margin-top:.4rem}
+
+  /* ══════════════ PAGE 1 · GAMEPLAY ══════════════ */
+  .gp-inner{
+    position:relative;z-index:1;
+    width:100%;max-width:1200px;padding:52px 3rem 1.5rem;
+    display:flex;align-items:center;gap:2.5rem;
+    height:100vh;
+  }
+  .gp-left{flex:1.3;display:flex;flex-direction:column;gap:.75rem;min-height:0;height:100%;padding-bottom:1.5rem}
+  .gp-img{
+    flex:1;border-radius:12px;overflow:hidden;min-height:0;
+    border:1px solid rgba(6,182,212,.18);
+    box-shadow:0 0 60px rgba(6,182,212,.12),0 20px 60px rgba(0,0,0,.6);
+  }
+  .gp-img img{width:100%;height:100%;object-fit:cover;display:block}
+  .gp-img-grid{display:flex;flex-direction:row;gap:6px;padding:0}
+  .gp-img-main{flex:1.6;position:relative;border-radius:8px;overflow:hidden;min-height:0}
+  .gp-img-main img{width:100%;height:100%;object-fit:cover}
+  .gp-img-side{flex:1;display:flex;flex-direction:column;gap:6px;min-height:0}
+  .gp-img-sub{flex:1;position:relative;border-radius:8px;overflow:hidden;min-height:0}
+  .gp-img-sub img{width:100%;height:100%;object-fit:cover}
+  .gp-img-tag{position:absolute;bottom:6px;left:8px;font-size:10px;font-weight:600;letter-spacing:.06em;color:rgba(255,255,255,.8);background:rgba(0,0,0,.55);backdrop-filter:blur(6px);padding:2px 7px;border-radius:4px;text-transform:uppercase}
+  .gp-right{flex:0 0 260px;display:flex;flex-direction:column;gap:.75rem}
+  .gp-feat{
+    display:flex;align-items:flex-start;gap:.65rem;padding:.8rem;border-radius:10px;
+    background:rgba(10,10,10,.9);border:1px solid rgba(255,255,255,.07);
+    transition:border-color .3s,transform .2s;
+  }
+  .gp-feat:hover{border-color:rgba(6,182,212,.25);transform:translateX(2px)}
+  .gp-fi{
+    width:32px;height:32px;border-radius:8px;flex-shrink:0;
+    display:flex;align-items:center;justify-content:center;font-size:.95rem;
+    background:rgba(6,182,212,.1);border:1px solid rgba(6,182,212,.2);
+  }
+  .gp-feat h4{font-size:.8rem;font-weight:800;margin-bottom:.12rem}
+  .gp-feat p{font-size:.72rem;color:var(--muted);line-height:1.45}
+
+  /* ══════════════ PAGE 2 · FEATURES ══════════════ */
+  .feat-inner{
+    width:100%;max-width:1100px;padding:52px 2rem 1.5rem;
+    display:flex;flex-direction:column;gap:.75rem;height:100vh;
+  }
+  .fg{display:grid;grid-template-columns:repeat(3,1fr);gap:.65rem;flex:1;min-height:0}
+  .fc{
+    background:rgba(12,12,12,.92);border:1px solid rgba(255,255,255,.06);
+    border-radius:12px;padding:1rem 1.1rem;
+    display:flex;flex-direction:column;gap:.35rem;
+    transition:border-color .3s,transform .2s;position:relative;overflow:hidden;
+  }
+  .fc::before{content:'';position:absolute;inset:0;background:radial-gradient(circle at top left,var(--fcg,rgba(6,182,212,.04)),transparent 55%);pointer-events:none}
+  .fc:hover{border-color:var(--fcb,rgba(6,182,212,.3));transform:translateY(-2px)}
+  .fi{width:34px;height:34px;border-radius:8px;font-size:.95rem;display:flex;align-items:center;justify-content:center;background:var(--fib,rgba(6,182,212,.1));border:1px solid var(--fib2,rgba(6,182,212,.2));flex-shrink:0}
+  .fc h3{font-size:.82rem;font-weight:800;letter-spacing:-.01em}
+  .fc p{color:var(--muted);font-size:.73rem;line-height:1.5}
+
+  /* ══════════════ PAGE 3 · SCREENSHOTS ══════════════ */
+  .ss-inner{
+    width:100%;max-width:1200px;padding:52px 2.5rem 1.5rem;
+    display:flex;flex-direction:column;gap:.7rem;height:100vh;
+  }
+  .ss-pc-row{
+    display:grid;grid-template-columns:repeat(3,1fr);gap:.65rem;
+    flex:0 0 auto;
+  }
+  .ss-pc-row .simg{
+    border-radius:8px;overflow:hidden;
+    border:1px solid rgba(255,255,255,.07);
+    aspect-ratio:16/9;
+    transition:transform .3s,border-color .3s,box-shadow .3s;
+    cursor:pointer;
+  }
+  .ss-pc-row .simg:hover{transform:scale(1.02);border-color:rgba(6,182,212,.3);box-shadow:0 0 20px rgba(6,182,212,.15)}
+  .ss-pc-row .simg img{width:100%;height:100%;object-fit:cover;display:block}
+  .ss-label{font-size:.7rem;color:var(--muted);text-align:center;margin-top:.25rem;font-weight:600;letter-spacing:.05em}
+  .ss-divider{display:flex;align-items:center;gap:.75rem;flex-shrink:0}
+  .ss-divider::before,.ss-divider::after{content:'';flex:1;height:1px;background:rgba(255,255,255,.05)}
+  .ss-divider span{font-size:.62rem;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:var(--muted)}
+  .ss-android-row{
+    display:flex;gap:.65rem;justify-content:center;align-items:flex-start;
+    flex:1;min-height:0;overflow:hidden;
+  }
+  .ss-phone{
+    flex:0 0 auto;
+    background:rgba(10,10,10,.95);border-radius:16px;
+    border:2px solid rgba(255,255,255,.1);padding:5px;
+    box-shadow:0 0 20px rgba(0,0,0,.5);
+    transition:transform .3s,border-color .3s;
+    overflow:hidden;
+    height:100%;
+    aspect-ratio:9/19;
+  }
+  .ss-phone:hover{transform:translateY(-4px);border-color:rgba(217,70,239,.35)}
+  .ss-phone img{width:100%;height:100%;object-fit:cover;border-radius:12px;display:block}
+
+  /* ══════════════ PAGE 4 · DOWNLOAD ══════════════ */
+  .dl-inner{
+    display:flex;flex-direction:column;align-items:center;
+    padding:52px 2rem 1.5rem;width:100%;max-width:860px;
+    gap:1.25rem;height:100vh;justify-content:center;
+  }
+  .dl-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem;width:100%}
+  .dlcard{
+    background:rgba(10,10,10,.95);border:1px solid rgba(255,255,255,.07);
+    border-radius:16px;padding:1.5rem;
+    display:flex;flex-direction:column;align-items:center;
+    text-align:center;gap:.7rem;
+    transition:border-color .3s,transform .25s;overflow:hidden;
+  }
+  .dlcard:hover{border-color:rgba(6,182,212,.25);transform:translateY(-3px)}
+  .dlcard-ss{width:100%;aspect-ratio:16/9;border-radius:8px;overflow:hidden;border:1px solid rgba(255,255,255,.08)}
+  .dlcard-ss img{width:100%;height:100%;object-fit:cover;display:block}
+  .dlcard h3{font-size:1.1rem;font-weight:800}
+  .dlfree{display:inline-block;padding:.17rem .6rem;border-radius:999px;font-size:.62rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.25);color:#22c55e}
+  .dlspec{font-size:.72rem;color:#404040;line-height:1.7;font-family:monospace}
+  .dlbtn{width:100%;padding:.65rem;border-radius:8px;font-weight:700;font-size:.83rem;text-decoration:none;display:flex;align-items:center;justify-content:center;gap:.4rem;transition:transform .2s,box-shadow .2s}
+  .dlbtn-pc{background:linear-gradient(135deg,var(--c),#3b82f6);color:#000;box-shadow:0 0 16px rgba(6,182,212,.25)}
+  .dlbtn-pc:hover{transform:translateY(-1px);box-shadow:0 0 28px rgba(6,182,212,.45)}
+  .dlbtn-ao{background:linear-gradient(135deg,#22c55e,#16a34a);color:#000;box-shadow:0 0 16px rgba(34,197,94,.25)}
+  .dlbtn-ao:hover{transform:translateY(-1px);box-shadow:0 0 28px rgba(34,197,94,.45)}
+  .dlbtn-gp{background:#000;color:#fff;border:1px solid rgba(255,255,255,.15);box-shadow:0 0 16px rgba(255,255,255,.05)}
+  .dlbtn-gp:hover{transform:translateY(-1px);border-color:rgba(255,255,255,.3);box-shadow:0 0 24px rgba(255,255,255,.1)}
+
+  /* ══════════════ PAGE 5 · PRICING + FAQ ══════════════ */
+  .pr-inner{
+    display:flex;flex-direction:column;
+    padding:52px 2.5rem 1.5rem;width:100%;max-width:1000px;
+    gap:.7rem;height:100vh;justify-content:center;
+  }
+  .pr-wrap{display:grid;grid-template-columns:1fr 1fr;gap:1.75rem;flex:1;min-height:0}
+  .pr-col{display:flex;flex-direction:column;gap:.65rem;min-height:0}
+  .pr-grid{display:grid;grid-template-columns:1fr 1fr;gap:.7rem}
+  .pcard{
+    border-radius:14px;padding:1.2rem;
+    border:1px solid rgba(255,255,255,.07);background:rgba(10,10,10,.95);
+    display:flex;flex-direction:column;gap:.55rem;
+  }
+  .pcard.hot{
+    border-color:rgba(245,158,11,.28);
+    background:linear-gradient(145deg,rgba(245,158,11,.07),rgba(8,8,8,.97));
+    box-shadow:0 0 40px rgba(245,158,11,.08);
+  }
+  .plabel{font-size:.62rem;font-weight:700;letter-spacing:.15em;text-transform:uppercase}
+  .pcard:not(.hot) .plabel{color:var(--muted)}
+  .pcard.hot .plabel{color:var(--a)}
+  .pamt{font-size:1.75rem;font-weight:900;letter-spacing:-.04em;line-height:1}
+  .pamt .cur{font-size:.78rem;font-weight:600;color:var(--subtle);vertical-align:top;margin-top:.2rem;display:inline-block}
+  .pper{font-size:.7rem;color:var(--muted)}
+  .pfeats{list-style:none;display:flex;flex-direction:column;gap:.32rem;flex:1}
+  .pfeats li{font-size:.75rem;color:var(--subtle);display:flex;align-items:center;gap:.4rem}
+  .pfeats li.off{color:#2a2a2a}
+  .ck{color:#22c55e;font-size:.82rem}
+  .xk{color:#2a2a2a}
+  .pbtn{padding:.58rem;border-radius:8px;font-weight:700;font-size:.8rem;text-align:center;text-decoration:none;display:block;transition:transform .2s}
+  .pbtn:hover{transform:translateY(-1px)}
+  .pbtn-f{border:1px solid rgba(255,255,255,.09);color:var(--subtle);background:rgba(255,255,255,.03)}
+  .pbtn-h{background:linear-gradient(135deg,var(--a),#f97316);color:#000;box-shadow:0 0 20px rgba(245,158,11,.25)}
+
+  /* FAQ column */
+  .fq-col{display:flex;flex-direction:column;gap:.2rem;overflow:hidden}
+  .fq{border-bottom:1px solid rgba(255,255,255,.05);padding:.6rem 0;cursor:pointer;flex-shrink:0}
+  .fq-q{font-weight:700;font-size:.82rem;display:flex;justify-content:space-between;align-items:center;color:var(--text);user-select:none}
+  .fq-q:hover{color:var(--c)}
+  .fq-q span{color:var(--muted);font-size:1rem;transition:transform .25s;flex-shrink:0;margin-left:.5rem}
+  .fq-q span.open{transform:rotate(45deg)}
+  .fq-a{color:var(--muted);font-size:.76rem;line-height:1.6;max-height:0;overflow:hidden;transition:max-height .3s ease,margin .3s}
+  .fq-a.show{max-height:90px;margin-top:.4rem}
+  footer{margin-top:auto;padding-top:.7rem;border-top:1px solid rgba(255,255,255,.05);display:flex;align-items:center;justify-content:space-between;width:100%;flex-shrink:0}
+  .flogo{font-size:.95rem;font-weight:900;font-style:italic;background:linear-gradient(120deg,var(--c),var(--f));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+  footer p{font-size:.7rem;color:#222222}
+
+  /* ═══════════════ SMOOTH PAGE TRANSITIONS ═══════════════ */
+  /* Initial state — content hidden before page comes into view */
+  .hero-left,.hero-right{
+    opacity:0;transform:translateY(22px);
+    transition:opacity .75s cubic-bezier(.22,1,.36,1),transform .75s cubic-bezier(.22,1,.36,1);
+  }
+  .gp-inner,.feat-inner,.ss-inner,.dl-inner,.pr-inner{
+    opacity:0;transform:translateY(24px);
+    transition:opacity .72s cubic-bezier(.22,1,.36,1),transform .72s cubic-bezier(.22,1,.36,1);
+  }
+  /* Visible state */
+  .pg.visible .hero-left{opacity:1;transform:none;transition-delay:0ms}
+  .pg.visible .hero-right{opacity:1;transform:none;transition-delay:150ms}
+  .pg.visible .gp-inner{opacity:1;transform:none}
+  .pg.visible .feat-inner{opacity:1;transform:none}
+  .pg.visible .ss-inner{opacity:1;transform:none}
+  .pg.visible .dl-inner{opacity:1;transform:none}
+  .pg.visible .pr-inner{opacity:1;transform:none}
+
+  /* Feature cards — stagger individually */
+  .fg .fc{
+    opacity:0;transform:translateY(12px);
+    transition:border-color .3s,transform .28s ease,opacity .5s cubic-bezier(.22,1,.36,1);
+  }
+  .pg.visible .fg .fc{opacity:1;transform:none}
+  .pg.visible .fg .fc:nth-child(1){transition-delay:40ms}
+  .pg.visible .fg .fc:nth-child(2){transition-delay:105ms}
+  .pg.visible .fg .fc:nth-child(3){transition-delay:170ms}
+  .pg.visible .fg .fc:nth-child(4){transition-delay:235ms}
+  .pg.visible .fg .fc:nth-child(5){transition-delay:300ms}
+  .pg.visible .fg .fc:nth-child(6){transition-delay:365ms}
+  /* Hover always instant after reveal */
+  .pg.visible .fg .fc:hover{
+    transform:translateY(-2px);transition-delay:0ms;
+  }
+
+  /* Gameplay features — slide in from right */
+  .gp-feat{
+    opacity:0;transform:translateX(20px);
+    transition:opacity .5s cubic-bezier(.22,1,.36,1),transform .5s cubic-bezier(.22,1,.36,1),
+               border-color .3s;
+  }
+  .pg.visible .gp-feat{opacity:1;transform:none}
+  .pg.visible .gp-feat:nth-child(1){transition-delay:120ms}
+  .pg.visible .gp-feat:nth-child(2){transition-delay:190ms}
+  .pg.visible .gp-feat:nth-child(3){transition-delay:260ms}
+  .pg.visible .gp-feat:nth-child(4){transition-delay:330ms}
+  .pg.visible .gp-feat:nth-child(5){transition-delay:400ms}
+  .pg.visible .gp-feat:hover{transform:translateX(2px);transition-delay:0ms}
+
+  /* Download & pricing cards */
+  .dlcard,.pcard{
+    opacity:0;transform:translateY(20px);
+    transition:opacity .6s cubic-bezier(.22,1,.36,1),transform .6s cubic-bezier(.22,1,.36,1),
+               border-color .3s;
+  }
+  .pg.visible .dlcard:nth-child(1){opacity:1;transform:none;transition-delay:60ms}
+  .pg.visible .dlcard:nth-child(2){opacity:1;transform:none;transition-delay:160ms}
+  .pg.visible .pcard:nth-child(1){opacity:1;transform:none;transition-delay:60ms}
+  .pg.visible .pcard:nth-child(2){opacity:1;transform:none;transition-delay:160ms}
+  .pg.visible .dlcard:hover,.pg.visible .pcard:hover{transition-delay:0ms}
+
+  /* Screenshots */
+  .ss-pc-row .simg{
+    opacity:0;transform:translateY(16px) scale(.97);
+    transition:opacity .55s cubic-bezier(.22,1,.36,1),transform .55s cubic-bezier(.22,1,.36,1),
+               border-color .3s,box-shadow .3s;
+  }
+  .pg.visible .ss-pc-row .simg{opacity:1;transform:none}
+  .pg.visible .ss-pc-row > div:nth-child(1) .simg{transition-delay:40ms}
+  .pg.visible .ss-pc-row > div:nth-child(2) .simg{transition-delay:120ms}
+  .pg.visible .ss-pc-row > div:nth-child(3) .simg{transition-delay:200ms}
+  .ss-phone{
+    opacity:0;transform:translateY(18px);
+    transition:opacity .55s cubic-bezier(.22,1,.36,1),transform .55s cubic-bezier(.22,1,.36,1),
+               border-color .3s;
+  }
+  .pg.visible .ss-phone{opacity:1;transform:none}
+  .pg.visible .ss-android-row .ss-phone:nth-child(1){transition-delay:120ms}
+  .pg.visible .ss-android-row .ss-phone:nth-child(2){transition-delay:180ms}
+  .pg.visible .ss-android-row .ss-phone:nth-child(3){transition-delay:240ms}
+  .pg.visible .ss-android-row .ss-phone:nth-child(4){transition-delay:300ms}
+  .pg.visible .ss-android-row .ss-phone:nth-child(5){transition-delay:360ms}
+  .pg.visible .ss-phone:hover{transform:translateY(-4px);transition-delay:0ms}
+
+  /* ══════════════ STICKY PHONE ══════════════ */
+  #sticky-phone{
+    position:fixed;right:3%;top:50%;
+    transform:translateY(-50%);
+    z-index:50;pointer-events:none;
+    transition:transform .85s cubic-bezier(.22,1,.36,1);
+  }
+  .sp-glow{
+    position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+    width:190%;height:190%;
+    background:radial-gradient(ellipse 70% 60% at 50% 50%,rgba(6,182,212,.14),rgba(217,70,239,.08) 55%,transparent 70%);
+    animation:g1 10s ease-in-out infinite;pointer-events:none;
+  }
+  .sp-frame{
+    height:min(68vh,465px);aspect-ratio:9/19.5;
+    background:linear-gradient(175deg,#141414,#080808);
+    border-radius:38px;overflow:hidden;
+    border:2px solid rgba(6,182,212,.35);
+    box-shadow:0 0 45px rgba(6,182,212,.22),0 0 80px rgba(217,70,239,.1),0 40px 100px rgba(0,0,0,.9);
+    position:relative;
+    animation:float 6s ease-in-out infinite;
+  }
+  .sp-dot{position:absolute;top:10px;left:50%;transform:translateX(-50%);width:9px;height:9px;border-radius:50%;background:#030303;border:1px solid rgba(255,255,255,.08);z-index:10}
+  .sp-bar{position:absolute;bottom:9px;left:50%;transform:translateX(-50%);width:70px;height:4px;border-radius:2px;background:rgba(255,255,255,.18);z-index:10}
+  .sp-screen{width:100%;height:100%;overflow:hidden;border-radius:36px;position:relative}
+  .sp-screen img{width:100%;height:100%;object-fit:cover;position:absolute;inset:0;transition:opacity .65s ease}
+
+  /* ══════════════ AUTH NAV ══════════════ */
+  .auth-sep{width:1px;height:18px;background:rgba(255,255,255,.08);margin:0 .1rem;flex-shrink:0}
+  .btn-login{
+    padding:.3rem .85rem;border-radius:6px;
+    border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);
+    color:var(--text);font-size:.75rem;font-weight:700;cursor:pointer;
+    font-family:'Prompt',sans-serif;transition:all .2s;white-space:nowrap;
+  }
+  .btn-login:hover{background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.2)}
+  .btn-reg{
+    padding:.3rem .85rem;border-radius:6px;
+    background:linear-gradient(135deg,var(--c),#3b82f6);color:#000;
+    border:none;font-size:.75rem;font-weight:800;cursor:pointer;
+    font-family:'Prompt',sans-serif;transition:opacity .2s;white-space:nowrap;
+  }
+  .btn-reg:hover{opacity:.85}
+
+  /* User avatar menu */
+  .u-menu{position:relative;display:flex;align-items:center}
+  .u-btn{
+    display:flex;align-items:center;gap:.45rem;padding:.22rem .22rem .22rem .55rem;
+    background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);
+    border-radius:999px;cursor:pointer;transition:all .2s;
+  }
+  .u-btn:hover{background:rgba(255,255,255,.09);border-color:rgba(6,182,212,.3)}
+  .u-btn img{width:24px;height:24px;border-radius:50%;object-fit:cover}
+  .u-btn span{font-size:.73rem;font-weight:700;max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .u-caret{font-size:.6rem;color:var(--muted);margin-right:.3rem}
+  .u-drop{
+    position:absolute;top:calc(100% + 8px);right:0;min-width:180px;
+    background:rgba(8,8,8,.98);border:1px solid rgba(255,255,255,.1);
+    border-radius:12px;overflow:hidden;z-index:1000;
+    box-shadow:0 12px 40px rgba(0,0,0,.6);
+    opacity:0;pointer-events:none;transform:translateY(-6px);
+    transition:opacity .18s,transform .18s;
+  }
+  .u-drop.show{opacity:1;pointer-events:auto;transform:none}
+  .u-info{padding:.75rem 1rem .6rem;border-bottom:1px solid rgba(255,255,255,.06)}
+  .u-info-name{font-size:.8rem;font-weight:800}
+  .u-info-email{font-size:.68rem;color:var(--muted);margin-top:.07rem}
+  .u-info-plan{display:inline-block;margin-top:.35rem;padding:.1rem .5rem;border-radius:999px;font-size:.62rem;font-weight:700;letter-spacing:.06em}
+  .plan-free{background:rgba(82,82,91,.15);border:1px solid rgba(82,82,91,.3);color:var(--muted)}
+  .plan-premium{background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.25);color:var(--a)}
+  .u-drop a,.u-drop button{
+    display:flex;align-items:center;gap:.5rem;width:100%;padding:.62rem 1rem;
+    font-size:.78rem;font-weight:600;color:var(--text);text-decoration:none;
+    background:none;border:none;cursor:pointer;font-family:'Prompt',sans-serif;
+    transition:background .15s;
+  }
+  .u-drop a:hover,.u-drop button:hover{background:rgba(255,255,255,.05)}
+  .u-drop button.logout{color:#ef4444}
+
+  /* Login modal */
+  #login-modal{
+    position:fixed;inset:0;z-index:2000;
+    display:flex;align-items:center;justify-content:center;
+    background:rgba(0,0,0,.75);backdrop-filter:blur(8px);
+    opacity:0;pointer-events:none;transition:opacity .2s;
+  }
+  #login-modal.show{opacity:1;pointer-events:auto}
+  .lm-card{
+    background:#080808;border:1px solid rgba(255,255,255,.1);
+    border-radius:20px;padding:2rem;width:min(340px,90vw);
+    transform:translateY(12px);transition:transform .25s;text-align:center;
+  }
+  #login-modal.show .lm-card{transform:none}
+  .lm-logo{font-size:1.4rem;font-weight:900;font-style:italic;background:linear-gradient(120deg,var(--c),var(--f));-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:.3rem}
+  .lm-title{font-size:1rem;font-weight:800;margin-bottom:.25rem}
+  .lm-sub{font-size:.78rem;color:var(--muted);margin-bottom:1.5rem;line-height:1.5}
+  .lm-g{
+    display:flex;align-items:center;justify-content:center;gap:.55rem;
+    padding:.75rem 1.25rem;background:#fff;color:#333;border:none;
+    border-radius:10px;cursor:pointer;font-size:.88rem;font-weight:700;
+    font-family:'Prompt',sans-serif;width:100%;transition:transform .2s,box-shadow .2s;
+  }
+  .lm-g:hover{transform:translateY(-1px);box-shadow:0 4px 20px rgba(255,255,255,.08)}
+  .lm-divider{display:flex;align-items:center;gap:.5rem;margin:1rem 0}
+  .lm-divider::before,.lm-divider::after{content:'';flex:1;height:1px;background:rgba(255,255,255,.07)}
+  .lm-divider span{font-size:.68rem;color:var(--muted)}
+  .lm-close{
+    position:absolute;top:.75rem;right:.75rem;
+    background:none;border:none;color:var(--muted);font-size:1.2rem;
+    cursor:pointer;transition:color .2s;
+  }
+  .lm-close:hover{color:var(--text)}
+  .lm-card{position:relative}
+  .lm-note{font-size:.7rem;color:var(--muted);margin-top:1rem;line-height:1.5}
+
+  /* ══════════════ MOBILE NAV ══════════════ */
+  #nav-toggle{
+    display:none;align-items:center;justify-content:center;
+    width:36px;height:36px;border-radius:8px;
+    border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);
+    color:var(--text);font-size:1.1rem;cursor:pointer;flex-shrink:0;
+  }
+
+  /* ══════════════ TABLET (≤900px) ══════════════ */
+  @media (max-width:900px){
+    html,body{overflow:auto}
+    #wrap{
+      height:auto;overflow:visible;
+      scroll-snap-type:none;scroll-behavior:auto;
+    }
+    .pg{
+      scroll-snap-align:none;scroll-snap-stop:normal;
+      padding-right:0;padding-bottom:2.5rem;
+      height:auto;min-height:100dvh;overflow:visible;
+    }
+    #sticky-phone{display:none}
+    nav{padding:0 1rem}
+    .nm .cta{display:none}
+    #nav-toggle{display:flex}
+    .btn-reg{display:none}
+    .btn-login{padding:.28rem .65rem;font-size:.7rem}
+    .u-btn span{display:none}
+    .u-caret{display:none}
+    .auth-sep{display:none}
+    .nm{
+      position:fixed;top:52px;right:0;left:0;
+      flex-direction:column;align-items:stretch;gap:0;
+      background:rgba(0,0,0,.97);backdrop-filter:blur(20px);
+      border-bottom:1px solid rgba(255,255,255,.08);
+      padding:.5rem 1rem 1rem;
+      transform:translateY(-120%);opacity:0;pointer-events:none;
+      transition:transform .28s ease,opacity .28s ease;
+    }
+    .nm.open{transform:translateY(0);opacity:1;pointer-events:auto}
+    .nm a{padding:.75rem .5rem;border-bottom:1px solid rgba(255,255,255,.05);font-size:.9rem}
+    .nm a:last-child{border-bottom:none}
+    .hero-inner{flex-direction:column;padding:64px 1.5rem 2rem;gap:1.5rem;text-align:center}
+    .hero-left{align-items:center}
+    .hero-desc{max-width:100%}
+    .btns{justify-content:center}
+    .scroll-hint{justify-content:center}
+    .gp-inner{flex-direction:column;padding:64px 1.25rem 2rem;height:auto;min-height:100dvh;gap:1.25rem}
+    .gp-left{padding-bottom:0;height:auto}
+    .gp-right{flex:none;width:100%}
+    .gp-img{min-height:220px;max-height:42vh}
+    .feat-inner{padding:64px 1.25rem 2rem;height:auto;min-height:100dvh}
+    .fg{grid-template-columns:repeat(2,1fr)}
+    .ss-inner{padding:64px 1.25rem 2rem;height:auto;min-height:100dvh}
+    .ss-pc-row{grid-template-columns:1fr 1fr}
+    .ss-pc-row > div:last-child{grid-column:1/-1;max-width:70%;margin:0 auto}
+    .ss-android-row{overflow-x:auto;justify-content:flex-start;padding-bottom:.5rem;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+    .ss-android-row::-webkit-scrollbar{display:none}
+    .ss-phone{height:min(42vh,360px)}
+    .dl-inner{padding:64px 1.25rem 2rem;height:auto;min-height:100dvh}
+    .dl-grid{grid-template-columns:1fr;max-width:420px}
+    .pr-inner{padding:64px 1.25rem 2rem;height:auto;min-height:100dvh}
+    .pr-wrap{grid-template-columns:1fr}
+    .fq-col{overflow:visible}
+    footer{flex-direction:column;gap:.35rem;text-align:center}
+  }
+
+  /* ══════════════ PHONE (≤600px) ══════════════ */
+  @media (max-width:600px){
+    nav{height:48px;padding:0 1rem}
+    .nl b{font-size:.95rem}
+    .hero-inner{padding:56px 1.1rem 1.5rem;gap:1rem}
+    .hero-left h1{font-size:clamp(2.8rem,14vw,4rem)}
+    .hero-sub{letter-spacing:.14em;font-size:.78rem}
+    .hero-desc{font-size:.82rem}
+    .bp,.bs{width:100%;justify-content:center;padding:.7rem 1rem;font-size:.82rem}
+    .btns{flex-direction:column;width:100%}
+    .gp-inner{padding:56px 1rem 1.5rem}
+    .gp-img{min-height:180px;max-height:36vh}
+    .gp-img-grid{flex-direction:column}
+    .gp-img-side{flex-direction:row}
+    .gp-img-sub{min-height:100px}
+    .gp-feat{padding:.65rem}
+    .feat-inner{padding:56px 1rem 1.5rem}
+    .fg{grid-template-columns:1fr}
+    .ss-inner{padding:56px 1rem 1.5rem}
+    .ss-pc-row{grid-template-columns:1fr}
+    .ss-pc-row > div:last-child{max-width:100%}
+    .ss-phone{height:min(38vh,320px)}
+    .dl-inner{padding:56px 1rem 1.5rem;gap:1rem}
+    .dlcard{padding:1.1rem}
+    .pr-inner{padding:56px 1rem 1.5rem}
+    .pr-grid{grid-template-columns:1fr}
+    .pcard{padding:1rem}
+    .pamt{font-size:1.5rem}
+    .fq-a.show{max-height:200px}
+    #dots{bottom:.75rem;padding:.35rem .55rem}
+    .dot.on{width:14px}
+    .sh-hd{margin-bottom:.5rem}
+    .st{font-size:clamp(1.2rem,6vw,1.5rem)}
+  }
+  </style>
+</head>
+<body>
+
+<!-- STICKY PHONE -->
+<div id="sticky-phone">
+  <div class="sp-glow"></div>
+  <div class="sp-frame">
+    <div class="sp-dot"></div>
+    <div class="sp-screen">
+      <img id="sp-a" src="img/phone-front.png" alt="DJBIG" style="opacity:1"/>
+      <img id="sp-b" src="img/android2.png" alt="DJBIG" style="opacity:0"/>
+    </div>
+    <div class="sp-bar"></div>
+  </div>
+</div>
+
+<!-- NAV -->
+<nav>
+  <a href="#" class="nl">
+    <img src="logodjbig.png" alt="DJBIG" onerror="this.style.display='none'"/>
+    <b>DJBIG</b>
+  </a>
+  <div class="nm" id="nav-menu">
+    <a onclick="go(1);closeNav()">Gameplay</a>
+    <a onclick="go(2);closeNav()">Screenshots</a>
+    <a onclick="go(3);closeNav()">Download</a>
+    <a onclick="go(3);closeNav()" class="cta">ดาวน์โหลดฟรี</a>
+  </div>
+
+  <!-- Auth area (logged out) -->
+  <div id="auth-out" style="display:flex;align-items:center;gap:.5rem;flex-shrink:0">
+    <div class="auth-sep"></div>
+    <button class="btn-login" onclick="openLoginModal()">เข้าสู่ระบบ</button>
+    <button class="btn-reg" onclick="openLoginModal()">สมัครสมาชิก</button>
+  </div>
+
+  <!-- Auth area (logged in) -->
+  <div id="auth-in" class="u-menu" style="display:none;flex-shrink:0">
+    <div class="auth-sep" style="margin-right:.35rem"></div>
+    <button class="u-btn" onclick="toggleUserDrop()">
+      <img id="u-pic" src="" alt=""/>
+      <span id="u-name-nav"></span>
+      <span class="u-caret">▾</span>
+    </button>
+    <div class="u-drop" id="u-drop">
+      <div class="u-info">
+        <div class="u-info-name" id="u-info-name"></div>
+        <div class="u-info-email" id="u-info-email"></div>
+        <span class="u-info-plan plan-free" id="u-plan-badge">Free</span>
+      </div>
+      <a href="/portal/dashboard.html">📋 แดชบอร์ดของฉัน</a>
+      <a href="/portal/purchase.html" id="u-upgrade-link">⭐ อัพเกรด Premium</a>
+      <button class="logout" onclick="logout()">🚪 ออกจากระบบ</button>
+    </div>
+  </div>
+
+  <button id="nav-toggle" aria-label="เปิดเมนู" aria-expanded="false">☰</button>
+</nav>
+
+<!-- DOTS -->
+<div id="dots"></div>
+
+<div id="wrap">
+
+<!-- ══════════════════════════════ PAGE 0 · HERO ══════════════════════════════ -->
+<div class="pg">
+  <div class="hero-bg">
+    <div class="hero-bg-img" style="background-image:url('img/01.png')"></div>
+  </div>
+  <div class="hero-inner">
+    <div class="hero-left">
+      <div class="badge"><i></i>PC · Android on Google Play</div>
+      <h1>DJBIG</h1>
+      <div class="hero-sub">CYBER RHYTHM ACTION</div>
+      <p class="hero-desc">เกมดนตรีสไตล์ DJMAX ที่ให้คุณนำเพลงของตัวเองมาเล่น<br/>AI วิเคราะห์บีทอัตโนมัติ · รองรับ 4 / 5 / 7 คีย์ · Multiplayer</p>
+      <div class="btns">
+        <a onclick="go(3)" class="bp">⬇ ดาวน์โหลดฟรี</a>
+        <a onclick="go(1)" class="bs">▶ ดูตัวอย่างเกม</a>
+      </div>
+      <div class="scroll-hint"><div class="sh-line"></div>เลื่อนดูต่อ</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════ PAGE 1 · GAMEPLAY ══════════════════════════════ -->
+<div class="pg">
+  <div class="gp-inner">
+    <div class="gp-left">
+      <div class="sh-hd">
+        <div class="sl">Gameplay</div>
+        <div class="st">เล่นได้ทุกเพลงที่คุณชอบ</div>
+        <div class="sd">โหลด mp3 / mp4 จากเครื่อง — AI สร้าง chart ให้อัตโนมัติภายในไม่กี่วินาที</div>
+      </div>
+      <div class="gp-img gp-img-grid">
+        <div class="gp-img-main">
+          <img src="img/songselect.png" alt="Song Select"/>
+          <div class="gp-img-tag">Select Music</div>
+        </div>
+        <div class="gp-img-side">
+          <div class="gp-img-sub">
+            <img src="img/01.png" alt="Title Screen"/>
+            <div class="gp-img-tag">Title Screen</div>
+          </div>
+          <div class="gp-img-sub">
+            <img src="img/phone-front.png" alt="Android Gameplay" style="object-position:center top"/>
+            <div class="gp-img-tag">Android</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="gp-right">
+      <div class="gp-feat">
+        <div class="gp-fi">🎵</div>
+        <div><h4>AI Beat Analysis</h4><p>วิเคราะห์ audio ตรวจจับ peak สร้าง note chart พร้อมเล่นทันที</p></div>
+      </div>
+      <div class="gp-feat">
+        <div class="gp-fi">🎮</div>
+        <div><h4>4 / 5 / 7 Key Modes</h4><p>เลือกโหมดตามความถนัด ตั้งแต่มือใหม่ถึง Pro พร้อม hold note</p></div>
+      </div>
+      <div class="gp-feat">
+        <div class="gp-fi">🏆</div>
+        <div><h4>Level 1–10</h4><p>ปรับความยาก 10 ระดับ ยิ่งสูงยิ่งเร็วหนาแน่น</p></div>
+      </div>
+      <div class="gp-feat">
+        <div class="gp-fi">⚡</div>
+        <div><h4>Overdrive System</h4><p>ชาร์จ overdrive จากการเล่นดี เปิดใช้เพื่อ boost combo score</p></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════ PAGE 3 · SCREENSHOTS ══════════════════════════════ -->
+<div class="pg">
+  <div class="ss-inner">
+    <div class="sh-hd">
+      <div class="sl">Screenshots</div>
+      <div class="st">ดูเกมจริง ทั้ง PC และ Android</div>
+    </div>
+
+    <!-- PC screenshots -->
+    <div class="ss-pc-row">
+      <div>
+        <div class="simg"><img src="img/01.png" alt="Title Screen"/></div>
+        <div class="ss-label">Title Screen</div>
+      </div>
+      <div>
+        <div class="simg"><img src="img/songselect.png" alt="Song Select"/></div>
+        <div class="ss-label">Select Music</div>
+      </div>
+      <div>
+        <div class="simg"><img src="img/gameplay.png" alt="Gameplay"/></div>
+        <div class="ss-label">Gameplay (7K)</div>
+      </div>
+    </div>
+
+    <!-- Android divider -->
+    <div class="ss-divider"><span>Android</span></div>
+
+    <!-- Android screenshots -->
+    <div class="ss-android-row">
+      <div class="ss-phone">
+        <img src="img/android1.png" alt="Android 1"/>
+      </div>
+      <div class="ss-phone">
+        <img src="img/android2.png" alt="Android 2"/>
+      </div>
+      <div class="ss-phone">
+        <img src="img/phone-front.png" alt="Android 3"/>
+      </div>
+      <div class="ss-phone">
+        <img src="img/android4.png" alt="Android 4"/>
+      </div>
+      <div class="ss-phone">
+        <img src="img/phone-back.png" alt="Android 5"/>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════ PAGE 4 · DOWNLOAD ══════════════════════════════ -->
+<div class="pg">
+  <div class="dl-inner">
+    <div class="sh-hd" style="text-align:center">
+      <div class="sl">Download</div>
+      <div class="st">รองรับทุก Platform</div>
+      <div class="sd">Windows PC · Android บน Google Play Store</div>
+    </div>
+    <div class="dl-grid">
+      <div class="dlcard">
+        <div class="dlcard-ss">
+          <img src="img/gameplay.png" alt="PC Gameplay"/>
+        </div>
+        <h3>🖥️ Windows PC</h3>
+        <div class="dlfree">FREE</div>
+        <div class="dlspec">Windows 10 / 11 64-bit<br/>RAM 4 GB+ · ขนาด ~200 MB</div>
+        <a href="#" class="dlbtn dlbtn-pc">⬇ Download for Windows</a>
+      </div>
+      <div class="dlcard">
+        <div class="dlcard-ss" style="aspect-ratio:9/16;max-height:160px">
+          <img src="img/android1.png" alt="Android Gameplay" style="object-position:center top"/>
+        </div>
+        <h3>📱 Android</h3>
+        <div class="dlspec">Android 8.0+ · ARM64<br/>RAM 3 GB+ · ขนาด ~100 MB</div>
+        <a href="https://play.google.com/store/apps/details?id=com.djbiggame.djbig&hl=th" target="_blank" class="dlbtn dlbtn-gp">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="flex-shrink:0"><path d="M3.18 23.76c.37.2.8.2 1.19-.02l12.93-7.47-2.79-2.79-11.33 10.28zm-1.61-20.4A1.5 1.5 0 0 0 1.5 4.5v15c0 .23.03.44.07.64l11.61-10.55L1.57 3.36zM20.31 9.9l-2.52-1.46-3.12 2.83 3.12 3.12 2.55-1.47A1.72 1.72 0 0 0 21.2 12a1.72 1.72 0 0 0-.89-2.1zM4.37.26 17.3 7.73l-2.79 2.79L3.18.24a1.48 1.48 0 0 1 1.19.02z"/></svg>
+          Get it on Google Play
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════ PAGE 5 · PRICING + FAQ ══════════════════════════════ -->
+<div class="pg">
+  <div class="pr-inner">
+    <div class="sh-hd" style="text-align:center">
+      <div class="sl">Pricing &amp; FAQ</div>
+      <div class="st">เล่นฟรี · อัพโหลดเพลงเองด้วย Premium</div>
+      <div class="sd">จ่ายครั้งเดียว ฿199 · ไม่มี subscription</div>
+    </div>
+    <div class="pr-wrap">
+
+      <!-- Pricing cards -->
+      <div class="pr-col">
+        <div class="pr-grid">
+          <div class="pcard">
+            <div class="plabel">Free</div>
+            <div><div class="pamt">฿0</div><div class="pper">ตลอดชีพ</div></div>
+            <ul class="pfeats">
+              <li><span class="ck">✓</span> เล่นเกมได้เต็มรูปแบบ</li>
+              <li><span class="ck">✓</span> ทุก key mode (4/5/7)</li>
+              <li><span class="ck">✓</span> Multiplayer online</li>
+              <li><span class="ck">✓</span> ทุก theme &amp; modifier</li>
+              <li class="off"><span class="xk">✗</span> อัพโหลดเพลงส่วนตัว</li>
+            </ul>
+            <a onclick="go(3)" class="pbtn pbtn-f">ดาวน์โหลดฟรี</a>
+          </div>
+          <div class="pcard hot">
+            <div class="plabel">★ Premium</div>
+            <div><div class="pamt"><span class="cur">฿</span>199</div><div class="pper">จ่ายครั้งเดียว</div></div>
+            <ul class="pfeats">
+              <li><span class="ck">✓</span> ทุกอย่างใน Free</li>
+              <li><span class="ck">✓</span> อัพโหลด mp3 / mp4</li>
+              <li><span class="ck">✓</span> โหลด folder หลายเพลง</li>
+              <li><span class="ck">✓</span> AI วิเคราะห์เพลงส่วนตัว</li>
+              <li><span class="ck">✓</span> ฟีเจอร์ใหม่ในอนาคต</li>
+            </ul>
+            <a href="/portal/purchase.html" id="upgrade-btn" class="pbtn pbtn-h">อัพเกรด ฿199</a>
+          </div>
+        </div>
+      </div>
+
+      <!-- FAQ column -->
+      <div class="pr-col fq-col">
+        <div class="fq">
+          <div class="fq-q">เกมนี้ฟรีจริงไหม?<span>+</span></div>
+          <div class="fq-a">ใช่ครับ ดาวน์โหลดและเล่นได้ฟรีทั้ง PC และ Android ฟีเจอร์ทั้งหมดใช้ได้ฟรี ยกเว้นอัพโหลดเพลงส่วนตัว</div>
+        </div>
+        <div class="fq">
+          <div class="fq-q">Premium จ่ายครั้งเดียวจริงไหม?<span>+</span></div>
+          <div class="fq-a">ใช่ครับ ฿199 ครั้งเดียว ไม่มี subscription รายเดือน ใช้ได้ตลอดชีพรวมถึงอัปเดตในอนาคต</div>
+        </div>
+        <div class="fq">
+          <div class="fq-q">รองรับไฟล์เพลงอะไรบ้าง?<span>+</span></div>
+          <div class="fq-a">รองรับ mp3, mp4, m4a, wav, ogg, webm และ m4v ทั้งไฟล์เสียงและวิดีโอ AI จะสร้าง chart ให้อัตโนมัติ</div>
+        </div>
+        <div class="fq">
+          <div class="fq-q">Multiplayer เล่นกับใครได้?<span>+</span></div>
+          <div class="fq-a">เล่นกับเพื่อนผ่าน room code 2 คนพร้อมกัน ไม่ต้องมีบัญชี แค่รันเกมและสร้าง room ได้เลย</div>
+        </div>
+        <div class="fq">
+          <div class="fq-q">ต้องต่ออินเทอร์เน็ตตลอดไหม?<span>+</span></div>
+          <div class="fq-a">Single player เล่นออฟไลน์ได้เลย ต้องออนไลน์เฉพาะ Multiplayer และการซื้อ Premium</div>
+        </div>
+        <footer>
+          <div class="flogo">DJBIG</div>
+          <p>© 2025 BigBundit · Made with ♥ in Thailand</p>
+          <p style="color:#1a1a1a;font-size:.65rem">v2.0.0</p>
+        </footer>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+</div><!-- #wrap -->
+
+<!-- LOGIN MODAL -->
+<div id="login-modal" onclick="closeLoginModalBg(event)">
+  <div class="lm-card">
+    <button class="lm-close" onclick="closeLoginModal()">✕</button>
+    <div class="lm-logo">DJBIG</div>
+    <div class="lm-title">เข้าสู่ระบบ / สมัครสมาชิก</div>
+    <div class="lm-sub">ใช้บัญชี Google ของคุณ<br/>สร้างบัญชีอัตโนมัติหากยังไม่มี</div>
+    <button class="lm-g" onclick="googleLogin()">
+      <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+      เข้าสู่ระบบด้วย Google
+    </button>
+    <div class="lm-note">การสมัครสมาชิกฟรี · ไม่ต้องใช้รหัสผ่าน<br/>ใช้ Google Account ที่คุณมีอยู่</div>
+  </div>
+</div>
+
+<script>
+  const wrap = document.getElementById('wrap');
+  const pages = wrap.querySelectorAll('.pg');
+  const dotsEl = document.getElementById('dots');
+  const N = pages.length;
+
+  // Build dots
+  for(let i=0;i<N;i++){
+    const d=document.createElement('button');
+    d.className='dot'+(i===0?' on':'');
+    d.setAttribute('aria-label','Page '+(i+1));
+    d.onclick=()=>go(i);
+    dotsEl.appendChild(d);
+  }
+
+  const MOBILE_MQ = window.matchMedia('(max-width:900px)');
+
+  function go(i){
+    if (MOBILE_MQ.matches) {
+      pages[i].scrollIntoView({behavior:'smooth',block:'start'});
+    } else {
+      wrap.scrollTo({top:i*window.innerHeight,behavior:'smooth'});
+    }
+  }
+
+  const navMenu = document.getElementById('nav-menu');
+  const navToggle = document.getElementById('nav-toggle');
+  function closeNav(){
+    navMenu.classList.remove('open');
+    navToggle.setAttribute('aria-expanded','false');
+    navToggle.textContent = '☰';
+  }
+  navToggle.addEventListener('click',()=>{
+    const open = navMenu.classList.toggle('open');
+    navToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    navToggle.textContent = open ? '✕' : '☰';
+  });
+
+  // Sticky phone
+  const sp = document.getElementById('sticky-phone');
+  const spA = document.getElementById('sp-a');
+  const spB = document.getElementById('sp-b');
+  const spImgs = [
+    'img/phone-front.png',   // 0 Hero
+    'img/android2.png',      // 1 Gameplay
+    'img/android1.png',      // 2 Screenshots
+    'img/android4.png',      // 3 Download
+    'img/phone-back.png',    // 4 Pricing
+  ];
+  const spY = [0, 18, -14, 26, 6]; // px offset per section
+  let spSlot = 'a', spLast = -1;
+
+  function updatePhone(i) {
+    if (i === spLast) return;
+    spLast = i;
+    const cur = spSlot === 'a' ? spA : spB;
+    const nxt = spSlot === 'a' ? spB : spA;
+    nxt.src = spImgs[i];
+    nxt.style.opacity = '1';
+    cur.style.opacity = '0';
+    spSlot = spSlot === 'a' ? 'b' : 'a';
+    sp.style.transform = `translateY(calc(-50% + ${spY[i]}px))`;
+  }
+
+  function currentPage(){
+    if (MOBILE_MQ.matches) {
+      const mid = window.innerHeight * 0.35;
+      let i = 0;
+      pages.forEach((p, idx) => {
+        const r = p.getBoundingClientRect();
+        if (r.top <= mid && r.bottom > mid) i = idx;
+      });
+      return i;
+    }
+    return Math.round(wrap.scrollTop / window.innerHeight);
+  }
+
+  function sync(){
+    const i = currentPage();
+    dotsEl.querySelectorAll('.dot').forEach((d,j)=>d.classList.toggle('on',j===i));
+    updatePhone(i);
+  }
+  wrap.addEventListener('scroll',sync,{passive:true});
+  window.addEventListener('scroll',sync,{passive:true});
+  updatePhone(0);
+
+  document.addEventListener('keydown',e=>{
+    const i = currentPage();
+    if(e.key==='ArrowDown'||e.key==='PageDown'){e.preventDefault();go(Math.min(i+1,N-1))}
+    if(e.key==='ArrowUp'||e.key==='PageUp'){e.preventDefault();go(Math.max(i-1,0))}
+  });
+
+  // Smooth page reveal — IntersectionObserver
+  const revealObserver = new IntersectionObserver(entries => {
+    entries.forEach(e => {
+      if (e.isIntersecting) e.target.classList.add('visible');
+      else e.target.classList.remove('visible');
+    });
+  }, {threshold: 0.08, rootMargin: '-20px 0px'});
+  pages.forEach(p => revealObserver.observe(p));
+  // First page: reveal after brief paint delay
+  setTimeout(() => pages[0].classList.add('visible'), 60);
+
+  // ══════════════ AUTH ══════════════
+  const API_BASE = window.location.hostname === 'localhost' ? '' : 'https://djbig.last-prize.com';
+  let authUser = null;
+
+  async function initAuth() {
+    const token = localStorage.getItem('portalToken');
+    const raw   = localStorage.getItem('portalUser');
+    if (!token || !raw) return showLoggedOut();
+    try {
+      authUser = JSON.parse(raw);
+      showLoggedIn(authUser, 'free');
+      // Verify token + get plan
+      const r = await fetch(API_BASE+'/api/license/status', {
+        headers: { Authorization: 'Bearer ' + token }
+      });
+      if (!r.ok) { logout(); return; }
+      const data = await r.json();
+      const plan = (data.slip?.status === 'approved' && data.key) ? 'premium' : 'free';
+      showLoggedIn(authUser, plan);
+    } catch(e) { showLoggedOut(); }
+  }
+
+  function showLoggedOut() {
+    document.getElementById('auth-out').style.display = 'flex';
+    document.getElementById('auth-in').style.display  = 'none';
+  }
+
+  function showLoggedIn(user, plan) {
+    document.getElementById('auth-out').style.display = 'none';
+    document.getElementById('auth-in').style.display  = 'flex';
+    const pic = user.picture || user.pic || '';
+    document.getElementById('u-pic').src = pic;
+    document.getElementById('u-name-nav').textContent = (user.name||'').split(' ')[0];
+    document.getElementById('u-info-name').textContent  = user.name  || '';
+    document.getElementById('u-info-email').textContent = user.email || '';
+    const badge = document.getElementById('u-plan-badge');
+    if (plan === 'premium') {
+      badge.textContent = '★ Premium';
+      badge.className   = 'u-info-plan plan-premium';
+      const ul = document.getElementById('u-upgrade-link');
+      if (ul) ul.style.display = 'none';
+      const ub = document.getElementById('upgrade-btn');
+      if (ub) { ub.textContent = '✅ Premium แล้ว'; ub.href = '/portal/dashboard.html'; }
+    } else {
+      badge.textContent = 'Free';
+      badge.className   = 'u-info-plan plan-free';
+    }
+  }
+
+  function toggleUserDrop() {
+    document.getElementById('u-drop').classList.toggle('show');
+  }
+  document.addEventListener('click', e => {
+    const menu = document.querySelector('.u-menu');
+    if (menu && !menu.contains(e.target)) {
+      document.getElementById('u-drop')?.classList.remove('show');
+    }
+  });
+
+  function logout() {
+    localStorage.removeItem('portalToken');
+    localStorage.removeItem('portalUser');
+    authUser = null;
+    showLoggedOut();
+    document.getElementById('u-drop')?.classList.remove('show');
+  }
+
+  // Login modal
+  function openLoginModal()  { document.getElementById('login-modal').classList.add('show'); }
+  function closeLoginModal() { document.getElementById('login-modal').classList.remove('show'); }
+  function closeLoginModalBg(e) { if (e.target === document.getElementById('login-modal')) closeLoginModal(); }
+
+  async function googleLogin() {
+    // Open popup synchronously on click so browsers don't block it
+    const popup = window.open('', 'google_oauth', 'width=500,height=620,left=' + (screen.width/2-250) + ',top=100');
+    try {
+      const r = await fetch(API_BASE+'/api/auth/google/url?source=portal');
+      if (!r.ok) throw new Error('Server error');
+      const { url } = await r.json();
+      if (!url) throw new Error('No URL');
+      popup.location.href = url;
+      const handler = e => {
+        if (e.data?.type !== 'OAUTH_PORTAL_SUCCESS') return;
+        window.removeEventListener('message', handler);
+        const { token, user } = e.data;
+        if (token && user) {
+          localStorage.setItem('portalToken', token);
+          localStorage.setItem('portalUser', JSON.stringify(user));
+          authUser = user;
+          closeLoginModal();
+          initAuth();
+        }
+      };
+      window.addEventListener('message', handler);
+    } catch(err) {
+      popup?.close();
+      alert('ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้\nกรุณาลองใหม่อีกครั้ง');
+    }
+  }
+
+  initAuth();
+
+  // FAQ accordion
+  document.querySelectorAll('.fq-q').forEach(q=>{
+    q.addEventListener('click',()=>{
+      const a=q.nextElementSibling;
+      const s=q.querySelector('span');
+      const open=a.classList.contains('show');
+      document.querySelectorAll('.fq-a').forEach(x=>x.classList.remove('show'));
+      document.querySelectorAll('.fq-q span').forEach(x=>x.classList.remove('open'));
+      if(!open){a.classList.add('show');s.classList.add('open')}
+    });
+  });
+</script>
+</body>
+</html>

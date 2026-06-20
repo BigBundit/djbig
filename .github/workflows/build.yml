@@ -20,6 +20,8 @@ jobs:
 
       - name: Build Vite
         run: npx vite build
+        env:
+          VITE_AUTH_API: https://djbig.last-prize.com
 
       - name: Resize icon to 512x512
         run: sips -z 512 512 public/logodjbig.png
@@ -51,6 +53,8 @@ jobs:
 
       - name: Build Vite
         run: npx vite build
+        env:
+          VITE_AUTH_API: https://djbig.last-prize.com
 
       - name: Build Electron (Windows x64)
         run: npx electron-builder --win nsis --x64 --publish never

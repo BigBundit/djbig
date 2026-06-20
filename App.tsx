@@ -84,9 +84,21 @@ const codeToLabel = (code: string) => {
 };
 
 const isElectron = !!(window as Window & { electronAPI?: { isElectron: true } }).electronAPI;
+const AUTH_API = (import.meta.env?.VITE_AUTH_API as string) || 'http://localhost:3000';
 
 const App: React.FC = () => {
   const [status, setStatus] = useState<GameStatus>(GameStatus.TITLE);
+
+  // --- License Key System (v2.1.0) ---
+  const [userPlan, setUserPlan] = useState<'free' | 'premium'>('free');
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [licenseKey, setLicenseKey] = useState('');
+  const [machineId, setMachineId] = useState('');
+  const [showLicenseModal, setShowLicenseModal] = useState(false);
+  const [licenseInput, setLicenseInput] = useState('');
+  const [licenseError, setLicenseError] = useState('');
+  const [licenseLoading, setLicenseLoading] = useState(false);
+
   const [isPinned, setIsPinned] = useState<boolean>(false);
   const [windowOpacity, setWindowOpacity] = useState<number>(1.0);
   const [windowSize, setWindowSize] = useState<'S'|'M'|'L'>('S');
@@ -106,6 +118,27 @@ const App: React.FC = () => {
     // Start with size S
     const S_W = 300 + ELECTRON_LEFT_W, S_H = 632;
     window.electronAPI?.resizeWindow(S_W, S_H);
+    // Get machine ID and validate saved license key on startup
+    (async () => {
+      const mid: string = (await window.electronAPI?.getMachineId?.()) || '';
+      if (mid) setMachineId(mid);
+      const savedKey = localStorage.getItem('djbigLicenseKey');
+      if (!savedKey) return;
+      try {
+        const r = await fetch(`${AUTH_API}/api/license/validate`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ key: savedKey, machineId: mid }),
+        });
+        const data = r.ok ? await r.json() : null;
+        if (data?.valid) {
+          setLicenseKey(savedKey);
+          setUserPlan('premium');
+        } else {
+          localStorage.removeItem('djbigLicenseKey');
+        }
+      } catch { /* offline ok — keep key for next run */ }
+    })();
   }, []);
 
   useEffect(() => {
@@ -239,6 +272,8 @@ const App: React.FC = () => {
 
   const mobileSetupStartBtnRef = useRef<HTMLButtonElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const electronSingleFileRef = useRef<HTMLInputElement>(null);
+  const electronFolderFileRef = useRef<HTMLInputElement>(null);
 
   const t = TRANSLATIONS[layoutSettings.language];
   const fontClass = layoutSettings.language === 'th' ? 'font-thai' : 'font-display';
@@ -1164,6 +1199,48 @@ const App: React.FC = () => {
         setIsAnalyzing(false);
       }
     }
+  };
+
+  const handleActivateLicense = async () => {
+    setLicenseError('');
+    setLicenseLoading(true);
+    try {
+      const res = await fetch(`${AUTH_API}/api/license/validate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key: licenseInput.trim().toUpperCase(), machineId }),
+      });
+      const data = await res.json();
+      if (!data.valid) throw new Error(data.error || 'Key ไม่ถูกต้อง');
+      const key = licenseInput.trim().toUpperCase();
+      setLicenseKey(key);
+      setUserPlan('premium');
+      localStorage.setItem('djbigLicenseKey', key);
+      setShowLicenseModal(false);
+      setShowUpgradeModal(false);
+      setLicenseInput('');
+      setLicenseError('');
+    } catch (e: any) {
+      setLicenseError(e.message || 'เกิดข้อผิดพลาด');
+    } finally {
+      setLicenseLoading(false);
+    }
+  };
+
+  const handleDeactivateLicense = () => {
+    setLicenseKey('');
+    setUserPlan('free');
+    localStorage.removeItem('djbigLicenseKey');
+  };
+
+  const handleUploadSingleClick = () => {
+    if (userPlan !== 'premium') { setShowUpgradeModal(true); return; }
+    electronSingleFileRef.current?.click();
+  };
+
+  const handleUploadFolderClick = () => {
+    if (userPlan !== 'premium') { setShowUpgradeModal(true); return; }
+    electronFolderFileRef.current?.click();
   };
 
   const handleSingleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -2385,15 +2462,31 @@ const App: React.FC = () => {
                      </button>
                    </div>
                  )}
+                 {/* License status bar */}
+                 <div className="px-3 pt-2 pb-1 flex items-center justify-between border-t border-slate-800">
+                   {userPlan === 'premium' ? (
+                     <div className="flex items-center gap-1.5">
+                       <span className="text-[9px] text-amber-400 font-bold bg-amber-900/30 border border-amber-700/50 px-1.5 rounded">★ PREMIUM</span>
+                       <span className="text-[9px] text-slate-600 font-mono">{licenseKey.slice(0, 10)}…</span>
+                     </div>
+                   ) : (
+                     <span className="text-[10px] text-slate-500 font-mono">FREE · ล็อค 🔒</span>
+                   )}
+                   {userPlan === 'premium' ? (
+                     <button onClick={handleDeactivateLicense} className="text-[9px] text-slate-500 hover:text-red-400 font-mono transition-colors">ยกเลิก Key</button>
+                   ) : (
+                     <button onClick={() => setShowLicenseModal(true)} className="text-[10px] text-cyan-400 hover:text-cyan-300 font-bold font-mono bg-cyan-900/30 border border-cyan-700/50 px-2 py-0.5 rounded transition-colors">กรอก KEY</button>
+                   )}
+                 </div>
                  <div className="px-3 py-2 flex gap-2">
-                   <label className="flex-1 h-10 bg-slate-800 hover:bg-cyan-900/50 border border-slate-600 hover:border-cyan-500 rounded flex items-center justify-center cursor-pointer transition-colors">
-                     <span className={`text-[9px] font-bold text-slate-400 hover:text-cyan-400 ${fontClass}`}>+ {t.LOAD_SINGLE}</span>
-                     <input type="file" accept="video/*,audio/*" onChange={handleSingleFileUpload} className="hidden" />
-                   </label>
-                   <label className="flex-1 h-10 bg-slate-800 hover:bg-fuchsia-900/50 border border-slate-600 hover:border-fuchsia-500 rounded flex items-center justify-center cursor-pointer transition-colors">
-                     <span className={`text-[9px] font-bold text-slate-400 hover:text-fuchsia-400 ${fontClass}`}>+ {t.LOAD_FOLDER}</span>
-                     <input type="file" multiple onChange={handleFolderSelect} className="hidden" />
-                   </label>
+                   <button onClick={handleUploadSingleClick} className="flex-1 h-10 bg-slate-800 hover:bg-cyan-900/50 border border-slate-600 hover:border-cyan-500 rounded flex items-center justify-center cursor-pointer transition-colors">
+                     <span className={`text-[9px] font-bold text-slate-400 hover:text-cyan-400 ${fontClass}`}>+ {t.LOAD_SINGLE} {userPlan !== 'premium' && '🔒'}</span>
+                   </button>
+                   <button onClick={handleUploadFolderClick} className="flex-1 h-10 bg-slate-800 hover:bg-fuchsia-900/50 border border-slate-600 hover:border-fuchsia-500 rounded flex items-center justify-center cursor-pointer transition-colors">
+                     <span className={`text-[9px] font-bold text-slate-400 hover:text-fuchsia-400 ${fontClass}`}>+ {t.LOAD_FOLDER} {userPlan !== 'premium' && '🔒'}</span>
+                   </button>
+                   <input ref={electronSingleFileRef} type="file" accept="video/*,audio/*" onChange={handleSingleFileUpload} className="hidden" />
+                   <input ref={electronFolderFileRef} type="file" multiple onChange={handleFolderSelect} className="hidden" />
                  </div>
                </div>
              )}
@@ -2466,6 +2559,86 @@ const App: React.FC = () => {
       )}
       {status === GameStatus.PAUSED && ( <PauseMenu onResume={togglePause} onRestart={startCountdownSequence} onSettings={() => setShowKeyConfig(true)} onQuit={quitGame} t={t} fontClass={fontClass} onTitleClick={handlePauseTitleClick} /> )}
       {status === GameStatus.FINISHED && ( <EndScreen stats={{ perfect: perfectCount, good: goodCount, miss: missCount, maxCombo, score }} opponentStats={isMultiplayer && opponentState && opponentFinalScore !== null ? { ...opponentState, score: opponentFinalScore, miss: 0, perfect: 0, good: 0, maxCombo: opponentState.combo } : null} fileName={currentSongMetadata?.name || "UNKNOWN"} onRestart={startCountdownSequence} onMenu={quitGame} t={t} fontClass={fontClass} onPlaySound={playUiSound} /> )}
+
+      {/* Auth Modal */}
+      {/* License Key Modal */}
+      {showLicenseModal && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-sm" onClick={() => { setShowLicenseModal(false); setLicenseError(''); }}>
+          <div className="bg-slate-900 border border-cyan-500/50 rounded-xl p-6 w-80 flex flex-col gap-4 shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <h2 className={`text-lg font-black italic text-cyan-400 ${fontClass}`}>🔑 LICENSE KEY</h2>
+              <button onClick={() => { setShowLicenseModal(false); setLicenseError(''); }} className="text-slate-500 hover:text-white text-xl leading-none">✕</button>
+            </div>
+            <p className="text-slate-400 text-xs leading-relaxed">วาง License Key ที่ได้รับหลังจากซื้อ Premium<br/>Key จะถูกผูกกับเครื่องนี้ทันที (1 Key = 1 เครื่อง)</p>
+            <input
+              type="text"
+              placeholder="DJBIG-XXXX-XXXX-XXXX-XXXX"
+              value={licenseInput}
+              onChange={e => setLicenseInput(e.target.value.toUpperCase())}
+              onKeyDown={e => e.key === 'Enter' && handleActivateLicense()}
+              className="w-full bg-black/60 border border-slate-700 rounded px-3 py-2 text-sm text-cyan-300 font-mono placeholder-slate-600 focus:outline-none focus:border-cyan-500 tracking-widest"
+            />
+            {licenseError && <div className="text-red-400 text-xs font-mono">{licenseError}</div>}
+            <button onClick={handleActivateLicense} disabled={licenseLoading || !licenseInput.trim()}
+              className="w-full py-2.5 bg-cyan-500 hover:bg-cyan-400 disabled:opacity-40 text-black font-black text-sm rounded transition-colors">
+              {licenseLoading ? 'กำลังตรวจสอบ…' : 'ยืนยัน Key'}
+            </button>
+            <div className="text-center text-xs text-slate-500">
+              ยังไม่มี Key?{' '}
+              <button
+                onClick={() => window.electronAPI?.openExternal(`${AUTH_API}/portal/purchase.html`)}
+                className="text-amber-400 hover:text-amber-300 underline"
+              >ซื้อ Premium ฿199</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Upgrade Modal */}
+      {showUpgradeModal && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-sm" onClick={() => setShowUpgradeModal(false)}>
+          <div className="bg-slate-900 border border-amber-500/50 rounded-xl p-5 w-80 flex flex-col gap-3.5 shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <h2 className={`text-lg font-black italic text-amber-400 ${fontClass}`}>★ PREMIUM</h2>
+              <button onClick={() => setShowUpgradeModal(false)} className="text-slate-500 hover:text-white text-xl leading-none">✕</button>
+            </div>
+            <p className="text-slate-300 text-sm">ฟีเจอร์นี้ต้องการ <span className="text-amber-400 font-bold">Premium License Key</span></p>
+            <div className="bg-black/40 border border-amber-500/30 rounded-lg p-3 flex flex-col gap-1.5">
+              <div className="flex items-center justify-between">
+                <div className="text-amber-400 font-black">Premium</div>
+                <div className="text-white font-black text-lg">฿199</div>
+              </div>
+              <div className="text-slate-400 text-xs">จ่ายครั้งเดียว • ไม่มี subscription • 1 Key = 1 เครื่อง</div>
+              <div className="text-slate-300 text-xs mt-0.5">✓ อัพโหลด mp3/mp4 ส่วนตัวไม่จำกัด<br/>✓ AI วิเคราะห์บีท • รองรับ wav, ogg และอื่นๆ</div>
+            </div>
+            <div className="flex flex-col gap-2">
+              <button
+                onClick={() => { window.electronAPI?.openExternal(`${AUTH_API}/portal/purchase.html`); }}
+                className="w-full py-2.5 bg-amber-500 hover:bg-amber-400 text-black font-black text-sm rounded transition-colors"
+              >🌐 ซื้อ Premium บนเว็บไซต์</button>
+              <div className="relative flex items-center gap-2 my-0.5">
+                <div className="flex-1 h-px bg-slate-700" />
+                <span className="text-slate-500 text-[10px] font-mono">มี Key แล้ว?</span>
+                <div className="flex-1 h-px bg-slate-700" />
+              </div>
+              <input
+                type="text"
+                placeholder="DJBIG-XXXX-XXXX-XXXX-XXXX"
+                value={licenseInput}
+                onChange={e => setLicenseInput(e.target.value.toUpperCase())}
+                onKeyDown={e => e.key === 'Enter' && handleActivateLicense()}
+                className="w-full bg-black/60 border border-slate-700 rounded px-3 py-2 text-xs text-cyan-300 font-mono placeholder-slate-600 focus:outline-none focus:border-cyan-500 tracking-widest"
+              />
+              {licenseError && <div className="text-red-400 text-xs font-mono">{licenseError}</div>}
+              <button
+                onClick={handleActivateLicense}
+                disabled={licenseLoading || !licenseInput.trim()}
+                className="w-full py-2 bg-cyan-600 hover:bg-cyan-500 disabled:opacity-40 text-black font-black text-xs rounded transition-colors"
+              >{licenseLoading ? 'กำลังตรวจสอบ…' : '🔑 ยืนยัน License Key'}</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   </>
   );

@@ -10,7 +10,7 @@
     "dev": "tsx server.ts",
     "build": "vite build",
     "preview": "vite preview",
-    "electron:dev": "electron .",
+    "electron:dev": "cross-env ELECTRON_DEV=1 electron .",
     "electron:build": "vite build && cross-env CSC_IDENTITY_AUTO_DISCOVERY=false WIN_CSC_LINK=\"\" electron-builder"
   },
   "dependencies": {
@@ -18,14 +18,20 @@
     "@capacitor/status-bar": "^7.0.3",
     "@google/genai": "^1.30.0",
     "@libsql/client": "^0.14.0",
+    "@types/multer": "^2.1.0",
+    "@types/uuid": "^10.0.0",
     "axios": "^1.13.5",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "jsonwebtoken": "^9.0.3",
+    "multer": "^2.2.0",
+    "mysql2": "^3.22.5",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
+    "stripe": "^22.1.1",
+    "uuid": "^14.0.0",
     "ws": "^8.19.0"
   },
   "devDependencies": {

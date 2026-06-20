@@ -8,6 +8,8 @@ interface ElectronAPI {
   resizeWindow: (width: number, height: number) => Promise<void>;
   setFullscreen: (value: boolean) => Promise<boolean>;
   onFullscreenChange: (callback: (value: boolean) => void) => void;
+  openExternal: (url: string) => Promise<void>;
+  getMachineId: () => Promise<string>;
 }
 
 declare interface Window {

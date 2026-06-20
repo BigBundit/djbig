@@ -6,9 +6,13 @@ import { WebSocketServer, WebSocket } from 'ws';
 import axios from 'axios';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import jwt from 'jsonwebtoken';
 import { initDb } from './server/db.js';
 import authRoutes from './server/authRoutes.js';
 import userRoutes from './server/userRoutes.js';
+import paymentRoutes from './server/paymentRoutes.js';
+import licenseRoutes from './server/licenseRoutes.js';
+import { initMysqlDb, getDb } from './server/mysqlDb.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -17,22 +21,61 @@ async function startServer() {
   // Init Turso DB
   await initDb();
 
+  // Init MySQL DB (license system) — non-fatal if not configured yet
+  try {
+    await initMysqlDb();
+  } catch (err) {
+    console.warn('[MySQL] Not connected — license features disabled:', (err as Error).message);
+  }
+
   const app = express();
   const PORT = 3000;
 
-  // Middleware
-  app.use(cors());
-  app.use(express.json());
+  // Middleware — allow PHP host + localhost in dev
+  const allowedOrigins = [
+    'http://localhost:3000',
+    'http://localhost:5173',
+    process.env.APP_URL,                        // e.g. https://djbig.last-prize.com
+    process.env.PHP_HOST_URL,                   // e.g. https://djbig.last-prize.com (same or diff)
+  ].filter(Boolean);
+  app.use(cors({
+    origin: (origin, cb) => {
+      // Allow no-origin (Electron, curl, mobile) and whitelisted origins
+      if (!origin || allowedOrigins.includes(origin)) return cb(null, true);
+      cb(new Error('Not allowed by CORS'));
+    },
+    credentials: true,
+  }));
+  // Preserve raw body for Stripe webhook signature verification
+  app.use((req, res, next) => {
+    if (req.path === '/api/payment/webhook') {
+      let data = '';
+      req.setEncoding('utf8');
+      req.on('data', chunk => { data += chunk; });
+      req.on('end', () => { (req as any).rawBody = data; next(); });
+    } else {
+      express.json()(req, res, next);
+    }
+  });
+
+  // Serve marketing website (including portal pages)
+  app.use('/website', express.static(path.join(__dirname, 'website')));
+  app.use('/portal', express.static(path.join(__dirname, 'website', 'portal')));
+  app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
   // Auth & User routes (v2.0.0)
   app.use('/api/auth', authRoutes);
   app.use('/api/user', userRoutes);
+  app.use('/api/payment', paymentRoutes);
+  app.use('/payment', paymentRoutes);
+  app.use('/api/license', licenseRoutes);
 
   // --- OAuth Routes ---
   app.get('/api/auth/google/url', (req, res) => {
+    const source = (req.query.source as string) || 'electron';
     const redirectUri = `${req.protocol}://${req.get('host')}/api/auth/callback`;
     const clientId = process.env.GOOGLE_CLIENT_ID;
-    
+
     if (!clientId) {
       return res.status(500).json({ error: 'Google Client ID not configured' });
     }
@@ -43,7 +86,8 @@ async function startServer() {
       response_type: 'code',
       scope: 'profile email',
       access_type: 'offline',
-      prompt: 'consent'
+      prompt: 'consent',
+      state: source,
     });
 
     const url = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
@@ -51,49 +95,77 @@ async function startServer() {
   });
 
   app.get('/api/auth/callback', async (req, res) => {
-    const { code } = req.query;
-    
+    const { code, state } = req.query;
+    const source = (state as string) || 'electron';
+
     if (!code) {
       return res.status(400).send('No code provided');
     }
 
     try {
       const redirectUri = `${req.protocol}://${req.get('host')}/api/auth/callback`;
-      
+
       // Exchange code for tokens
       const tokenResponse = await axios.post('https://oauth2.googleapis.com/token', {
         code,
         client_id: process.env.GOOGLE_CLIENT_ID,
         client_secret: process.env.GOOGLE_CLIENT_SECRET,
         redirect_uri: redirectUri,
-        grant_type: 'authorization_code'
+        grant_type: 'authorization_code',
       });
 
       const { access_token } = tokenResponse.data;
 
-      // Get user info
+      // Get user info from Google
       const userResponse = await axios.get('https://www.googleapis.com/oauth2/v2/userinfo', {
-        headers: { Authorization: `Bearer ${access_token}` }
+        headers: { Authorization: `Bearer ${access_token}` },
       });
+      const googleUser = userResponse.data;
 
-      const user = userResponse.data;
+      if (source === 'portal') {
+        // Upsert user in MySQL and return a portal JWT
+        let portalToken: string | null = null;
+        let dbUser = googleUser;
+        try {
+          const db = getDb();
+          await db.execute(
+            `INSERT INTO djbig_users (google_id, email, name, picture)
+             VALUES (?, ?, ?, ?)
+             ON DUPLICATE KEY UPDATE email=VALUES(email), name=VALUES(name), picture=VALUES(picture)`,
+            [googleUser.id, googleUser.email, googleUser.name || '', googleUser.picture || '']
+          );
+          const [rows] = await db.execute<any[]>(
+            'SELECT id, email, name, picture FROM djbig_users WHERE google_id = ?',
+            [googleUser.id]
+          );
+          if (rows[0]) {
+            dbUser = rows[0];
+            portalToken = jwt.sign(
+              { userId: rows[0].id, email: rows[0].email, name: rows[0].name, picture: rows[0].picture },
+              process.env.JWT_SECRET!,
+              { expiresIn: '7d' }
+            );
+          }
+        } catch (dbErr) {
+          console.error('[OAuth portal] MySQL error:', dbErr);
+        }
 
-      // Send success message to parent window
-      const html = `
-        <html>
-          <body>
-            <script>
-              if (window.opener) {
-                window.opener.postMessage({ type: 'OAUTH_AUTH_SUCCESS', user: ${JSON.stringify(user)} }, '*');
-                window.close();
-              } else {
-                window.location.href = '/';
-              }
-            </script>
-            <p>Authentication successful. You can close this window.</p>
-          </body>
-        </html>
-      `;
+        const html = `<html><body><script>
+          if(window.opener){
+            window.opener.postMessage({type:'OAUTH_PORTAL_SUCCESS',token:${JSON.stringify(portalToken)},user:${JSON.stringify(dbUser)}},'*');
+            window.close();
+          }
+        </script><p>เข้าสู่ระบบสำเร็จ สามารถปิดหน้าต่างนี้ได้</p></body></html>`;
+        return res.send(html);
+      }
+
+      // Default: Electron app flow
+      const html = `<html><body><script>
+        if(window.opener){
+          window.opener.postMessage({type:'OAUTH_AUTH_SUCCESS',user:${JSON.stringify(googleUser)}},'*');
+          window.close();
+        } else { window.location.href='/'; }
+      </script><p>Authentication successful. You can close this window.</p></body></html>`;
       res.send(html);
 
     } catch (error) {
@@ -308,8 +380,8 @@ async function startServer() {
     });
     app.use(vite.middlewares);
   } else {
-    // Serve static files in production
-    app.use(express.static(path.join(__dirname, 'dist')));
+    // Production: serve marketing website at root
+    app.use(express.static(path.join(__dirname, 'website')));
   }
 }
 

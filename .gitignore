@@ -16,6 +16,9 @@ release
 *.lnk
 .env
 .env.local
+uploads/slips/*
+!uploads/slips/.gitkeep
+website/api/config.local.php
 
 # Editor directories and files
 .vscode/*

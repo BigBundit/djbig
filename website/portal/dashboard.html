@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>แดชบอร์ด — DJBIG Premium</title>
+<link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;600;700;800;900&display=swap" rel="stylesheet"/>
+<style>
+:root{--c:#06b6d4;--f:#d946ef;--a:#f59e0b;--g:#22c55e;--bg:#000;--text:#e2e8f0;--muted:#52525b;--border:rgba(255,255,255,.07)}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Prompt',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+nav{background:rgba(0,0,0,.9);border-bottom:1px solid var(--border);padding:1rem 2rem;display:flex;align-items:center;gap:.75rem}
+.logo{font-size:1.2rem;font-weight:900;font-style:italic;background:linear-gradient(120deg,var(--c),var(--f));-webkit-background-clip:text;-webkit-text-fill-color:transparent;text-decoration:none}
+.nav-links{margin-left:auto;display:flex;align-items:center;gap:1rem}
+.nav-links a{font-size:.78rem;color:var(--muted);text-decoration:none;transition:color .2s}
+.nav-links a:hover{color:var(--text)}
+.nav-links a.home{color:var(--c)}
+.container{max-width:580px;margin:0 auto;padding:2.5rem 1.25rem}
+h1{font-size:1.5rem;font-weight:900;font-style:italic;text-align:center;margin-bottom:.35rem}
+.sub{color:var(--muted);font-size:.82rem;text-align:center;margin-bottom:2.5rem}
+/* User card */
+.user-card{background:#080808;border:1px solid var(--border);border-radius:14px;padding:1.25rem;display:flex;align-items:center;gap:.85rem;margin-bottom:1.25rem}
+.user-card img{width:44px;height:44px;border-radius:50%;object-fit:cover;border:2px solid rgba(6,182,212,.3)}
+.user-name{font-size:.92rem;font-weight:700}
+.user-email{font-size:.75rem;color:var(--muted);margin-top:.1rem}
+.btn-logout{margin-left:auto;padding:.35rem .75rem;background:none;border:1px solid var(--border);border-radius:8px;color:var(--muted);font-size:.72rem;cursor:pointer;font-family:'Prompt',sans-serif;transition:all .2s}
+.btn-logout:hover{color:var(--text);border-color:rgba(255,255,255,.15)}
+/* Status card */
+.status-card{background:#080808;border:1px solid var(--border);border-radius:16px;padding:2rem;text-align:center;margin-bottom:1.25rem}
+.status-icon{font-size:3rem;margin-bottom:.75rem}
+.status-title{font-size:1.1rem;font-weight:800;margin-bottom:.5rem}
+.status-desc{font-size:.82rem;color:var(--muted);line-height:1.6}
+/* License key box */
+.key-wrap{margin:1.25rem 0}
+.key-label{font-size:.68rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--c);margin-bottom:.5rem}
+.key-box{background:#000;border:1px solid rgba(6,182,212,.3);border-radius:12px;padding:1rem 1.25rem;font-family:monospace;font-size:1.05rem;letter-spacing:.1em;color:var(--c);display:flex;align-items:center;justify-content:space-between;gap:.75rem;word-break:break-all}
+.copy-key{flex-shrink:0;padding:.3rem .7rem;background:rgba(6,182,212,.1);border:1px solid rgba(6,182,212,.2);border-radius:7px;color:var(--c);font-size:.7rem;cursor:pointer;font-family:'Prompt',sans-serif;font-weight:700;transition:background .2s}
+.copy-key:hover{background:rgba(6,182,212,.2)}
+.key-hint{font-size:.73rem;color:var(--muted);margin-top:.6rem;line-height:1.5}
+/* How to use */
+.howto{background:#080808;border:1px solid var(--border);border-radius:14px;padding:1.25rem;margin-bottom:1.25rem}
+.howto-title{font-size:.82rem;font-weight:800;margin-bottom:.85rem;color:var(--c)}
+.step-row{display:flex;gap:.75rem;align-items:flex-start;margin-bottom:.65rem}
+.step-n{width:22px;height:22px;border-radius:50%;background:rgba(6,182,212,.1);border:1px solid rgba(6,182,212,.25);font-size:.68rem;font-weight:800;color:var(--c);display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:.05rem}
+.step-text{font-size:.78rem;color:var(--muted);line-height:1.5}
+/* Buttons */
+.btn-primary{display:block;width:100%;padding:.85rem;background:linear-gradient(135deg,var(--c),#3b82f6);color:#000;border:none;border-radius:10px;font-size:.92rem;font-weight:800;cursor:pointer;font-family:'Prompt',sans-serif;text-decoration:none;text-align:center;transition:transform .2s,box-shadow .2s;margin-bottom:.65rem}
+.btn-primary:hover{transform:translateY(-2px);box-shadow:0 0 28px rgba(6,182,212,.35)}
+.btn-home{display:block;width:100%;padding:.75rem;background:none;border:1px solid var(--border);border-radius:10px;font-size:.88rem;font-weight:700;color:var(--muted);font-family:'Prompt',sans-serif;text-decoration:none;text-align:center;transition:all .2s}
+.btn-home:hover{color:var(--text);border-color:rgba(255,255,255,.15)}
+/* Not logged in */
+.login-prompt{text-align:center;padding:3rem 1rem}
+.login-prompt p{color:var(--muted);font-size:.85rem;margin-bottom:1.5rem}
+/* Loading */
+.loading-state{text-align:center;padding:3rem 1rem;color:var(--muted);font-size:.85rem}
+.hidden{display:none!important}
+/* Status colors */
+.s-approved .status-icon{filter:drop-shadow(0 0 12px rgba(34,197,94,.5))}
+.s-approved .status-title{color:#22c55e}
+.s-pending .status-title{color:var(--a)}
+.s-rejected .status-title{color:#ef4444}
+.s-none .status-title{color:var(--muted)}
+</style>
+</head>
+<body>
+
+<nav>
+  <a class="logo" href="/">DJBIG</a>
+  <span style="color:var(--muted);font-size:.8rem">/ แดชบอร์ด</span>
+  <div class="nav-links">
+    <a href="/portal/purchase.html">ซื้อ Premium</a>
+    <a href="/" class="home">← หน้าหลัก</a>
+  </div>
+</nav>
+
+<div class="container">
+  <h1>แดชบอร์ด</h1>
+  <p class="sub">ดูสถานะ License Key ของคุณ</p>
+
+  <!-- Not logged in -->
+  <div id="not-logged-in" class="login-prompt">
+    <p>กรุณาเข้าสู่ระบบก่อนเพื่อดูสถานะ</p>
+    <a href="/portal/purchase.html" class="btn-primary" style="max-width:280px;margin:0 auto">เข้าสู่ระบบ / ซื้อ Premium</a>
+  </div>
+
+  <!-- Loading -->
+  <div id="loading-state" class="loading-state hidden">กำลังโหลด...</div>
+
+  <!-- Logged in -->
+  <div id="logged-in" class="hidden">
+    <!-- User info -->
+    <div class="user-card">
+      <img id="u-pic" src="" alt=""/>
+      <div>
+        <div class="user-name" id="u-name"></div>
+        <div class="user-email" id="u-email"></div>
+      </div>
+      <button class="btn-logout" onclick="logout()">ออกจากระบบ</button>
+    </div>
+
+    <!-- Status -->
+    <div class="status-card" id="status-card">
+      <!-- filled by JS -->
+    </div>
+
+    <!-- How to activate (shown only when approved) -->
+    <div class="howto hidden" id="howto">
+      <div class="howto-title">วิธีเปิดใช้งาน License Key</div>
+      <div class="step-row"><div class="step-n">1</div><div class="step-text">เปิดเกม DJBIG บน Windows PC</div></div>
+      <div class="step-row"><div class="step-n">2</div><div class="step-text">ไปที่ <b style="color:var(--text)">ตั้งค่า (⚙) → License Key</b></div></div>
+      <div class="step-row"><div class="step-n">3</div><div class="step-text">วาง Key และกด <b style="color:var(--text)">ยืนยัน</b> — ฟีเจอร์ Premium จะเปิดทันที</div></div>
+    </div>
+
+    <!-- Actions -->
+    <a href="/" class="btn-home">← กลับหน้าหลัก</a>
+  </div>
+</div>
+
+<script>
+const API_BASE = window.location.hostname === 'localhost' ? '' : 'https://djbig.last-prize.com';
+let currentUser = null;
+
+async function init() {
+  const token = localStorage.getItem('portalToken');
+  const user  = localStorage.getItem('portalUser');
+  if (!token || !user) {
+    document.getElementById('not-logged-in').classList.remove('hidden');
+    return;
+  }
+
+  currentUser = JSON.parse(user);
+  document.getElementById('not-logged-in').classList.add('hidden');
+  document.getElementById('loading-state').classList.remove('hidden');
+
+  document.getElementById('u-pic').src   = currentUser.picture || '';
+  document.getElementById('u-name').textContent  = currentUser.name || '';
+  document.getElementById('u-email').textContent = currentUser.email || '';
+
+  await loadStatus(token);
+  document.getElementById('loading-state').classList.add('hidden');
+  document.getElementById('logged-in').classList.remove('hidden');
+}
+
+async function loadStatus(token) {
+  try {
+    const r    = await fetch(API_BASE+'/api/license/status', { headers: { Authorization: 'Bearer ' + token } });
+    const data = await r.json();
+    renderStatus(data);
+  } catch(e) {
+    renderStatus(null);
+  }
+}
+
+function renderStatus(data) {
+  const card = document.getElementById('status-card');
+
+  if (!data || !data.slip) {
+    card.className = 'status-card s-none';
+    card.innerHTML = `
+      <div class="status-icon">💎</div>
+      <div class="status-title">ยังไม่มี Premium</div>
+      <div class="status-desc">อัปเกรดเป็น Premium เพื่อปลดล็อคฟีเจอร์อัปโหลดเพลงส่วนตัว</div>
+      <div style="margin-top:1.25rem">
+        <a href="/portal/purchase.html" class="btn-primary">ซื้อ Premium — ฿199</a>
+      </div>`;
+    return;
+  }
+
+  const { slip, key } = data;
+
+  if (slip.status === 'approved' && key) {
+    card.className = 'status-card s-approved';
+    card.innerHTML = `
+      <div class="status-icon">✅</div>
+      <div class="status-title">Premium — ใช้งานได้แล้ว</div>
+      <div class="status-desc">License Key ของคุณ</div>
+      <div class="key-wrap">
+        <div class="key-label">License Key</div>
+        <div class="key-box">
+          <span id="key-val">${esc(key)}</span>
+          <button class="copy-key" onclick="copyKey()">คัดลอก</button>
+        </div>
+        <div class="key-hint">📌 Key นี้ใช้ได้ตลอดชีพ กรอกในเกมเพียงครั้งเดียว</div>
+      </div>`;
+    document.getElementById('howto').classList.remove('hidden');
+    return;
+  }
+
+  if (slip.status === 'pending') {
+    const d = new Date(slip.submitted_at);
+    const dt = d.toLocaleDateString('th-TH') + ' ' + d.toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'});
+    card.className = 'status-card s-pending';
+    card.innerHTML = `
+      <div class="status-icon">⏳</div>
+      <div class="status-title">รอตรวจสอบสลิป</div>
+      <div class="status-desc">แอดมินกำลังตรวจสอบหลักฐานการโอนเงิน<br/>ส่งเมื่อ ${esc(dt)} · ใช้เวลาไม่เกิน 24 ชั่วโมง</div>
+      <div style="margin-top:1rem;font-size:.75rem;color:var(--muted)">หน้านี้จะอัพเดตอัตโนมัติเมื่อได้รับการอนุมัติ</div>`;
+    // Auto-refresh every 30 sec while pending
+    setTimeout(()=>{ const t=localStorage.getItem('portalToken'); if(t) loadStatus(t); }, 30000);
+    return;
+  }
+
+  if (slip.status === 'rejected') {
+    card.className = 'status-card s-rejected';
+    card.innerHTML = `
+      <div class="status-icon">❌</div>
+      <div class="status-title">สลิปไม่ผ่านการตรวจสอบ</div>
+      <div class="status-desc">${slip.notes ? 'หมายเหตุ: ' + esc(slip.notes) + '<br/>' : ''}กรุณาส่งสลิปใหม่อีกครั้ง</div>
+      <div style="margin-top:1.25rem">
+        <a href="/portal/purchase.html" class="btn-primary">ส่งสลิปใหม่</a>
+      </div>`;
+  }
+}
+
+function copyKey() {
+  const key = document.getElementById('key-val')?.textContent;
+  if (!key) return;
+  navigator.clipboard.writeText(key);
+  const btn = document.querySelector('.copy-key');
+  btn.textContent = 'คัดลอกแล้ว!';
+  setTimeout(() => btn.textContent = 'คัดลอก', 2000);
+}
+
+function logout() {
+  localStorage.removeItem('portalToken');
+  localStorage.removeItem('portalUser');
+  window.location.href = '/portal/purchase.html';
+}
+
+function esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+init();
+</script>
+</body>
+</html>

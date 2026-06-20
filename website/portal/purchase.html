@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>ซื้อ DJBIG Premium — ฿199</title>
+<link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;600;700;800;900&display=swap" rel="stylesheet"/>
+<style>
+:root{--c:#06b6d4;--f:#d946ef;--a:#f59e0b;--g:#22c55e;--bg:#000;--text:#e2e8f0;--muted:#52525b}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Prompt',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+nav{background:rgba(0,0,0,.9);border-bottom:1px solid rgba(255,255,255,.06);padding:1rem 2rem;display:flex;align-items:center;gap:.75rem}
+.logo{font-size:1.25rem;font-weight:900;font-style:italic;background:linear-gradient(120deg,var(--c),var(--f));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.container{max-width:660px;margin:0 auto;padding:2rem 1.25rem}
+h1{font-size:1.55rem;font-weight:900;font-style:italic;text-align:center;margin-bottom:.4rem}
+.sub{color:var(--muted);text-align:center;font-size:.82rem;margin-bottom:2rem}
+.step{background:#080808;border:1px solid rgba(255,255,255,.07);border-radius:16px;padding:1.5rem;margin-bottom:1rem}
+.step-num{font-size:.62rem;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:var(--c);margin-bottom:.4rem}
+.step-title{font-size:.95rem;font-weight:800;margin-bottom:.85rem}
+/* Google btn */
+.btn-google{display:flex;align-items:center;justify-content:center;gap:.65rem;padding:.75rem 1.25rem;background:#fff;color:#333;border-radius:10px;border:none;cursor:pointer;font-size:.88rem;font-weight:700;font-family:'Prompt',sans-serif;width:100%;transition:transform .2s,box-shadow .2s}
+.btn-google:hover{transform:translateY(-1px);box-shadow:0 4px 20px rgba(255,255,255,.08)}
+/* User card */
+.user-card{display:flex;align-items:center;gap:.75rem;padding:.75rem 1rem;background:rgba(6,182,212,.06);border:1px solid rgba(6,182,212,.18);border-radius:10px}
+.user-card img{width:38px;height:38px;border-radius:50%;object-fit:cover}
+.uname{font-weight:700;font-size:.88rem}
+.uemail{font-size:.72rem;color:var(--muted)}
+.btn-logout{margin-left:auto;font-size:.7rem;color:var(--muted);background:none;border:none;cursor:pointer;font-family:'Prompt',sans-serif}
+.btn-logout:hover{color:var(--text)}
+/* Bank box */
+.bank-box{background:rgba(34,197,94,.05);border:1px solid rgba(34,197,94,.18);border-radius:10px;padding:1rem 1.25rem}
+.bank-label{font-size:.65rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--g);margin-bottom:.35rem;display:flex;justify-content:space-between;align-items:center}
+.bank-acct{font-size:1.4rem;font-weight:900;letter-spacing:.06em;margin-bottom:.15rem;font-family:monospace}
+.bank-holder{font-size:.78rem;color:var(--muted);margin-bottom:.65rem}
+.amount{font-size:.82rem}
+.amount b{color:var(--a);font-size:1.05rem}
+.copy-btn{padding:.22rem .6rem;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.2);border-radius:6px;color:var(--g);font-size:.68rem;cursor:pointer;font-family:'Prompt',sans-serif;font-weight:700}
+.copy-btn:hover{background:rgba(34,197,94,.18)}
+/* Upload */
+.drop-zone{border:2px dashed rgba(255,255,255,.1);border-radius:12px;padding:1.75rem;text-align:center;cursor:pointer;transition:border-color .2s,background .2s;position:relative;display:block}
+.drop-zone:hover,.drop-zone.drag{border-color:var(--c);background:rgba(6,182,212,.04)}
+.drop-zone input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.upload-icon{font-size:2rem;margin-bottom:.5rem}
+.upload-lbl{font-size:.82rem;color:var(--muted)}
+.upload-lbl span{color:var(--c);font-weight:700}
+#slip-preview{max-width:100%;max-height:200px;border-radius:8px;margin-top:.75rem;display:none}
+.btn-submit{width:100%;padding:.85rem;background:linear-gradient(135deg,var(--c),#3b82f6);color:#000;border:none;border-radius:10px;font-size:.95rem;font-weight:800;cursor:pointer;font-family:'Prompt',sans-serif;transition:transform .2s,box-shadow .2s;margin-top:.85rem}
+.btn-submit:hover:not(:disabled){transform:translateY(-2px);box-shadow:0 0 28px rgba(6,182,212,.35)}
+.btn-submit:disabled{opacity:.4;cursor:not-allowed}
+/* Status */
+.sbox{padding:.9rem 1.1rem;border-radius:10px;font-size:.85rem;margin-bottom:.75rem}
+.s-pending{background:rgba(245,158,11,.07);border:1px solid rgba(245,158,11,.2);color:var(--a)}
+.s-approved{background:rgba(34,197,94,.07);border:1px solid rgba(34,197,94,.2);color:var(--g)}
+.s-rejected{background:rgba(239,68,68,.07);border:1px solid rgba(239,68,68,.2);color:#ef4444}
+.key-box{background:#0d0d0d;border:1px solid rgba(6,182,212,.3);border-radius:10px;padding:.9rem 1rem;font-family:monospace;font-size:1rem;letter-spacing:.08em;color:var(--c);text-align:center;position:relative;margin-top:.6rem}
+.copy-key{position:absolute;right:.6rem;top:50%;transform:translateY(-50%);padding:.2rem .55rem;background:rgba(6,182,212,.1);border:1px solid rgba(6,182,212,.2);border-radius:6px;color:var(--c);font-size:.66rem;cursor:pointer;font-family:'Prompt',sans-serif}
+.msg{font-size:.8rem;margin-top:.5rem;padding:.45rem .7rem;border-radius:7px}
+.msg-ok{background:rgba(34,197,94,.1);color:var(--g)}
+.msg-err{background:rgba(239,68,68,.1);color:#ef4444}
+.hidden{display:none!important}
+.hint{font-size:.72rem;color:var(--muted);margin-top:.6rem}
+</style>
+</head>
+<body>
+<nav>
+  <div class="logo">DJBIG</div>
+  <span style="color:var(--muted);font-size:.8rem">/ Premium ฿199</span>
+  <span style="margin-left:auto;font-size:.75rem;color:var(--muted)"><a href="/portal/dashboard.html" style="color:var(--c);text-decoration:none">แดชบอร์ด →</a></span>
+</nav>
+
+<div class="container">
+  <h1>ซื้อ DJBIG Premium</h1>
+  <p class="sub">จ่ายครั้งเดียว ฿199 · รับ License Key · ปลดล็อคอัปโหลดเพลงส่วนตัว</p>
+
+  <!-- Step 1: Login -->
+  <div class="step">
+    <div class="step-num">ขั้นตอนที่ 1</div>
+    <div class="step-title">เข้าสู่ระบบด้วย Google</div>
+    <div id="login-area">
+      <button class="btn-google" onclick="googleLogin()">
+        <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+        เข้าสู่ระบบด้วย Google
+      </button>
+    </div>
+    <div id="user-area" class="hidden">
+      <div class="user-card">
+        <img id="user-pic" src="" alt=""/>
+        <div>
+          <div class="uname" id="user-name"></div>
+          <div class="uemail" id="user-email"></div>
+        </div>
+        <button class="btn-logout" onclick="logout()">ออกจากระบบ</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Step 2: Transfer -->
+  <div class="step">
+    <div class="step-num">ขั้นตอนที่ 2</div>
+    <div class="step-title">โอนเงิน ฿199</div>
+    <div class="bank-box" id="bank-box">
+      <div class="bank-label"><span id="bank-name">ธนาคารกสิกรไทย</span><button class="copy-btn" onclick="copyAcct()">คัดลอกเลขบัญชี</button></div>
+      <div class="bank-acct" id="bank-acct">770-2-00719-9</div>
+      <div class="bank-holder" id="bank-holder">ชื่อบัญชี: บัณฑิต อ่อนอำไพ</div>
+      <div class="amount">ยอดโอน: <b>฿199.00</b></div>
+    </div>
+    <p class="hint">⚠️ โอนตรงตามจำนวน และบันทึกสลิปให้ชัดเจน</p>
+  </div>
+
+  <!-- Step 3: Upload Slip -->
+  <div class="step">
+    <div class="step-num">ขั้นตอนที่ 3</div>
+    <div class="step-title">อัปโหลดสลิปโอนเงิน</div>
+
+    <!-- Status boxes (shown if already submitted) -->
+    <div id="status-area" class="hidden">
+      <div id="s-pending" class="sbox s-pending hidden">⏳ ส่งสลิปแล้ว — รอแอดมินตรวจสอบ (ภายใน 24 ชั่วโมง)</div>
+      <div id="s-approved" class="sbox s-approved hidden">
+        ✅ ชำระเงินสำเร็จ! License Key ของคุณ:
+        <div class="key-box"><span id="key-value"></span><button class="copy-key" onclick="copyKey()">คัดลอก</button></div>
+        <p class="hint" style="margin-top:.5rem">กรอก Key นี้ในเกม DJBIG ที่ ตั้งค่า → License Key เพื่อปลดล็อคฟีเจอร์ Premium</p>
+      </div>
+      <div id="s-rejected" class="sbox s-rejected hidden">
+        ❌ สลิปไม่ผ่านการตรวจสอบ กรุณาส่งสลิปใหม่
+        <p id="reject-note" class="hint" style="color:#ef4444aa;margin-top:.25rem"></p>
+        <button class="btn-submit" style="margin-top:.75rem;background:linear-gradient(135deg,#ef4444,#b91c1c)" onclick="resetForm()">ส่งสลิปใหม่</button>
+      </div>
+    </div>
+
+    <!-- Upload form -->
+    <div id="upload-form">
+      <label class="drop-zone" id="drop-zone">
+        <input type="file" id="slip-file" accept="image/*" onchange="previewSlip(this)"/>
+        <div class="upload-icon">🖼️</div>
+        <div class="upload-lbl"><span>คลิกเลือกไฟล์</span> หรือลากวาง<br/>รองรับ JPG, PNG, GIF (ไม่เกิน 10MB)</div>
+        <img id="slip-preview"/>
+      </label>
+      <button class="btn-submit" id="submit-btn" onclick="submitSlip()" disabled>ส่งสลิปเพื่อตรวจสอบ</button>
+      <div id="submit-msg"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ← เปลี่ยนเป็น URL ของ Node.js backend ก่อน deploy
+const API_BASE = window.location.hostname === 'localhost' ? '' : 'https://djbig.last-prize.com';
+let currentUser = null;
+
+async function init() {
+  // Load bank info
+  try {
+    const r = await fetch(API_BASE+'/api/license/bank-info');
+    const b = await r.json();
+    document.getElementById('bank-name').textContent = b.bank;
+    document.getElementById('bank-acct').textContent = b.account;
+    document.getElementById('bank-holder').textContent = 'ชื่อบัญชี: ' + b.holder;
+  } catch(e) {}
+
+  const token = localStorage.getItem('portalToken');
+  const user = localStorage.getItem('portalUser');
+  if (token && user) {
+    currentUser = JSON.parse(user);
+    showUser();
+    await checkStatus();
+  }
+}
+
+function showUser() {
+  document.getElementById('login-area').classList.add('hidden');
+  document.getElementById('user-area').classList.remove('hidden');
+  document.getElementById('user-name').textContent = currentUser.name || '';
+  document.getElementById('user-email').textContent = currentUser.email || '';
+  document.getElementById('user-pic').src = currentUser.picture || '';
+}
+
+function logout() {
+  localStorage.removeItem('portalToken');
+  localStorage.removeItem('portalUser');
+  currentUser = null;
+  document.getElementById('login-area').classList.remove('hidden');
+  document.getElementById('user-area').classList.add('hidden');
+  document.getElementById('status-area').classList.add('hidden');
+  document.getElementById('upload-form').classList.remove('hidden');
+}
+
+async function googleLogin() {
+  const popup = window.open('', 'google-oauth', 'width=500,height=620,left=200,top=100');
+  try {
+    const r = await fetch(API_BASE+'/api/auth/google/url?source=portal');
+    if (!r.ok) throw new Error('Server error');
+    const { url } = await r.json();
+    if (!url) throw new Error('No URL');
+    popup.location.href = url;
+
+    window.addEventListener('message', async function handler(e) {
+      if (e.data?.type === 'OAUTH_PORTAL_SUCCESS') {
+        window.removeEventListener('message', handler);
+        const { token, user } = e.data;
+        localStorage.setItem('portalToken', token);
+        localStorage.setItem('portalUser', JSON.stringify(user));
+        currentUser = user;
+        showUser();
+        await checkStatus();
+      }
+    });
+  } catch(e) {
+    popup?.close();
+    alert('ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้\nกรุณาลองใหม่อีกครั้ง');
+  }
+}
+
+async function checkStatus() {
+  const token = localStorage.getItem('portalToken');
+  if (!token) return;
+  try {
+    const r = await fetch(API_BASE+'/api/license/status', { headers: { 'Authorization': 'Bearer ' + token } });
+    const data = await r.json();
+    if (!data.slip) return;
+
+    document.getElementById('status-area').classList.remove('hidden');
+    document.getElementById('upload-form').classList.add('hidden');
+    ['s-pending','s-approved','s-rejected'].forEach(id => document.getElementById(id).classList.add('hidden'));
+
+    if (data.slip.status === 'pending') {
+      document.getElementById('s-pending').classList.remove('hidden');
+    } else if (data.slip.status === 'approved' && data.key) {
+      document.getElementById('s-approved').classList.remove('hidden');
+      document.getElementById('key-value').textContent = data.key;
+    } else if (data.slip.status === 'rejected') {
+      document.getElementById('s-rejected').classList.remove('hidden');
+      if (data.slip.notes) document.getElementById('reject-note').textContent = 'หมายเหตุ: ' + data.slip.notes;
+    }
+  } catch(e) {}
+}
+
+function resetForm() {
+  document.getElementById('status-area').classList.add('hidden');
+  document.getElementById('upload-form').classList.remove('hidden');
+}
+
+function previewSlip(input) {
+  if (!input.files[0]) return;
+  const img = document.getElementById('slip-preview');
+  img.src = URL.createObjectURL(input.files[0]);
+  img.style.display = 'block';
+  document.getElementById('submit-btn').disabled = false;
+}
+
+async function submitSlip() {
+  const token = localStorage.getItem('portalToken');
+  if (!token) { showMsg('กรุณาเข้าสู่ระบบก่อน', 'err'); return; }
+  const file = document.getElementById('slip-file').files[0];
+  if (!file) { showMsg('กรุณาเลือกไฟล์สลิป', 'err'); return; }
+
+  const btn = document.getElementById('submit-btn');
+  btn.textContent = 'กำลังส่ง...';
+  btn.disabled = true;
+
+  const form = new FormData();
+  form.append('slip', file);
+
+  try {
+    const r = await fetch(API_BASE+'/api/slip/upload', { method: 'POST', headers: { 'Authorization': 'Bearer ' + token }, body: form });
+    const data = await r.json();
+    if (data.ok) {
+      showMsg('ส่งสลิปสำเร็จ! กรุณารอแอดมินตรวจสอบภายใน 24 ชั่วโมง ✅', 'ok');
+      setTimeout(checkStatus, 1500);
+    } else {
+      showMsg(data.error || 'เกิดข้อผิดพลาด', 'err');
+      btn.textContent = 'ส่งสลิปเพื่อตรวจสอบ';
+      btn.disabled = false;
+    }
+  } catch(e) {
+    showMsg('เกิดข้อผิดพลาด กรุณาลองใหม่', 'err');
+    btn.textContent = 'ส่งสลิปเพื่อตรวจสอบ';
+    btn.disabled = false;
+  }
+}
+
+function showMsg(msg, type) {
+  const el = document.getElementById('submit-msg');
+  el.textContent = msg;
+  el.className = 'msg msg-' + type;
+}
+
+function copyAcct() {
+  const acct = document.getElementById('bank-acct').textContent;
+  navigator.clipboard.writeText(acct);
+  const btn = document.querySelector('.copy-btn');
+  btn.textContent = 'คัดลอกแล้ว!';
+  setTimeout(() => btn.textContent = 'คัดลอกเลขบัญชี', 2000);
+}
+
+function copyKey() {
+  navigator.clipboard.writeText(document.getElementById('key-value').textContent);
+  const btn = document.querySelector('.copy-key');
+  btn.textContent = 'คัดลอกแล้ว!';
+  setTimeout(() => btn.textContent = 'คัดลอก', 2000);
+}
+
+// Drag & drop
+const dz = document.getElementById('drop-zone');
+dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag'); });
+dz.addEventListener('dragleave', () => dz.classList.remove('drag'));
+dz.addEventListener('drop', e => { e.preventDefault(); dz.classList.remove('drag'); const f = e.dataTransfer.files[0]; if (f) { document.getElementById('slip-file').files = e.dataTransfer.files; previewSlip(document.getElementById('slip-file')); } });
+
+init();
+</script>
+</body>
+</html>
