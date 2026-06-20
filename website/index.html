@@ -418,6 +418,57 @@
   .pg.visible .ss-android-row .ss-phone:nth-child(5){transition-delay:360ms}
   .pg.visible .ss-phone:hover{transform:translateY(-4px);transition-delay:0ms}
 
+  /* ══════════════ LAPTOP MOCKUP ══════════════ */
+  .laptop-wrap{
+    position:relative;z-index:1;
+    width:clamp(300px,38vw,460px);
+    filter:drop-shadow(0 40px 70px rgba(0,0,0,.85));
+    animation:float 7s ease-in-out infinite;
+  }
+  .laptop-glow{
+    position:absolute;top:50%;left:50%;transform:translate(-50%,-55%);
+    width:130%;height:130%;pointer-events:none;z-index:-1;
+    background:radial-gradient(ellipse 70% 55% at 50% 50%,rgba(6,182,212,.18),rgba(217,70,239,.09) 55%,transparent 72%);
+    animation:g1 10s ease-in-out infinite;
+  }
+  .laptop-lid{
+    background:linear-gradient(175deg,#1e1e1e 0%,#0d0d0d 100%);
+    border-radius:14px 14px 0 0;
+    border:2px solid rgba(255,255,255,.16);
+    padding:10px 10px 0;
+    position:relative;
+  }
+  .laptop-cam{
+    width:5px;height:5px;border-radius:50%;
+    background:#111;border:1px solid rgba(255,255,255,.1);
+    margin:0 auto 6px;
+  }
+  .laptop-screen-area{
+    background:#000;border-radius:6px;overflow:hidden;
+    aspect-ratio:16/9;
+    border:1px solid rgba(255,255,255,.07);
+    box-shadow:inset 0 0 30px rgba(6,182,212,.08);
+  }
+  .laptop-screen-area img{width:100%;height:100%;object-fit:cover;display:block}
+  .laptop-base{
+    background:linear-gradient(to bottom,#1a1a1a,#111);
+    height:16px;margin:0 -2px;
+    border:2px solid rgba(255,255,255,.12);
+    border-top:1px solid rgba(255,255,255,.06);
+    border-radius:0 0 3px 3px;
+    position:relative;
+  }
+  .laptop-base::after{
+    content:'';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+    width:40px;height:4px;border-radius:2px;background:rgba(255,255,255,.05);
+  }
+  .laptop-foot{
+    background:linear-gradient(to bottom,#151515,#0c0c0c);
+    height:10px;border-radius:0 0 10px 10px;
+    margin:0 clamp(20px,8%,38px);
+    border:2px solid rgba(255,255,255,.09);border-top:none;
+  }
+
   /* ══════════════ STICKY PHONE ══════════════ */
   #sticky-phone{
     position:fixed;right:3%;top:50%;
@@ -715,6 +766,19 @@
       </div>
       <div class="scroll-hint"><div class="sh-line"></div>เลื่อนดูต่อ</div>
     </div>
+    <div class="hero-right">
+      <div class="laptop-wrap">
+        <div class="laptop-glow"></div>
+        <div class="laptop-lid">
+          <div class="laptop-cam"></div>
+          <div class="laptop-screen-area">
+            <img src="img/gameplay.png" alt="DJBIG Gameplay"/>
+          </div>
+        </div>
+        <div class="laptop-base"></div>
+        <div class="laptop-foot"></div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -830,7 +894,7 @@
         <h3>🖥️ Windows PC</h3>
         <div class="dlfree">FREE</div>
         <div class="dlspec">Windows 10 / 11 64-bit<br/>RAM 4 GB+ · ขนาด ~200 MB</div>
-        <a href="#" class="dlbtn dlbtn-pc">⬇ Download for Windows</a>
+        <a href="https://djbig.last-prize.com/download/djbig.exe" class="dlbtn dlbtn-pc">⬇ Download for Windows</a>
       </div>
       <div class="dlcard">
         <div class="dlcard-ss" style="aspect-ratio:9/16;max-height:160px">
@@ -838,9 +902,23 @@
         </div>
         <h3>📱 Android</h3>
         <div class="dlspec">Android 8.0+ · ARM64<br/>RAM 3 GB+ · ขนาด ~100 MB</div>
-        <a href="https://play.google.com/store/apps/details?id=com.djbiggame.djbig&hl=th" target="_blank" class="dlbtn dlbtn-gp">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="flex-shrink:0"><path d="M3.18 23.76c.37.2.8.2 1.19-.02l12.93-7.47-2.79-2.79-11.33 10.28zm-1.61-20.4A1.5 1.5 0 0 0 1.5 4.5v15c0 .23.03.44.07.64l11.61-10.55L1.57 3.36zM20.31 9.9l-2.52-1.46-3.12 2.83 3.12 3.12 2.55-1.47A1.72 1.72 0 0 0 21.2 12a1.72 1.72 0 0 0-.89-2.1zM4.37.26 17.3 7.73l-2.79 2.79L3.18.24a1.48 1.48 0 0 1 1.19.02z"/></svg>
-          Get it on Google Play
+        <a href="https://play.google.com/store/apps/details?id=com.djbiggame.djbig&hl=th" target="_blank" class="dlbtn dlbtn-gp" style="padding:.5rem .9rem;gap:.7rem">
+          <svg width="22" height="24" viewBox="0 0 24 27" fill="none" style="flex-shrink:0">
+            <path d="M1.2 0.4C0.7 0.7 0.4 1.3 0.4 2.1V24.9C0.4 25.7 0.7 26.3 1.2 26.6L1.4 26.8L13.7 14.5V14.2L1.4 1.9L1.2 0.4Z" fill="url(#gp1)"/>
+            <path d="M17.8 18.7L13.7 14.5V14.2L17.8 10L17.9 10.1L22.9 13L22.9 13C23.8 13.5 23.8 14.3 22.9 14.8L17.8 18.7Z" fill="url(#gp2)"/>
+            <path d="M17.9 18.6L13.7 14.4L1.2 26.6C1.7 27.1 2.5 27.1 3.4 26.6L17.9 18.6Z" fill="url(#gp3)"/>
+            <path d="M17.9 10.1L3.4 2.1C2.5 1.6 1.7 1.6 1.2 2.1L13.7 14.4L17.9 10.1Z" fill="url(#gp4)"/>
+            <defs>
+              <linearGradient id="gp1" x1="12.3" y1="1.8" x2="-4.2" y2="18.3" gradientUnits="userSpaceOnUse"><stop stop-color="#00A0FF"/><stop offset="1" stop-color="#00679E"/></linearGradient>
+              <linearGradient id="gp2" x1="24.5" y1="14.3" x2="0.2" y2="14.3" gradientUnits="userSpaceOnUse"><stop stop-color="#FFD000"/><stop offset="1" stop-color="#FFBC00"/></linearGradient>
+              <linearGradient id="gp3" x1="15.3" y1="16.8" x2="-3.5" y2="35.6" gradientUnits="userSpaceOnUse"><stop stop-color="#FF3A44"/><stop offset="1" stop-color="#C31162"/></linearGradient>
+              <linearGradient id="gp4" x1="-1.8" y1="-5.2" x2="8.4" y2="5" gradientUnits="userSpaceOnUse"><stop stop-color="#32A071"/><stop offset="1" stop-color="#2DA771"/></linearGradient>
+            </defs>
+          </svg>
+          <div style="text-align:left;line-height:1.2">
+            <div style="font-size:.58rem;letter-spacing:.08em;opacity:.75;font-weight:600">GET IT ON</div>
+            <div style="font-size:.95rem;font-weight:700;letter-spacing:.01em">Google Play</div>
+          </div>
         </a>
       </div>
     </div>
