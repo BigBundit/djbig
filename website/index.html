@@ -260,10 +260,10 @@
   /* ══════════════ PAGE 4 · DOWNLOAD ══════════════ */
   .dl-inner{
     display:flex;flex-direction:column;align-items:center;
-    padding:52px 2rem 1.5rem;width:100%;max-width:860px;
+    padding:52px 2rem 1.5rem;width:100%;max-width:1120px;
     gap:1.25rem;height:100vh;justify-content:center;
   }
-  .dl-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem;width:100%}
+  .dl-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;width:100%}
   .dlcard{
     background:rgba(10,10,10,.95);border:1px solid rgba(255,255,255,.07);
     border-radius:16px;padding:1.5rem;
@@ -280,6 +280,8 @@
   .dlbtn{width:100%;padding:.65rem;border-radius:8px;font-weight:700;font-size:.83rem;text-decoration:none;display:flex;align-items:center;justify-content:center;gap:.4rem;transition:transform .2s,box-shadow .2s}
   .dlbtn-pc{background:linear-gradient(135deg,var(--c),#3b82f6);color:#000;box-shadow:0 0 16px rgba(6,182,212,.25)}
   .dlbtn-pc:hover{transform:translateY(-1px);box-shadow:0 0 28px rgba(6,182,212,.45)}
+  .dlbtn-mac{background:linear-gradient(135deg,#f5f5f5,#a3a3a3);color:#050505;box-shadow:0 0 16px rgba(255,255,255,.18)}
+  .dlbtn-mac:hover{transform:translateY(-1px);box-shadow:0 0 28px rgba(255,255,255,.35)}
   .dlbtn-ao{background:linear-gradient(135deg,#22c55e,#16a34a);color:#000;box-shadow:0 0 16px rgba(34,197,94,.25)}
   .dlbtn-ao:hover{transform:translateY(-1px);box-shadow:0 0 28px rgba(34,197,94,.45)}
   .dlbtn-gp{background:#000;color:#fff;border:1px solid rgba(255,255,255,.15);box-shadow:0 0 16px rgba(255,255,255,.05)}
@@ -469,32 +471,37 @@
     border:2px solid rgba(255,255,255,.09);border-top:none;
   }
 
-  /* ══════════════ STICKY PHONE ══════════════ */
-  #sticky-phone{
-    position:fixed;right:3%;top:50%;
-    transform:translateY(-50%);
-    z-index:50;pointer-events:none;
-    transition:transform .85s cubic-bezier(.22,1,.36,1);
+  /* ══════════════ GAME DEMO WIDGET ══════════════ */
+  #game-demo{
+    position:fixed;bottom:1.25rem;right:1.25rem;
+    z-index:200;width:222px;
+    border-radius:14px;overflow:hidden;
+    background:#030305;
+    border:1px solid rgba(6,182,212,.4);
+    box-shadow:0 0 40px rgba(6,182,212,.15),0 0 80px rgba(217,70,239,.07),0 20px 60px rgba(0,0,0,.85);
+    transition:transform .4s cubic-bezier(.22,1,.36,1);
   }
-  .sp-glow{
-    position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
-    width:190%;height:190%;
-    background:radial-gradient(ellipse 70% 60% at 50% 50%,rgba(6,182,212,.14),rgba(217,70,239,.08) 55%,transparent 70%);
-    animation:g1 10s ease-in-out infinite;pointer-events:none;
+  #game-demo.gd-min{transform:translateY(calc(100% - 34px))}
+  #gd-bar{
+    height:34px;background:rgba(6,182,212,.07);
+    border-bottom:1px solid rgba(6,182,212,.18);
+    display:flex;align-items:center;padding:0 .65rem;gap:.4rem;
+    cursor:pointer;user-select:none;
   }
-  .sp-frame{
-    height:min(68vh,465px);aspect-ratio:9/19.5;
-    background:linear-gradient(175deg,#141414,#080808);
-    border-radius:38px;overflow:hidden;
-    border:2px solid rgba(6,182,212,.35);
-    box-shadow:0 0 45px rgba(6,182,212,.22),0 0 80px rgba(217,70,239,.1),0 40px 100px rgba(0,0,0,.9);
-    position:relative;
-    animation:float 6s ease-in-out infinite;
+  .gd-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+  #gd-label{font-size:.58rem;font-weight:800;letter-spacing:.12em;color:var(--c);margin-left:.2rem;flex:1}
+  #gd-min-btn{font-size:.8rem;color:var(--muted);background:none;border:none;cursor:pointer;line-height:1;padding:0 .15rem;pointer-events:none}
+  #gd-canvas{display:block}
+  #gd-footer{
+    padding:.45rem .75rem;background:rgba(0,0,0,.5);
+    border-top:1px solid rgba(255,255,255,.05);text-align:center;
   }
-  .sp-dot{position:absolute;top:10px;left:50%;transform:translateX(-50%);width:9px;height:9px;border-radius:50%;background:#030303;border:1px solid rgba(255,255,255,.08);z-index:10}
-  .sp-bar{position:absolute;bottom:9px;left:50%;transform:translateX(-50%);width:70px;height:4px;border-radius:2px;background:rgba(255,255,255,.18);z-index:10}
-  .sp-screen{width:100%;height:100%;overflow:hidden;border-radius:36px;position:relative}
-  .sp-screen img{width:100%;height:100%;object-fit:cover;position:absolute;inset:0;transition:opacity .65s ease}
+  #gd-footer a{
+    font-size:.62rem;font-weight:800;letter-spacing:.08em;
+    text-transform:uppercase;color:var(--c);text-decoration:none;
+  }
+  #gd-footer a:hover{color:var(--f)}
+  @media(max-width:900px){#game-demo{display:none}}
 
   /* ══════════════ AUTH NAV ══════════════ */
   .auth-sep{width:1px;height:18px;background:rgba(255,255,255,.08);margin:0 .1rem;flex-shrink:0}
@@ -625,7 +632,7 @@
       padding-right:0;padding-bottom:3rem;
       height:auto;min-height:100dvh;overflow:visible;
     }
-    #sticky-phone{display:none}
+    #game-demo{display:none}
     .hero-right{display:none}
     .hero-phone-mobile{display:block}
     nav{padding:0 1rem}
@@ -726,16 +733,18 @@
 </head>
 <body>
 
-<!-- STICKY PHONE -->
-<div id="sticky-phone">
-  <div class="sp-glow"></div>
-  <div class="sp-frame">
-    <div class="sp-dot"></div>
-    <div class="sp-screen">
-      <img id="sp-a" src="img/phone-front.png" alt="DJBIG" style="opacity:1"/>
-      <img id="sp-b" src="img/android2.png" alt="DJBIG" style="opacity:0"/>
-    </div>
-    <div class="sp-bar"></div>
+<!-- GAME DEMO WIDGET -->
+<div id="game-demo">
+  <div id="gd-bar" onclick="gdToggleMin()">
+    <div class="gd-dot" style="background:#ef4444"></div>
+    <div class="gd-dot" style="background:#f59e0b"></div>
+    <div class="gd-dot" style="background:#22c55e"></div>
+    <span id="gd-label">▶ LIVE DEMO</span>
+    <button id="gd-min-btn">—</button>
+  </div>
+  <canvas id="gd-canvas" width="222" height="571"></canvas>
+  <div id="gd-footer">
+    <a href="https://drive.google.com/file/d/16o0Eh3W6tEMHzGMT-U5tVh0VK7qzNnYG/view?usp=sharing" target="_blank">⬇ ดาวน์โหลดเล่นฟรี</a>
   </div>
 </div>
 
@@ -795,7 +804,7 @@
   </div>
   <div class="hero-inner">
     <div class="hero-left">
-      <div class="badge"><i></i>PC · Android on Google Play</div>
+      <div class="badge"><i></i>Windows · macOS · Android</div>
       <h1>DJBIG</h1>
       <div class="hero-sub">CYBER RHYTHM ACTION</div>
       <p class="hero-desc">เกมดนตรีสไตล์ DJMAX ที่ให้คุณนำเพลงของตัวเองมาเล่น<br/>AI วิเคราะห์บีทอัตโนมัติ · รองรับ 4 / 5 / 7 คีย์ · Multiplayer</p>
@@ -932,7 +941,7 @@
     <div class="sh-hd" style="text-align:center">
       <div class="sl">Download</div>
       <div class="st">รองรับทุก Platform</div>
-      <div class="sd">Windows PC · Android บน Google Play Store</div>
+      <div class="sd">Windows PC · macOS · Android บน Google Play Store</div>
     </div>
     <div class="dl-grid">
       <div class="dlcard">
@@ -943,6 +952,15 @@
         <div class="dlfree">FREE</div>
         <div class="dlspec">Windows 10 / 11 64-bit<br/>RAM 4 GB+ · ขนาด ~200 MB</div>
         <a href="https://drive.google.com/file/d/16o0Eh3W6tEMHzGMT-U5tVh0VK7qzNnYG/view?usp=sharing" target="_blank" class="dlbtn dlbtn-pc">⬇ Download for Windows</a>
+      </div>
+      <div class="dlcard">
+        <div class="dlcard-ss">
+          <img src="img/gameplay.png" alt="macOS Gameplay"/>
+        </div>
+        <h3> macOS</h3>
+        <div class="dlfree">FREE</div>
+        <div class="dlspec">macOS 12+ · Apple Silicon<br/>M1 / M2 / M3 / M4 · ขนาด ~160 MB</div>
+        <a href="https://github.com/BigBundit/djbig/releases/download/v2.0.0/DJBIG-2.0.0-arm64.dmg" target="_blank" rel="noopener" class="dlbtn dlbtn-mac">⬇ Download for macOS</a>
       </div>
       <div class="dlcard">
         <div class="dlcard-ss" style="aspect-ratio:9/16;max-height:160px;display:flex;align-items:center;justify-content:center;background:radial-gradient(ellipse 80% 70% at 50% 50%,rgba(6,182,212,.08),rgba(217,70,239,.05),transparent)">
@@ -1101,32 +1119,6 @@
     navToggle.textContent = open ? '✕' : '☰';
   });
 
-  // Sticky phone
-  const sp = document.getElementById('sticky-phone');
-  const spA = document.getElementById('sp-a');
-  const spB = document.getElementById('sp-b');
-  const spImgs = [
-    'img/phone-front.png',   // 0 Hero
-    'img/android2.png',      // 1 Gameplay
-    'img/android1.png',      // 2 Screenshots
-    'img/android4.png',      // 3 Download
-    'img/phone-back.png',    // 4 Pricing
-  ];
-  const spY = [0, 18, -14, 26, 6]; // px offset per section
-  let spSlot = 'a', spLast = -1;
-
-  function updatePhone(i) {
-    if (i === spLast) return;
-    spLast = i;
-    const cur = spSlot === 'a' ? spA : spB;
-    const nxt = spSlot === 'a' ? spB : spA;
-    nxt.src = spImgs[i];
-    nxt.style.opacity = '1';
-    cur.style.opacity = '0';
-    spSlot = spSlot === 'a' ? 'b' : 'a';
-    sp.style.transform = `translateY(calc(-50% + ${spY[i]}px))`;
-  }
-
   function currentPage(){
     if (MOBILE_MQ.matches) {
       const mid = window.innerHeight * 0.35;
@@ -1143,11 +1135,237 @@
   function sync(){
     const i = currentPage();
     dotsEl.querySelectorAll('.dot').forEach((d,j)=>d.classList.toggle('on',j===i));
-    updatePhone(i);
   }
   wrap.addEventListener('scroll',sync,{passive:true});
   window.addEventListener('scroll',sync,{passive:true});
-  updatePhone(0);
+
+  // ══════════════ GAME DEMO ENGINE (5-key player-controlled) ══════════════
+  (function(){
+    const canvas = document.getElementById('gd-canvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const W=222, H=571, LANES=5;
+    const LW=W/LANES;
+    const HIT_Y=H-58, NOTE_H=10, SPEED=240;
+    const FALL_TIME=(HIT_Y+NOTE_H)/SPEED;
+    const PERFECT_MS=50, GOOD_MS=100, MISS_MS=140;
+
+    const LANE_HEX=['#06b6d4','#94a3b8','#f59e0b','#94a3b8','#06b6d4'];
+    const LANE_RGB=[[6,182,212],[148,163,184],[245,158,11],[148,163,184],[6,182,212]];
+    const KEYS=['D','F','SPC','J','K'];
+    const KEY_MAP={KeyD:0,KeyF:1,Space:2,KeyJ:3,KeyK:4};
+
+    const RAW=[
+      [0.5,0],[1.0,4],[1.5,2],[2.0,1],[2.0,3],
+      [2.5,0],[2.5,4],[3.0,2],[3.5,1],[3.5,3],[4.0,0],[4.0,4],
+      [4.5,2],[4.75,1],[5.0,0],[5.25,3],[5.5,4],[5.75,2],[6.0,1],
+      [6.5,3],[6.75,0],[7.0,4],[7.25,2],[7.5,1],[7.75,3],[8.0,0],
+      [8.5,1],[8.75,2],[9.0,3],[9.25,4],
+      [9.5,0],[9.5,2],[10.0,1],[10.0,3],[10.5,2],
+      [11.0,0],[11.0,4],[11.5,1],[11.5,3],[12.0,2],
+      [12.5,0],[12.75,1],[13.0,2],[13.25,3],[13.5,4],
+      [14.0,0],[14.0,4],[14.5,1],[14.5,3],[15.0,2],
+      [15.25,0],[15.5,4],[15.75,2],[16.0,1],[16.25,3],[16.5,0],[16.75,4],
+      [17.0,0],[17.0,1],[17.0,2],[17.0,3],[17.0,4],
+      [17.5,2],[17.75,1],[18.0,0],
+      [18.5,4],[19.0,2],[19.5,0],[20.0,1],[20.5,3],[21.0,2],
+      [21.5,0],[21.5,4],[22.0,2],[22.5,1],[22.5,3],[23.0,0],[23.0,4],
+      [23.5,2],[24.0,1],[24.0,3],
+      [24.5,0],[24.75,2],[25.0,4],[25.25,2],[25.5,0],
+      [26.0,3],[26.25,1],[26.5,2],[26.75,0],[27.0,4],
+      [27.5,0],[27.5,1],[27.5,2],[27.5,3],[27.5,4],
+      [28.0,2],[28.5,0],[28.5,4],[29.0,1],[29.0,3],[29.5,2],
+    ];
+    const CHART=RAW.map(([t,l])=>({t,lane:l})).sort((a,b)=>a.t-b.t);
+    const LOOP=30.0;
+
+    let notes=[],particles=[],judgments=[],flash=new Array(LANES).fill(0),keyDown=new Array(LANES).fill(false);
+    let combo=0,maxCombo=0,score=0,chartIdx=0,elapsed=0,lastTs=null;
+
+    function reset(){
+      notes=[];particles=[];judgments=[];flash.fill(0);keyDown.fill(false);
+      combo=0;maxCombo=0;score=0;chartIdx=0;elapsed=0;lastTs=null;
+    }
+
+    function spawnParticles(lane){
+      const cx=lane*LW+LW/2;
+      for(let i=0;i<10;i++){
+        const a=Math.PI*2/10*i+Math.random()*0.5, sp=50+Math.random()*70;
+        particles.push({x:cx,y:HIT_Y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-40,life:1,color:LANE_HEX[lane],size:2+Math.random()*2.5});
+      }
+    }
+
+    function addJudgment(lane,text,color){
+      judgments.push({x:lane*LW+LW/2,y:HIT_Y-25,text,color,life:1});
+    }
+
+    function judgeKey(lane){
+      let best=null,bestDiff=Infinity;
+      for(const n of notes){
+        if(n.lane!==lane||n.done||n.missed) continue;
+        const diff=Math.abs((n.t-elapsed)*1000);
+        if(diff<MISS_MS&&diff<bestDiff){best=n;bestDiff=diff;}
+      }
+      if(!best) return;
+      best.done=true;
+      flash[lane]=0.55; spawnParticles(lane);
+      combo++; if(combo>maxCombo) maxCombo=combo;
+      if(bestDiff<=PERFECT_MS){
+        score+=combo*300; addJudgment(lane,'PERFECT','#06b6d4');
+      } else {
+        score+=combo*100; addJudgment(lane,'GOOD','#22c55e');
+      }
+    }
+
+    document.addEventListener('keydown',e=>{
+      const l=KEY_MAP[e.code]; if(l===undefined) return;
+      const tag=document.activeElement?.tagName;
+      if(tag==='INPUT'||tag==='TEXTAREA'||tag==='SELECT') return;
+      const demo=document.getElementById('game-demo');
+      if(!demo||demo.classList.contains('gd-min')) return;
+      e.preventDefault();
+      if(!keyDown[l]){keyDown[l]=true; judgeKey(l); flash[l]=Math.max(flash[l],0.4);}
+    });
+    document.addEventListener('keyup',e=>{
+      const l=KEY_MAP[e.code]; if(l!==undefined) keyDown[l]=false;
+    });
+
+    function update(dt){
+      elapsed+=dt;
+      if(elapsed>=LOOP) reset();
+
+      while(chartIdx<CHART.length){
+        const n=CHART[chartIdx];
+        if(elapsed>=n.t-FALL_TIME){notes.push({lane:n.lane,y:-NOTE_H,t:n.t,done:false,missed:false});chartIdx++;}
+        else break;
+      }
+
+      const MISS_PX=(MISS_MS/1000)*SPEED;
+      notes=notes.filter(n=>{
+        n.y+=SPEED*dt;
+        if(!n.done&&!n.missed&&n.y>HIT_Y+MISS_PX){
+          n.missed=true; combo=0; addJudgment(n.lane,'MISS','#ef4444');
+        }
+        return n.y<H+30;
+      });
+
+      particles=particles.filter(p=>{
+        p.x+=p.vx*dt;p.y+=p.vy*dt;p.vy+=150*dt;p.life-=dt*2; return p.life>0;
+      });
+      judgments=judgments.filter(j=>{
+        j.y-=38*dt;j.life-=dt*1.6; return j.life>0;
+      });
+      for(let i=0;i<LANES;i++) if(flash[i]>0) flash[i]-=dt*2;
+    }
+
+    function rr(x,y,w,h,r){ctx.beginPath();ctx.roundRect(x,y,w,h,r);}
+
+    function draw(){
+      ctx.clearRect(0,0,W,H);
+      const bg=ctx.createLinearGradient(0,0,0,H);
+      bg.addColorStop(0,'#04040a');bg.addColorStop(1,'#020205');
+      ctx.fillStyle=bg;ctx.fillRect(0,0,W,H);
+
+      // Lane separators
+      ctx.strokeStyle='rgba(255,255,255,.04)';ctx.lineWidth=1;
+      for(let i=1;i<LANES;i++){ctx.beginPath();ctx.moveTo(i*LW,.5);ctx.lineTo(i*LW,H);ctx.stroke();}
+
+      // Lane flash
+      for(let i=0;i<LANES;i++){
+        const f=Math.max(0,flash[i]); if(f<=0) continue;
+        const [r,g,b]=LANE_RGB[i];
+        ctx.save();ctx.globalAlpha=f*0.18;
+        ctx.fillStyle=`rgb(${r},${g},${b})`;ctx.fillRect(i*LW,0,LW,HIT_Y+NOTE_H+5);ctx.restore();
+      }
+
+      // Notes
+      notes.forEach(n=>{
+        if(n.done||n.missed) return;
+        const x=n.lane*LW+2,nw=LW-4;
+        ctx.save();
+        ctx.shadowColor=LANE_HEX[n.lane];ctx.shadowBlur=16;
+        const gr=ctx.createLinearGradient(x,n.y,x,n.y+NOTE_H);
+        gr.addColorStop(0,'#fff');gr.addColorStop(0.18,LANE_HEX[n.lane]);gr.addColorStop(1,LANE_HEX[n.lane]+'77');
+        ctx.fillStyle=gr; rr(x,n.y,nw,NOTE_H,3); ctx.fill();
+        ctx.restore();
+      });
+
+      // Hit zone: colored segments per lane
+      for(let i=0;i<LANES;i++){
+        const f=Math.max(0,flash[i]);
+        ctx.save();ctx.globalAlpha=0.1+f*0.3;
+        ctx.fillStyle=LANE_HEX[i];ctx.fillRect(i*LW,HIT_Y,LW,NOTE_H+2);ctx.restore();
+        ctx.save();ctx.globalAlpha=0.4+f*0.5;
+        ctx.fillStyle=LANE_HEX[i];ctx.fillRect(i*LW+1,HIT_Y,LW-2,2);ctx.restore();
+      }
+
+      // Key buttons
+      const BTN_Y=HIT_Y+NOTE_H+4,BTN_H=28;
+      for(let i=0;i<LANES;i++){
+        const f=Math.max(0,flash[i]),pr=keyDown[i];
+        ctx.save();
+        if(pr||f>0.15){ctx.shadowColor=LANE_HEX[i];ctx.shadowBlur=14;ctx.globalAlpha=0.95;ctx.fillStyle=LANE_HEX[i];}
+        else{ctx.globalAlpha=1;ctx.fillStyle='rgba(255,255,255,.05)';}
+        rr(i*LW+3,BTN_Y,LW-6,BTN_H,5);ctx.fill();
+        ctx.globalAlpha=(pr||f>0.15)?1:0.35;
+        ctx.fillStyle=(pr||f>0.15)?'#000':LANE_HEX[i];
+        ctx.font='700 11px monospace';ctx.textAlign='center';ctx.textBaseline='middle';
+        ctx.fillText(KEYS[i],i*LW+LW/2,BTN_Y+BTN_H/2);
+        ctx.restore();
+      }
+
+      // Particles
+      particles.forEach(p=>{
+        ctx.save();ctx.globalAlpha=p.life*0.85;ctx.fillStyle=p.color;
+        ctx.beginPath();ctx.arc(p.x,p.y,p.size*Math.max(0.1,p.life),0,Math.PI*2);ctx.fill();ctx.restore();
+      });
+
+      // Judgment texts
+      judgments.forEach(j=>{
+        ctx.save();ctx.globalAlpha=Math.min(1,j.life*1.5);
+        ctx.fillStyle=j.color;ctx.shadowColor=j.color;ctx.shadowBlur=8;
+        ctx.font='700 10px monospace';ctx.textAlign='center';ctx.textBaseline='middle';
+        ctx.fillText(j.text,j.x,j.y);ctx.restore();
+      });
+
+      // HUD
+      ctx.fillStyle='rgba(0,0,0,.65)';ctx.fillRect(0,0,W,37);
+      ctx.textBaseline='alphabetic';
+      ctx.fillStyle='rgba(255,255,255,.4)';ctx.font='600 8px monospace';ctx.textAlign='left';
+      ctx.fillText('SCORE',8,12);
+      ctx.fillStyle='#fff';ctx.font='800 14px monospace';
+      ctx.fillText(score.toLocaleString(),8,27);
+
+      ctx.fillStyle='rgba(255,255,255,.4)';ctx.font='600 8px monospace';ctx.textAlign='center';
+      ctx.fillText('MAX',W/2,12);
+      ctx.fillStyle='#f59e0b';ctx.font='700 12px monospace';
+      ctx.fillText(maxCombo>0?maxCombo+'x':'—',W/2,27);
+
+      ctx.fillStyle='rgba(255,255,255,.4)';ctx.font='600 8px monospace';ctx.textAlign='right';
+      ctx.fillText('COMBO',W-8,12);
+      ctx.fillStyle=combo>0?'#06b6d4':'rgba(255,255,255,.25)';
+      ctx.font=`800 ${combo>99?11:14}px monospace`;
+      ctx.fillText(combo>0?combo+'x':'—',W-8,27);
+
+      // Progress bar
+      ctx.fillStyle='rgba(255,255,255,.04)';ctx.fillRect(0,H-2,W,2);
+      const pg=ctx.createLinearGradient(0,0,W,0);
+      pg.addColorStop(0,'#06b6d4');pg.addColorStop(1,'#d946ef');
+      ctx.fillStyle=pg;ctx.fillRect(0,H-2,W*(elapsed/LOOP),2);
+    }
+
+    function loop(ts){
+      if(!lastTs) lastTs=ts;
+      const dt=Math.min((ts-lastTs)/1000,.05);
+      lastTs=ts; update(dt); draw();
+      requestAnimationFrame(loop);
+    }
+    requestAnimationFrame(loop);
+  })();
+
+  window.gdToggleMin = function(){
+    document.getElementById('game-demo').classList.toggle('gd-min');
+  };
 
   document.addEventListener('keydown',e=>{
     const i = currentPage();
